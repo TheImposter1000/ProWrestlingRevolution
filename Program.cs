@@ -53,8 +53,12 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.ToString(), "Pro Wrestling Revolution Error",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--seed", StringComparer.OrdinalIgnoreCase))
+                Console.Error.WriteLine(ex.ToString());
+            else
+                MessageBox.Show(ex.ToString(), "Pro Wrestling Revolution Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
     }
