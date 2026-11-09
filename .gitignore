@@ -1,0 +1,11 @@
+bin/
+obj/
+out/
+dist/
+.vs/
+*.user
+Saves/*.db
+Saves/*.db-shm
+Saves/*.db-wal
+Logs/*.log
+Reports/*.txt
