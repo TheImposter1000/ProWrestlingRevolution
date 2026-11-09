@@ -1,3 +1,4 @@
+using System.Text;
 using System.Windows.Forms;
 
 namespace ProWrestlingRevolution;
@@ -9,57 +10,64 @@ internal static class Program
     {
         try
         {
-            var scenario = Path.Combine(AppContext.BaseDirectory, "Data", "Scenarios", "Genesis.json");
-            var save = Path.Combine(AppContext.BaseDirectory, "Saves", "career.db");
-            if (args.Contains("--seed", StringComparer.OrdinalIgnoreCase))
-            {
-                if (File.Exists(save)) File.Delete(save);
-                using var seedStore = new GameStore(save);
-                seedStore.Save(GameState.LoadScenario(scenario));
-                return 0;
-            }
             if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
             {
-                var temp = Path.Combine(Path.GetTempPath(), "pwr-" + Guid.NewGuid().ToString("N") + ".db");
-                try
-                {
-                    var game = GameState.LoadScenario(scenario);
-                    if (game.Workers.Count < 20 || game.Promotions.Count < 3)
-                        throw new Exception("Starter universe is incomplete.");
-                    var roster = game.Roster().ToList();
-                    GameEngine.AddMatch(game, roster[0].Id, roster[1].Id, roster[0].Id, null, 20, "Main Event");
-                    GameEngine.AddMatch(game, roster[2].Id, roster[3].Id, null, null, 15, "Singles");
-                    GameEngine.AddAngle(game, roster[0].Id, roster[1].Id, 8, "Face off");
-                    var report = GameEngine.RunShow(game);
-                    if (report.Rating <= 0 || report.Results.Count != 3) throw new Exception("Simulation failed.");
-                    using var store = new GameStore(temp);
-                    store.Save(game);
-                    var loaded = store.LoadOrCreate(scenario);
-                    if (loaded.History.Count != 1 || loaded.Card.Count != 0) throw new Exception("Save check failed.");
-                    GameEngine.AdvanceWeek(loaded);
-                    if (loaded.Week != 2) throw new Exception("Calendar check failed.");
-                    store.Save(loaded);
-                    return 0;
-                }
-                finally
-                {
-                    foreach (var suffix in new[] { "", "-wal", "-shm" })
-                        try { File.Delete(temp + suffix); } catch (IOException) { }
-                }
+                SmokeTest();
+                return 0;
             }
+
             ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm(scenario, save));
+            var paths = new AppPaths(AppContext.BaseDirectory);
+            paths.EnsureLayout();
+            Application.Run(new LauncherForm(paths));
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase) ||
-                args.Contains("--seed", StringComparer.OrdinalIgnoreCase))
-                Console.Error.WriteLine(ex.ToString());
-            else
-                MessageBox.Show(ex.ToString(), "Pro Wrestling Revolution Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Console.Error.WriteLine(e);
+            if (!args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
+                MessageBox.Show(e.Message + "\n\nIf the folder is protected, extract the game to a writable location.",
+                    "Pro Wrestling Revolution", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
+        }
+    }
+
+    private static void SmokeTest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PWR-phase1-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var paths = new AppPaths(root);
+            paths.EnsureLayout();
+            if (paths.Skins().Count < 2) throw new Exception("Built-in skins missing.");
+            var skin = paths.LoadSkin("Obsidian");
+            if (skin.Accent.IsEmpty) throw new Exception("Skin palette could not load.");
+            paths.WriteSetting("Skin", "Steel");
+            if (paths.ReadSetting("Skin", "") != "Steel") throw new Exception("Skin setting failed.");
+            var fixture = Path.Combine(root, "sample.mdb");
+            var header = new byte[2048];
+            Encoding.ASCII.GetBytes("Standard Jet DB").CopyTo(header, 4);
+            File.WriteAllBytes(fixture, header);
+            // Fixture only checks file management. It is not a valid Access database.
+            var world = paths.ImportUniverse(fixture, "Example World");
+            if (!File.Exists(world.MdbPath)) throw new Exception("Universe copy missing.");
+            var career = paths.CreateCareer(world, "Career 01");
+            if (!File.Exists(career.MdbPath)) throw new Exception("Career copy missing.");
+            if (!File.Exists(Path.Combine(Path.GetDirectoryName(career.MdbPath)!, "Backups", "initial.mdb")))
+                throw new Exception("Recovery snapshot missing.");
+            if (paths.Careers().Count != 1 || paths.Universes().Count != 1)
+                throw new Exception("Universe enumeration failed.");
+            bool unsafeRejected = false;
+            try { paths.CreateCareer(world, "../bad"); }
+            catch (ArgumentException) { unsafeRejected = true; }
+            if (!unsafeRejected) throw new Exception("Unsafe path was allowed.");
+            Console.WriteLine("Phase One smoke tests passed.");
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
     }
 }
