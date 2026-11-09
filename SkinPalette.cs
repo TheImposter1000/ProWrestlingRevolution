@@ -2,9 +2,14 @@ using System.Drawing;
 
 namespace ProWrestlingRevolution;
 
+/// <summary>
+/// Holds colors for native secondary-screen controls. The title screen itself
+/// is painted from categorised JPG assets, never from a theme config file.
+/// </summary>
 public sealed class SkinPalette
 {
     public string Id { get; init; } = "Obsidian";
+    public string Folder { get; init; } = "";
     public Color Background { get; init; }
     public Color Sidebar { get; init; }
     public Color Surface { get; init; }
@@ -14,42 +19,27 @@ public sealed class SkinPalette
     public Color Muted { get; init; }
     public Color Border { get; init; }
     public Color Button { get; init; }
-    public string? BackgroundImage { get; init; }
-    public string? LogoImage { get; init; }
 
-    public static SkinPalette Parse(string name, Dictionary<string, string> settings, string folder)
+    public string Asset(string relativeFile) => Path.Combine(Folder, relativeFile);
+    public string? BackgroundImage => Asset(Path.Combine("Backgrounds", "Title_Screen.jpg"));
+    public string? LogoImage => null;
+
+    public static SkinPalette FromImages(string name, string folder)
     {
-        Color C(string key, string fallback)
-        {
-            string candidate = settings.GetValueOrDefault(key, fallback);
-            try { return ColorTranslator.FromHtml(candidate); }
-            catch { return ColorTranslator.FromHtml(fallback); }
-        }
-
-        string? ImageFile(string key)
-        {
-            if (!settings.TryGetValue(key, out var filename)) return null;
-            var safe = Path.GetFileName(filename);
-            if (!safe.Equals(filename, StringComparison.OrdinalIgnoreCase)) return null;
-            var candidate = Path.Combine(folder, safe);
-            return File.Exists(candidate) && new[] { ".png", ".jpg", ".jpeg" }
-                .Contains(Path.GetExtension(candidate).ToLowerInvariant()) ? candidate : null;
-        }
-
+        bool steel = name.Equals("Steel", StringComparison.OrdinalIgnoreCase);
         return new SkinPalette
         {
             Id = name,
-            Background = C("Background", "#0B111D"),
-            Sidebar = C("Sidebar", "#101A2A"),
-            Surface = C("Surface", "#172438"),
-            Accent = C("Accent", "#24B8DE"),
-            AccentSecondary = C("AccentSecondary", "#6FE5EF"),
-            Foreground = C("Foreground", "#F1F7FA"),
-            Muted = C("Muted", "#9EB1C4"),
-            Border = C("Border", "#314A63"),
-            Button = C("Button", "#1C334B"),
-            BackgroundImage = ImageFile("BackgroundImage"),
-            LogoImage = ImageFile("LogoImage")
+            Folder = folder,
+            Background = steel ? Color.FromArgb(16, 20, 28) : Color.FromArgb(10, 15, 27),
+            Sidebar = steel ? Color.FromArgb(16, 19, 26) : Color.FromArgb(15, 18, 29),
+            Surface = steel ? Color.FromArgb(34, 39, 49) : Color.FromArgb(24, 34, 50),
+            Accent = steel ? Color.FromArgb(221, 173, 83) : Color.FromArgb(29, 170, 213),
+            AccentSecondary = steel ? Color.FromArgb(255, 222, 157) : Color.FromArgb(111, 233, 250),
+            Foreground = Color.White,
+            Muted = steel ? Color.FromArgb(172, 180, 198) : Color.FromArgb(170, 196, 213),
+            Border = steel ? Color.FromArgb(70, 78, 91) : Color.FromArgb(42, 76, 104),
+            Button = steel ? Color.FromArgb(42, 49, 61) : Color.FromArgb(25, 48, 69)
         };
     }
 }
