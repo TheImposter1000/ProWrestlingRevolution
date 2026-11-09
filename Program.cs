@@ -10,6 +10,12 @@ internal static class Program
     {
         try
         {
+            if (args.Contains("--generate-assets", StringComparer.OrdinalIgnoreCase))
+            {
+                var workingDirectory = new AppPaths(Directory.GetCurrentDirectory());
+                workingDirectory.EnsureLayout();
+                return 0;
+            }
             if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
             {
                 SmokeTest();
