@@ -26,54 +26,31 @@ public sealed class AppPaths
         foreach (var dir in new[] { Databases, Pictures, SkinsRoot, SystemRoot })
             Directory.CreateDirectory(dir);
 
-        EnsureSkin("Obsidian", """
-            Name=Obsidian
-            Background=#0B111D
-            Sidebar=#101A2A
-            Surface=#172438
-            Accent=#24B8DE
-            AccentSecondary=#6FE5EF
-            Foreground=#F1F7FA
-            Muted=#9EB1C4
-            Border=#314A63
-            Button=#1C334B
-            """);
-        EnsureSkin("Steel", """
-            Name=Steel
-            Background=#14171E
-            Sidebar=#1B202A
-            Surface=#272F3B
-            Accent=#D7B069
-            AccentSecondary=#F7D99D
-            Foreground=#FAFAF8
-            Muted=#AAB5C1
-            Border=#4D5868
-            Button=#303B4B
-            """);
+        // Build missing, original raster skin assets; existing user artwork is never overwritten.
+        SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Obsidian"), "Obsidian");
+        SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Steel"), "Steel");
 
         if (!File.Exists(_settings))
             File.WriteAllText(_settings, "Skin=Obsidian\nDatabase=\n", Encoding.UTF8);
     }
 
-    private void EnsureSkin(string slug, string contents)
-    {
-        var folder = Path.Combine(SkinsRoot, slug);
-        Directory.CreateDirectory(folder);
-        var filename = Path.Combine(folder, "skin.ini");
-        if (!File.Exists(filename)) File.WriteAllText(filename, contents + "\n", Encoding.UTF8);
-    }
-
+    // Every selectable skin is defined by raster artwork, not a configuration file.
     public IReadOnlyList<string> Skins() =>
         Directory.EnumerateDirectories(SkinsRoot)
-            .Where(x => File.Exists(Path.Combine(x, "skin.ini")))
-            .Select(Path.GetFileName).Where(x => x is not null).Select(x => x!)
+            .Where(x =>
+                File.Exists(Path.Combine(x, "Title_Screen(1).jpg")) &&
+                File.Exists(Path.Combine(x, "Title_Screen.jpg")) &&
+                File.Exists(Path.Combine(x, "Title_Screen_Alt.jpg")) &&
+                File.Exists(Path.Combine(x, "Title_Screen_On.jpg")) &&
+                File.Exists(Path.Combine(x, "Title_Screen_Off.jpg")))
+            .Select(x => Path.GetFileName(x)!)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
 
     public SkinPalette LoadSkin(string? name)
     {
-        var allowed = Skins().FirstOrDefault(s => s.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? "Obsidian";
-        var content = Ini.Read(Path.Combine(SkinsRoot, allowed, "skin.ini"));
-        return SkinPalette.Parse(allowed, content, Path.Combine(SkinsRoot, allowed));
+        var selected = Skins().FirstOrDefault(s => s.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ?? "Obsidian";
+        return SkinPalette.FromImages(selected, Path.Combine(SkinsRoot, selected));
     }
 
     public string ReadSetting(string key, string fallback) =>

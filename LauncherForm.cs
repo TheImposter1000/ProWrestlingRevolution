@@ -13,8 +13,14 @@ public sealed class LauncherForm : Form
     private readonly AppPaths _paths;
     private SkinPalette _skin;
     private readonly Panel _page = new() { Dock = DockStyle.Fill };
-    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 268 };
-    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 45 };
+    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = SkinArt.SidebarWidth };
+    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = SkinArt.TopHeight };
+    private readonly PictureBox _sidebarImage = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly PictureBox _topImage = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly Dictionary<string, Image> _assetCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ToolTip _iconTips = new();
+    private string? _hoverIcon;
+    private bool _soundEnabled = true;
     private readonly List<Button> _navigation = [];
     private readonly Label _status = new();
     private string _currentPage = "HOME";
@@ -24,14 +30,19 @@ public sealed class LauncherForm : Form
         _paths = paths;
         _skin = paths.LoadSkin(paths.ReadSetting("Skin", "Obsidian"));
         Text = "Pro Wrestling Revolution";
-        MinimumSize = new Size(1060, 680);
-        Size = new Size(1440, 840);
+        AutoScaleMode = AutoScaleMode.None;
+        ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
+        MinimumSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
+        MaximumSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
+        KeyPreview = true;
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
         Font = new Font("Segoe UI", 10);
         DoubleBuffered = true;
         BuildChrome();
         ShowHome();
+        FormClosed += (_, _) => ClearAssetCache();
+        KeyDown += HandleShortcut;
     }
 
     private void BuildChrome()
@@ -43,71 +54,147 @@ public sealed class LauncherForm : Form
         Controls.Add(_sidebar);
         Controls.Add(_topbar);
 
-        var label = new Label
-        {
-            Text = "PRO WRESTLING REVOLUTION    |    DESKTOP EDITION",
-            Dock = DockStyle.Left, Width = 470, TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(18, 0, 0, 0),
-            ForeColor = _skin.Foreground, Font = new Font("Segoe UI", 9, FontStyle.Bold)
-        };
-        label.MouseDown += DragWindow;
-        _topbar.MouseDown += DragWindow;
-        _topbar.Controls.Add(label);
+        // Entire sidebar and top bar are image assets. The click regions are transparent.
+        _sidebar.Controls.Add(_sidebarImage);
+        _topbar.Controls.Add(_topImage);
 
-        var close = TopButton("×", () => Close());
-        var minimize = TopButton("—", () => WindowState = FormWindowState.Minimized);
-        _topbar.Controls.Add(close);
-        _topbar.Controls.Add(minimize);
-
-        var brand = new Panel { Dock = DockStyle.Top, Height = 137, BackColor = _skin.Sidebar };
-        var acronym = new Label
+        _sidebarImage.MouseMove += (_, e) =>
         {
-            Text = "PWR", Location = new Point(25, 25), AutoSize = true,
-            ForeColor = _skin.Accent, Font = new Font("Segoe UI", 36, FontStyle.Bold)
+            var key = IconAt(e.Y);
+            if (key != _hoverIcon)
+            {
+                _hoverIcon = key;
+                RenderSidebar();
+                var label = SkinArt.MenuIcons.FirstOrDefault(x => x.Key == key).Label;
+                _iconTips.SetToolTip(_sidebarImage, label ?? "");
+            }
+            _sidebarImage.Cursor = key is null ? Cursors.Default : Cursors.Hand;
         };
-        var subtitle = new Label
+        _sidebarImage.MouseLeave += (_, _) =>
         {
-            Text = "PRO WRESTLING REVOLUTION", Location = new Point(29, 92),
-            Width = 223, Height = 25, ForeColor = _skin.Muted,
-            Font = new Font("Segoe UI", 8, FontStyle.Bold)
+            _hoverIcon = null;
+            RenderSidebar();
         };
-        brand.Controls.Add(acronym);
-        brand.Controls.Add(subtitle);
-        _sidebar.Controls.Add(brand);
-
-        var menu = new FlowLayoutPanel
+        _sidebarImage.MouseClick += (_, e) =>
         {
-            Dock = DockStyle.Top, Height = 400, AutoSize = false, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Padding = new Padding(13, 18, 12, 0)
+            if (e.Button != MouseButtons.Left) return;
+            var key = IconAt(e.Y);
+            if (key is not null) RunSafe(() => Navigate(key));
         };
-        menu.Controls.Add(NavigationButton("NEW GAME", ShowNewGame));
-        menu.Controls.Add(NavigationButton("LOAD GAME", ShowLoadGame));
-        menu.Controls.Add(NavigationButton("DATABASE SELECTOR", ShowDatabaseSelector));
-        menu.Controls.Add(NavigationButton("DATABASE EDITOR", ShowDatabaseEditor));
-        menu.Controls.Add(NavigationButton("SKINS", ShowSkins));
-        _sidebar.Controls.Add(menu);
-        menu.BringToFront();
-        brand.BringToFront();
 
-        var footer = new Panel { Dock = DockStyle.Bottom, Height = 185, BackColor = _skin.Sidebar };
-        var achievements = NavigationButton("ACHIEVEMENTS", ShowAchievements);
-        var credits = NavigationButton("CREDITS", ShowCredits);
-        achievements.Location = new Point(13, 14);
-        credits.Location = new Point(13, 65);
-        footer.Controls.Add(achievements);
-        footer.Controls.Add(credits);
-        _status.Location = new Point(22, 130);
-        _status.Size = new Size(225, 43);
-        _status.ForeColor = _skin.Muted;
-        _status.Font = new Font("Segoe UI", 8);
-        _status.Text = "Phase One  |  Foundation build";
-        footer.Controls.Add(_status);
-        _sidebar.Controls.Add(footer);
-        footer.BringToFront();
-        // Put branding at the top and the menu immediately underneath it.
-        _sidebar.Controls.SetChildIndex(brand, 0);
-        _sidebar.Controls.SetChildIndex(menu, 1);
-        _sidebar.Controls.SetChildIndex(footer, 2);
+        _topImage.MouseDown += (_, e) =>
+        {
+            // Drag only the title-bar surface; don't intercept its real controls.
+            if (e.Button == MouseButtons.Left && e.X < 1196)
+                DragWindow(_topImage, e);
+        };
+        _topImage.MouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            if (e.X is >= 1201 and < 1238)
+            {
+                _soundEnabled = !_soundEnabled;
+                RenderTop();
+            }
+            else if (e.X is >= 1238 and < 1278)
+                MessageBox.Show(this,
+                    "Select the images on the left to navigate.\n\n" +
+                    "New Game creates a separate Access MDB career.\n" +
+                    "Database Selector imports an existing MDB universe.\n" +
+                    "Skins changes the complete image pack.",
+                    "Main Menu Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else if (e.X is >= 1278 and < 1318)
+                WindowState = FormWindowState.Minimized;
+            else if (e.X >= 1318)
+                Close();
+        };
+
+        RenderSidebar();
+        RenderTop();
+    }
+
+    private void HandleShortcut(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Escape && _currentPage != "HOME")
+        {
+            ShowHome();
+            e.Handled = true;
+            return;
+        }
+        if (!e.Alt) return;
+        string? key = e.KeyCode switch
+        {
+            Keys.N => "new",
+            Keys.L => "load",
+            Keys.D => "database",
+            Keys.E => "editor",
+            Keys.S => "skins",
+            Keys.A => "achievements",
+            Keys.C => "credits",
+            Keys.H => "back",
+            _ => null
+        };
+        if (key is not null)
+        {
+            RunSafe(() => Navigate(key));
+            e.Handled = true;
+        }
+    }
+
+    private void Navigate(string key)
+    {
+        switch (key)
+        {
+            case "back": if (_currentPage != "HOME") ShowHome(); break;
+            case "new": ShowNewGame(); break;
+            case "load": ShowLoadGame(); break;
+            case "database": ShowDatabaseSelector(); break;
+            case "editor": ShowDatabaseEditor(); break;
+            case "skins": ShowSkins(); break;
+            case "achievements": ShowAchievements(); break;
+            case "credits": ShowCredits(); break;
+        }
+    }
+
+    private string? IconAt(int y)
+    {
+        foreach (var (key, _, cy) in SkinArt.MenuIcons)
+            if (Math.Abs(y - cy) <= 24 && !(key == "back" && _currentPage == "HOME"))
+                return key;
+        return null;
+    }
+
+    private Image LoadArt(string filename, string fallback)
+    {
+        var path = _skin.Asset(filename);
+        if (!File.Exists(path)) path = _skin.Asset(fallback);
+        if (_assetCache.TryGetValue(path, out var cached)) return cached;
+        using var stream = File.OpenRead(path);
+        using var bitmap = Image.FromStream(stream);
+        var copy = new Bitmap(bitmap);
+        _assetCache[path] = copy;
+        return copy;
+    }
+
+    private void RenderSidebar()
+    {
+        bool home = _currentPage == "HOME";
+        var baseFile = home ? "Title_Screen_Alt.jpg" : "Title_Screen.jpg";
+        var hover = _hoverIcon is null ? baseFile
+            : (home ? "Title_Screen_Alt_Hover_" : "Title_Screen_Hover_") + _hoverIcon + ".jpg";
+        _sidebarImage.Image = LoadArt(hover, baseFile);
+    }
+
+    private void RenderTop() =>
+        _topImage.Image = LoadArt(_soundEnabled ? "Title_Screen_On.jpg" : "Title_Screen_Off.jpg",
+            "Title_Screen_On.jpg");
+
+    private void ClearAssetCache()
+    {
+        _sidebarImage.Image = null;
+        _topImage.Image = null;
+        foreach (var item in _assetCache.Values) item.Dispose();
+        _assetCache.Clear();
     }
 
     private void DragWindow(object? sender, MouseEventArgs args)
@@ -186,6 +273,8 @@ public sealed class LauncherForm : Form
     private Panel NewPage(string pageName, string description, out Panel content)
     {
         _currentPage = pageName;
+        _hoverIcon = null;
+        RenderSidebar();
         _page.Controls.Clear();
         _page.BackColor = _skin.Background;
         var root = new Panel { Dock = DockStyle.Fill, BackColor = _skin.Background };
@@ -228,8 +317,29 @@ public sealed class LauncherForm : Form
     private void ShowHome()
     {
         _currentPage = "HOME";
+        _hoverIcon = null;
+        RenderSidebar();
         _page.Controls.Clear();
-        _page.Controls.Add(new HomeArtwork(_skin) { Dock = DockStyle.Fill });
+        var art = new PictureBox
+        {
+            Dock = DockStyle.Top,
+            Height = SkinArt.MainHeight,
+            BackColor = _skin.Background,
+            Image = LoadArt("Title_Screen(1).jpg", "Title_Screen(1).jpg"),
+            SizeMode = PictureBoxSizeMode.StretchImage
+        };
+        var footer = new Panel { Dock = DockStyle.Fill, BackColor = _skin.Background };
+        var left = TextLabel("PRO WRESTLING REVOLUTION   •   WINDOWS DESKTOP", 10, true, _skin.Muted);
+        left.Location = new Point(26, 22);
+        left.Size = new Size(520, 40);
+        var right = TextLabel("VERSION 0.3.0   |   IMAGE-BASED MAIN MENU", 10, true, _skin.Accent);
+        right.AutoSize = false;
+        right.Location = new Point(865, 23);
+        right.Size = new Size(400, 38);
+        footer.Controls.Add(left);
+        footer.Controls.Add(right);
+        _page.Controls.Add(footer);
+        _page.Controls.Add(art);
     }
 
     private void ShowDatabaseSelector()
@@ -463,16 +573,12 @@ public sealed class LauncherForm : Form
 
     private void ApplySkin()
     {
+        ClearAssetCache();
         _sidebar.BackColor = _skin.Sidebar;
         _topbar.BackColor = _skin.Surface;
         _page.BackColor = _skin.Background;
-        foreach (var b in _navigation)
-        {
-            b.BackColor = _skin.Button;
-            b.ForeColor = _skin.Foreground;
-            b.FlatAppearance.BorderColor = _skin.Border;
-            b.FlatAppearance.MouseOverBackColor = _skin.Surface;
-        }
+        RenderSidebar();
+        RenderTop();
     }
 
     private static SplitContainer MakeSplit(Control left, Control right, int width = 380)

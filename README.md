@@ -1,51 +1,68 @@
 # Pro Wrestling Revolution
 
-An original single-player Windows wrestling management project. Phase One rebuilds the startup shell, skin management and Microsoft Access MDB universe layout.
+An original, single-player Windows wrestling management project. Version 0.3.0 focuses on the visual identity of its image-based desktop main menu, while preserving MDB universe and career management.
 
-## What works in Phase One
+## Start the game
 
-* A native Windows desktop main menu opens automatically at launch.
-* Navigation: New Game, Load Game, Database Selector, Database Editor, Skins, Achievements and Credits.
-* Two included color skins, Obsidian and Steel. Additional folders with a skin.ini file appear automatically in the skin selector. Optional background and logo PNG or JPEG images can be configured in skin.ini.
-* Import a Microsoft Access .mdb universe into Databases/<Universe>/PWR.mdb. Every universe has its own folder; no universal scenario file and no JSON scenario.
-* Create a named career that copies the starting MDB into Databases/<Universe>/SaveGames/<Career>/PWRSave.mdb, plus Backups/initial.mdb. The original is never modified by this operation.
-* Browse and preview a database's tables via the installed Access OLE DB provider, with an optional local password entered at runtime. Open the MDB in Microsoft Access for direct editing.
+Download the latest [Windows x64 release ZIP](https://github.com/TheImposter1000/ProWrestlingRevolution/releases), extract it to a writable folder, and double-click ProWrestlingRevolution.exe. A separate .NET installation, Python, and Visual Studio are not required.
 
-## Download and run
+The exact client area is 1366 by 768 pixels, fixed size with no automatic scaling. On displays smaller than that client area, the entire window may not fit.
 
-Open the [GitHub Releases](https://github.com/TheImposter1000/ProWrestlingRevolution/releases) page and download the Phase One Windows x64 ZIP. Extract the entire ZIP to a writable folder and run ProWrestlingRevolution.exe. No Python, Visual Studio, or .NET installation is needed to open the main menu.
+## Native, image-based main menu
 
-**No commercial TEW databases or assets are included.** To use the database features, import your own compatible .mdb through Database Selector. If you already use Microsoft Access, its 64-bit Access Database Engine / ACE OLE DB provider can let the app inspect tables. An installed 32-bit Access provider cannot be loaded by a 64-bit executable; use matching driver architecture. Database import and save copying do not require the OLE DB provider.
+The left toolbar is a single graphical sidebar image with clickable hotspots rather than text buttons. Main-menu views use the alternate sidebar without a Back icon. Inner screens show the Back icon. Hovering highlights the icon using another image loaded from the skin folder. The top bar is also an image with clickable sound-state, Help, Minimize and Close regions.
 
-## Folder structure
+The graphical assets deliberately use the same component dimensions as the provided layout references but feature original Pro Wrestling Revolution art, not TEW marks or characters.
+
+| Image in each skin folder | Dimensions | Purpose |
+| --- | --- | --- |
+| Title_Screen(1).jpg | 1314 x 649 | Main title artwork |
+| Title_Screen.jpg | 57 x 736 | Inner-screen icon strip with Back |
+| Title_Screen_Alt.jpg | 57 x 736 | Main-menu icon strip without Back |
+| Title_Screen_On.jpg | 1370 x 32 | Top title bar, speaker icon on |
+| Title_Screen_Off.jpg | 1370 x 32 | Top title bar, speaker icon off |
+| Title_Screen_Hover_*.jpg | 57 x 736 | Hover images for inner screens |
+| Title_Screen_Alt_Hover_*.jpg | 57 x 736 | Hover images for main menu |
+
+The built-in Obsidian and Steel raster packs are generated during the Windows build and included in the ZIP. A custom skin can be created by copying a built-in folder, editing the actual images, and selecting the skin in the main-menu Skins screen. There are no skin.ini files or color configuration files controlling the title screen.
+
+Navigation order: Back (inner screens only), New Game, Load Game, Database Selector, Database Editor, Skins, Achievements and Credits. The user can also press Escape to return home and Alt+N, Alt+L, Alt+D, Alt+E, Alt+S, Alt+A or Alt+C to navigate.
+
+The top bar's speaker icon toggles a visual sound state. Audio playback is not implemented yet.
+
+## MDB universes and careers
+
+The app imports your own valid Microsoft Access .mdb files through Database Selector. Each universe is independent:
 
     ProWrestlingRevolution.exe
     Databases/
-        README.txt
-        <Universe>/
+        MyUniverse/
             PWR.mdb
             SaveGames/
-                <Career>/
+                MyCareer/
                     PWRSave.mdb
                     Backups/
                         initial.mdb
     Pictures/
-        README.txt
     Skins/
-        Obsidian/skin.ini
-        Steel/skin.ini
+        Obsidian/
+            Title_Screen.jpg
+            Title_Screen_Alt.jpg
+            Title_Screen_On.jpg
+            Title_Screen_Off.jpg
+            Title_Screen(1).jpg
+            ...hover images...
+        Steel/
+            ...same raster assets...
     System/
-        README.txt
         settings.ini
 
-System/settings.ini is created locally and is not uploaded to GitHub. The game does not store the MDB password. New skins may add optional background.png and logo.png, referenced by the BackgroundImage and LogoImage keys in the skin.ini file.
+A new career copies the universe MDB, preserving the starting universe. Database table previews require a matching 64-bit ACE OLE DB provider on Windows; copying and importing files do not.
 
-## Current scope
+Gameplay is not yet connected to the MDB model. This release is the title-screen and application architecture phase. It does not claim to implement a full TEW-like simulator or edit TEW's original data safely. Original copyrighted TEW assets and databases are not redistributed.
 
-This phase builds the application shell and file-management workflow, not the advanced TEW-style gameplay simulation. You can create and inspect .mdb career files, but there is not yet a gameplay screen connected to the imported MDB's schema. The prior v0.1.0 prototype remains available in Git history and its earlier GitHub release; its JSON scenario and SQLite store are not part of this Phase One ZIP. Future gameplay should use an original, documented MDB schema, not assume a TEW proprietary database can act as a playable Pro Wrestling Revolution universe.
+## Building
 
-## Development and verification
+The GitHub Actions Windows workflow generates the raster assets as genuine JPG files, validates the skin dimensions and universe file-management routines, publishes a self-contained Windows executable, and packages a portable ZIP. It runs on pushes to main. Skin assets are also generated locally on first launch if missing, without overwriting existing custom images.
 
-Built using C#, Windows Forms and .NET 10. The MDB table preview uses System.Data.OleDb on Windows. GitHub Actions runs a smoke test for directory layout, skins, MDB-header recognition, universe import, save copy, backups, settings persistence, and unsafe-path rejection, then publishes a self-contained x64 executable and ZIP. The automated smoke fixture is not a valid MDB; actual Access database connectivity needs to be tested on a matching Windows/Access installation.
-
-No activation, player account, or commercial licensing system is present.
+The source files remain C#/.NET 10, Windows Forms, and System.Data.OleDb. There is no license activation system.

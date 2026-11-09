@@ -27,6 +27,17 @@ jobs:
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
           if ($LASTEXITCODE -ne 0) { throw "Phase One smoke test failed: $LASTEXITCODE" }
 
+      - name: Generate original raster image packs at their exact reference sizes
+        shell: pwsh
+        run: |
+          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --generate-assets
+          if ($LASTEXITCODE -ne 0) { throw "Skin asset generation failed" }
+          foreach ($skin in @("Obsidian", "Steel")) {
+            foreach ($file in @("Title_Screen.jpg", "Title_Screen_Alt.jpg", "Title_Screen_On.jpg", "Title_Screen_Off.jpg", "Title_Screen(1).jpg")) {
+              if (-not (Test-Path ("Skins/" + $skin + "/" + $file))) { throw "Missing image: $skin/$file" }
+            }
+          }
+
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
         run: |
@@ -42,8 +53,8 @@ jobs:
             }
           }
           if (-not (Test-Path "publish/ProWrestlingRevolution.exe")) { throw "Executable missing" }
-          if (-not (Test-Path "publish/Skins/Obsidian/skin.ini")) { throw "Obsidian skin missing" }
-          if (-not (Test-Path "publish/Skins/Steel/skin.ini")) { throw "Steel skin missing" }
+          if (-not (Test-Path "publish/Skins/Obsidian/Title_Screen.jpg")) { throw "Obsidian sidebar missing" }
+          if (-not (Test-Path "publish/Skins/Steel/Title_Screen(1).jpg")) { throw "Steel title art missing" }
           if (-not (Test-Path "publish/Databases/README.txt")) { throw "Databases folder missing" }
           if (Test-Path "publish/Data/Scenarios/Genesis.json") { throw "Legacy JSON scenario accidentally included" }
           Get-ChildItem publish -Filter *.pdb | Remove-Item -Force
@@ -60,16 +71,18 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.2.0
-          name: Pro Wrestling Revolution 0.2.0 - Phase One Shell
+          tag_name: v0.3.0
+          name: Pro Wrestling Revolution 0.3.0 - Image-Driven Main Menu
           target_commitish: main
           prerelease: true
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Phase One: original Windows main menu, two switchable skins, Microsoft Access MDB universe import,
-            separate career save copies and an initial backup per career.
+            Main menu rebuilt for an exact 1366 x 768 client surface with raster image assets:
+            57 x 736 sidebar strips, 1370 x 32 top bar images and 1314 x 649 title artwork.
+            Image-based hit regions replace text buttons; skins are replaceable JPG image packs.
+            Existing MDB universe import, career copies, backups and database editor remain available.
             Download the ZIP, extract into a writable folder and launch ProWrestlingRevolution.exe.
             Includes no third-party databases or images. Your own MDB is imported from Database Selector.
             Access table preview requires a matching Microsoft ACE OLE DB driver; direct file import/copy does not.

@@ -12,7 +12,7 @@
     <PackageReference Include="System.Data.OleDb" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Skins/**/*.ini" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+    <Content Include="Skins/**/*.jpg;Skins/**/*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="System/README.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="Pictures/README.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="Databases/README.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
