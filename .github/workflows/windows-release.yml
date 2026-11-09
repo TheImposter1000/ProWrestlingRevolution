@@ -1,0 +1,86 @@
+name: Build and Release Windows Game
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Get source
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test world, booking, show simulation, and SQLite persistence
+        shell: pwsh
+        run: |
+          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Simulation smoke test failed: $LASTEXITCODE" }
+
+      - name: Publish a self-contained Windows x64 executable
+        shell: pwsh
+        run: |
+          dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
+
+      - name: Assemble complete portable game folder with starter data
+        shell: pwsh
+        run: |
+          foreach ($folder in @("Pictures", "Reports", "Logs", "Saves")) {
+            Copy-Item -Path $folder -Destination ("publish/" + $folder) -Recurse -Force
+          }
+          if (-not (Test-Path "publish/Data/Scenarios/Genesis.json")) {
+            throw "Starter universe was not copied into the publish folder."
+          }
+          $exe = (Resolve-Path "publish/ProWrestlingRevolution.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--seed" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Creating bundled save failed: $($process.ExitCode)" }
+          if (-not (Test-Path "publish/Saves/career.db")) {
+            throw "Expected pre-created SQLite career.db was not generated."
+          }
+          if ((Get-Item "publish/Saves/career.db").Length -lt 1024) {
+            throw "Bundled career database is too small."
+          }
+          Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
+          if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) {
+            throw "Portable game ZIP was not created."
+          }
+          Get-ChildItem publish -Recurse | Select-Object FullName, Length
+
+      - name: Save downloadable Windows game ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProWrestlingRevolution-Windows-x64
+          path: ProWrestlingRevolution-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub release for direct one-click ZIP download
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v0.1.0
+          name: Pro Wrestling Revolution 0.1.0
+          target_commitish: main
+          prerelease: true
+          make_latest: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Original single-player wrestling management game for Windows x64.
+            Download the ZIP, extract it to a writable folder, and run ProWrestlingRevolution.exe.
+            Includes an original fictional universe, a ready-to-play SQLite save,
+            booking, storylines, titles, talent signings, rival promotions,
+            show simulation, finances, and event reports.
+            No Python, build tools, activation, or separate .NET install required.
+            This is an early playable prototype, not a complete TEW equivalent.
+          files: ProWrestlingRevolution-Windows-x64.zip
