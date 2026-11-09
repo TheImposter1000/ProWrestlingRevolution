@@ -50,6 +50,18 @@ internal static class Program
             if (skin.Accent.IsEmpty) throw new Exception("Skin palette could not load.");
             paths.WriteSetting("Skin", "Steel");
             if (paths.ReadSetting("Skin", "") != "Steel") throw new Exception("Skin setting failed.");
+            // Construct the actual launcher (without showing a window) and verify its
+            // fixed logical canvas. This catches regressions in the native menu layout.
+            ApplicationConfiguration.Initialize();
+            using (var launcher = new LauncherForm(paths))
+            {
+                if (launcher.ClientSize.Width != SkinArt.WindowWidth ||
+                    launcher.ClientSize.Height != SkinArt.WindowHeight)
+                    throw new Exception("Launcher client dimensions must be 1366 x 768.");
+                if (launcher.FormBorderStyle != FormBorderStyle.None)
+                    throw new Exception("Launcher must not use a resizable standard border.");
+            }
+
             var fixture = Path.Combine(root, "sample.mdb");
             var header = new byte[2048];
             Encoding.ASCII.GetBytes("Standard Jet DB").CopyTo(header, 4);

@@ -30,19 +30,23 @@ public sealed class AppPaths
         SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Obsidian"), "Obsidian");
         SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Steel"), "Steel");
 
+        // Migrate older flat folders for user-installed custom skins, without deleting originals.
+        foreach (var folder in Directory.EnumerateDirectories(SkinsRoot))
+        {
+            if (!Path.GetFileName(folder).Equals("Obsidian", StringComparison.OrdinalIgnoreCase) &&
+                !Path.GetFileName(folder).Equals("Steel", StringComparison.OrdinalIgnoreCase))
+                SkinArt.MigrateFlatPack(folder);
+        }
+
         if (!File.Exists(_settings))
             File.WriteAllText(_settings, "Skin=Obsidian\nDatabase=\n", Encoding.UTF8);
     }
 
-    // Every selectable skin is defined by raster artwork, not a configuration file.
+    // The complete Febreeze-style folder structure defines a usable skin.
+    // A copied custom skin folder is immediately selectable without an INI file.
     public IReadOnlyList<string> Skins() =>
         Directory.EnumerateDirectories(SkinsRoot)
-            .Where(x =>
-                File.Exists(Path.Combine(x, "Title_Screen(1).jpg")) &&
-                File.Exists(Path.Combine(x, "Title_Screen.jpg")) &&
-                File.Exists(Path.Combine(x, "Title_Screen_Alt.jpg")) &&
-                File.Exists(Path.Combine(x, "Title_Screen_On.jpg")) &&
-                File.Exists(Path.Combine(x, "Title_Screen_Off.jpg")))
+            .Where(SkinArt.HasRequiredImages)
             .Select(x => Path.GetFileName(x)!)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
 

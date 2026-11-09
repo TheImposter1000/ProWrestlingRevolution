@@ -182,12 +182,12 @@ public sealed class LauncherForm : Form
         var baseFile = home ? "Title_Screen_Alt.jpg" : "Title_Screen.jpg";
         var hover = _hoverIcon is null ? baseFile
             : (home ? "Title_Screen_Alt_Hover_" : "Title_Screen_Hover_") + _hoverIcon + ".jpg";
-        _sidebarImage.Image = LoadArt(hover, baseFile);
+        _sidebarImage.Image = LoadArt(Path.Combine("SideBars", hover), Path.Combine("SideBars", baseFile));
     }
 
     private void RenderTop() =>
-        _topImage.Image = LoadArt(_soundEnabled ? "Title_Screen_On.jpg" : "Title_Screen_Off.jpg",
-            "Title_Screen_On.jpg");
+        _topImage.Image = LoadArt(Path.Combine("TopBars", _soundEnabled ? "Title_Screen_On.jpg" : "Title_Screen_Off.jpg"),
+            Path.Combine("TopBars", "Title_Screen_On.jpg"));
 
     private void ClearAssetCache()
     {
@@ -320,26 +320,30 @@ public sealed class LauncherForm : Form
         _hoverIcon = null;
         RenderSidebar();
         _page.Controls.Clear();
-        var art = new PictureBox
+
+        // Three independent skin graphics compose the home screen:
+        // Backgrounds/Title_Screen, LowerBars/Title_Screen and SideBars/Title_Screen_Alt.
+        // The upper title strip comes from TopBars. Assets are never scaled inside WinForms.
+        var background = new PictureBox
         {
             Dock = DockStyle.Top,
             Height = SkinArt.MainHeight,
             BackColor = _skin.Background,
-            Image = LoadArt("Title_Screen(1).jpg", "Title_Screen(1).jpg"),
-            SizeMode = PictureBoxSizeMode.StretchImage
+            Image = LoadArt(Path.Combine("Backgrounds", "Title_Screen.jpg"),
+                Path.Combine("Backgrounds", "Title_Screen.jpg")),
+            SizeMode = PictureBoxSizeMode.Normal
         };
-        var footer = new Panel { Dock = DockStyle.Fill, BackColor = _skin.Background };
-        var left = TextLabel("PRO WRESTLING REVOLUTION   •   WINDOWS DESKTOP", 10, true, _skin.Muted);
-        left.Location = new Point(26, 22);
-        left.Size = new Size(520, 40);
-        var right = TextLabel("VERSION 0.3.0   |   IMAGE-BASED MAIN MENU", 10, true, _skin.Accent);
-        right.AutoSize = false;
-        right.Location = new Point(865, 23);
-        right.Size = new Size(400, 38);
-        footer.Controls.Add(left);
-        footer.Controls.Add(right);
-        _page.Controls.Add(footer);
-        _page.Controls.Add(art);
+        var lower = new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            Height = SkinArt.LowerHeight,
+            BackColor = _skin.Background,
+            Image = LoadArt(Path.Combine("LowerBars", "Title_Screen.jpg"),
+                Path.Combine("LowerBars", "Title_Screen.jpg")),
+            SizeMode = PictureBoxSizeMode.Normal
+        };
+        _page.Controls.Add(lower);
+        _page.Controls.Add(background);
     }
 
     private void ShowDatabaseSelector()

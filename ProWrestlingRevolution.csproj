@@ -3,6 +3,10 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Use the same Windows DPI virtualization convention as older desktop sims.
+         Logical layout stays 1366 x 768; Windows scales its apparent physical size
+         to the user's display setting instead of shrinking the fixed-size artwork. -->
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>ProWrestlingRevolution</AssemblyName>

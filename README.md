@@ -1,68 +1,73 @@
 # Pro Wrestling Revolution
 
-An original, single-player Windows wrestling management project. Version 0.3.0 focuses on the visual identity of its image-based desktop main menu, while preserving MDB universe and career management.
+A native Windows professional wrestling management game project. This release focuses on matching the structure and footprint of the reference title screen.
 
-## Start the game
+## Download
 
-Download the latest [Windows x64 release ZIP](https://github.com/TheImposter1000/ProWrestlingRevolution/releases), extract it to a writable folder, and double-click ProWrestlingRevolution.exe. A separate .NET installation, Python, and Visual Studio are not required.
+Get the latest ZIP from [GitHub Releases](https://github.com/TheImposter1000/ProWrestlingRevolution/releases), extract the ZIP to a writable folder, and launch ProWrestlingRevolution.exe. No Python or separate .NET installation.
 
-The exact client area is 1366 by 768 pixels, fixed size with no automatic scaling. On displays smaller than that client area, the entire window may not fit.
+## Exact title-screen layout
 
-## Native, image-based main menu
+The logical client area is **1366 by 768**. The interface uses an original, image-based title design and a narrow image-sidebar with clickable regions. To match the apparent Windows display-scaled size of older desktop applications more closely, the executable now uses **DpiUnawareGdiScaled** mode. Windows scales the physical pixels according to your system display settings. As a result, a screen capture may have a larger physical footprint than 1366 by 768 at 125% scaling. We have not claimed the two applications will appear identically sized in every browser zoom or monitor configuration.
 
-The left toolbar is a single graphical sidebar image with clickable hotspots rather than text buttons. Main-menu views use the alternate sidebar without a Back icon. Inner screens show the Back icon. Hovering highlights the icon using another image loaded from the skin folder. The top bar is also an image with clickable sound-state, Help, Minimize and Close regions.
-
-The graphical assets deliberately use the same component dimensions as the provided layout references but feature original Pro Wrestling Revolution art, not TEW marks or characters.
-
-| Image in each skin folder | Dimensions | Purpose |
+The title screen is composed of separate files:
+ 
+| Folder and image | Asset size | Function |
 | --- | --- | --- |
-| Title_Screen(1).jpg | 1314 x 649 | Main title artwork |
-| Title_Screen.jpg | 57 x 736 | Inner-screen icon strip with Back |
-| Title_Screen_Alt.jpg | 57 x 736 | Main-menu icon strip without Back |
-| Title_Screen_On.jpg | 1370 x 32 | Top title bar, speaker icon on |
-| Title_Screen_Off.jpg | 1370 x 32 | Top title bar, speaker icon off |
-| Title_Screen_Hover_*.jpg | 57 x 736 | Hover images for inner screens |
-| Title_Screen_Alt_Hover_*.jpg | 57 x 736 | Hover images for main menu |
+| Backgrounds/Title_Screen.jpg | 1314 x 649 | Main central artwork |
+| LowerBars/Title_Screen.jpg | 1314 x 87 | Bottom artwork |
+| SideBars/Title_Screen_Alt.jpg | 57 x 736 | Main menu toolbar |
+| SideBars/Title_Screen.jpg | 57 x 736 | Inner-screen toolbar with Back |
+| TopBars/Title_Screen_On.jpg | 1370 x 32 | Upper title bar, sound enabled icon |
+| TopBars/Title_Screen_Off.jpg | 1370 x 32 | Upper title bar, sound muted icon |
 
-The built-in Obsidian and Steel raster packs are generated during the Windows build and included in the ZIP. A custom skin can be created by copying a built-in folder, editing the actual images, and selecting the skin in the main-menu Skins screen. There are no skin.ini files or color configuration files controlling the title screen.
+Images are drawn without stretching; the few extra pixels in the reference 1314/1370 files are cropped to the client's available width where needed. Hit regions keep the expected TEW-style navigation order.
 
-Navigation order: Back (inner screens only), New Game, Load Game, Database Selector, Database Editor, Skins, Achievements and Credits. The user can also press Escape to return home and Alt+N, Alt+L, Alt+D, Alt+E, Alt+S, Alt+A or Alt+C to navigate.
+## Complete image skin directory standard
 
-The top bar's speaker icon toggles a visual sound state. Audio playback is not implemented yet.
+Each skin is an independently replaceable folder. The two original bundled image packs, **Obsidian** and **Steel**, are organized as:
 
-## MDB universes and careers
+    Skins/
+        Obsidian/
+            Backgrounds/
+            Buttons/
+            Graphics/
+            Loading_NoProfile/
+            Loading_Profile/
+            LowerBars/
+            SideBars/
+            TopBars/
+        Steel/
+            [same eight directories]
 
-The app imports your own valid Microsoft Access .mdb files through Database Selector. Each universe is independent:
+A third skin can be added by placing an image pack with those folders under Skins. The game discovers packs by checking the title-screen components. No skin.ini or theme-color configuration is required for the visual title screen. The icon hotspot coordinates stay the same, so user-supplied artwork must put its icons at the expected positions.
+
+Obsidian and Steel include original generated graphic files in all eight categories, although many gameplay-specific images will only be populated as those screens are developed.
+
+If an older game folder contains v0.3 images directly inside a skin root, those image files are automatically copied to the correct categories when the game starts, without removing the originals. Custom artwork already present in category folders is never overwritten.
+
+## Application and databases
+
+The application starts at its image-based menu: New Game, Load Game, Database Selector, Database Editor, Skins, with Achievements and Credits below.
+
+Microsoft Access MDB universes live separately from career saves:
 
     ProWrestlingRevolution.exe
     Databases/
-        MyUniverse/
+        Default/
             PWR.mdb
             SaveGames/
                 MyCareer/
                     PWRSave.mdb
-                    Backups/
-                        initial.mdb
+                    Backups/initial.mdb
     Pictures/
     Skins/
-        Obsidian/
-            Title_Screen.jpg
-            Title_Screen_Alt.jpg
-            Title_Screen_On.jpg
-            Title_Screen_Off.jpg
-            Title_Screen(1).jpg
-            ...hover images...
-        Steel/
-            ...same raster assets...
     System/
-        settings.ini
 
-A new career copies the universe MDB, preserving the starting universe. Database table previews require a matching 64-bit ACE OLE DB provider on Windows; copying and importing files do not.
+The application can import your own MDB and create independent career and backup copies, but this version does not yet implement a fully connected gameplay simulation based on the MDB schema. The read-only database preview needs a compatible 64-bit ACE provider. Microsoft's Access application or its driver is not bundled.
 
-Gameplay is not yet connected to the MDB model. This release is the title-screen and application architecture phase. It does not claim to implement a full TEW-like simulator or edit TEW's original data safely. Original copyrighted TEW assets and databases are not redistributed.
+## What passed
 
-## Building
+The GitHub Windows pipeline compiles a self-contained executable, generates all original raster graphics, verifies that the correct images and categorized directories exist, checks image dimensions and MDB file handling, and publishes a complete ZIP.
 
-The GitHub Actions Windows workflow generates the raster assets as genuine JPG files, validates the skin dimensions and universe file-management routines, publishes a self-contained Windows executable, and packages a portable ZIP. It runs on pushes to main. Skin assets are also generated locally on first launch if missing, without overwriting existing custom images.
-
-The source files remain C#/.NET 10, Windows Forms, and System.Data.OleDb. There is no license activation system.
+No TEW images, CornellVerse data, or protected TEW database files are redistributed. The original TEW game and its developer are not affiliated with this project.

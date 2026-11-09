@@ -18,6 +18,7 @@ public static class SkinArt
     public const int SidebarHeight = 736;
     public const int MainWidth = 1314;
     public const int MainHeight = 649;
+    public const int LowerHeight = WindowHeight - TopHeight - MainHeight; // 87 pixels
 
     public static readonly (string Key, string Label, int Y)[] MenuIcons =
     [
@@ -42,23 +43,137 @@ public static class SkinArt
             Color.FromArgb(24, 34, 50), Color.FromArgb(29, 170, 213),
             Color.FromArgb(111, 233, 250), Color.White, Color.FromArgb(170, 196, 213));
 
+    public static readonly string[] Categories =
+    [
+        "Backgrounds", "Buttons", "Graphics", "Loading_NoProfile",
+        "Loading_Profile", "LowerBars", "SideBars", "TopBars"
+    ];
+
+    public static bool HasRequiredImages(string folder) =>
+        File.Exists(Path.Combine(folder, "Backgrounds", "Title_Screen.jpg")) &&
+        File.Exists(Path.Combine(folder, "SideBars", "Title_Screen.jpg")) &&
+        File.Exists(Path.Combine(folder, "SideBars", "Title_Screen_Alt.jpg")) &&
+        File.Exists(Path.Combine(folder, "TopBars", "Title_Screen_On.jpg")) &&
+        File.Exists(Path.Combine(folder, "TopBars", "Title_Screen_Off.jpg")) &&
+        File.Exists(Path.Combine(folder, "LowerBars", "Title_Screen.jpg"));
+
     public static void EnsurePack(string folder, string name)
     {
         Directory.CreateDirectory(folder);
+        foreach (var category in Categories)
+            Directory.CreateDirectory(Path.Combine(folder, category));
+
+        // Upgrade our flat v0.3 layout while preserving the player's custom JPGs.
+        MigrateFlatPack(folder);
+
         var palette = Theme(name);
-        Generate(folder, "Title_Screen(1).jpg", MainWidth, MainHeight, g => DrawMain(g, name, palette));
-        Generate(folder, "Title_Screen.jpg", SidebarWidth, SidebarHeight, g => DrawSidebar(g, palette, false, null));
-        Generate(folder, "Title_Screen_Alt.jpg", SidebarWidth, SidebarHeight, g => DrawSidebar(g, palette, true, null));
-        Generate(folder, "Title_Screen_On.jpg", 1370, TopHeight, g => DrawTop(g, palette, true));
-        Generate(folder, "Title_Screen_Off.jpg", 1370, TopHeight, g => DrawTop(g, palette, false));
+        string PathFor(string category) => Path.Combine(folder, category);
+
+        Generate(PathFor("Backgrounds"), "Title_Screen.jpg", MainWidth, MainHeight,
+            g => DrawMain(g, name, palette));
+        Generate(PathFor("Backgrounds"), "General.jpg", MainWidth, MainHeight,
+            g => DrawBackdrop(g, MainWidth, MainHeight, "PRO WRESTLING REVOLUTION", palette));
+        Generate(PathFor("SideBars"), "Title_Screen.jpg", SidebarWidth, SidebarHeight,
+            g => DrawSidebar(g, palette, false, null));
+        Generate(PathFor("SideBars"), "Title_Screen_Alt.jpg", SidebarWidth, SidebarHeight,
+            g => DrawSidebar(g, palette, true, null));
+        Generate(PathFor("TopBars"), "Title_Screen_On.jpg", 1370, TopHeight,
+            g => DrawTop(g, palette, true));
+        Generate(PathFor("TopBars"), "Title_Screen_Off.jpg", 1370, TopHeight,
+            g => DrawTop(g, palette, false));
+        Generate(PathFor("LowerBars"), "Title_Screen.jpg", MainWidth, LowerHeight,
+            g => DrawLowerBar(g, palette));
+        Generate(PathFor("LowerBars"), "General.jpg", MainWidth, LowerHeight,
+            g => DrawLowerBar(g, palette));
+
+        Generate(PathFor("Buttons"), "Action_Default.jpg", 240, 46,
+            g => DrawActionButton(g, palette, false));
+        Generate(PathFor("Buttons"), "Action_Hover.jpg", 240, 46,
+            g => DrawActionButton(g, palette, true));
+        Generate(PathFor("Graphics"), "Brand.jpg", 420, 150,
+            g => DrawBackdrop(g, 420, 150, "PWR", palette));
+        Generate(PathFor("Loading_NoProfile"), "Loading.jpg", 640, 360,
+            g => DrawBackdrop(g, 640, 360, "LOADING WRESTLING UNIVERSE", palette));
+        Generate(PathFor("Loading_Profile"), "Loading.jpg", 640, 360,
+            g => DrawBackdrop(g, 640, 360, "LOADING CAREER", palette));
+
         foreach (var (key, _, _) in MenuIcons)
         {
             if (key != "back")
-                Generate(folder, "Title_Screen_Alt_Hover_" + key + ".jpg", SidebarWidth,
-                    SidebarHeight, g => DrawSidebar(g, palette, true, key));
-            Generate(folder, "Title_Screen_Hover_" + key + ".jpg", SidebarWidth,
-                SidebarHeight, g => DrawSidebar(g, palette, false, key));
+                Generate(PathFor("SideBars"), "Title_Screen_Alt_Hover_" + key + ".jpg",
+                    SidebarWidth, SidebarHeight, g => DrawSidebar(g, palette, true, key));
+            Generate(PathFor("SideBars"), "Title_Screen_Hover_" + key + ".jpg",
+                SidebarWidth, SidebarHeight, g => DrawSidebar(g, palette, false, key));
         }
+    }
+
+    public static void MigrateFlatPack(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var file in Directory.EnumerateFiles(folder, "*.jpg", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileName(file);
+            string? category = null;
+            string destinationName = name;
+            if (name.Equals("Title_Screen(1).jpg", StringComparison.OrdinalIgnoreCase))
+            {
+                category = "Backgrounds";
+                destinationName = "Title_Screen.jpg";
+            }
+            else if (name.StartsWith("Title_Screen_On", StringComparison.OrdinalIgnoreCase) ||
+                     name.StartsWith("Title_Screen_Off", StringComparison.OrdinalIgnoreCase))
+                category = "TopBars";
+            else if (name.StartsWith("Title_Screen", StringComparison.OrdinalIgnoreCase))
+                category = "SideBars";
+
+            if (category is null) continue;
+            var targetDir = Path.Combine(folder, category);
+            Directory.CreateDirectory(targetDir);
+            var destination = Path.Combine(targetDir, destinationName);
+            if (!File.Exists(destination)) File.Copy(file, destination);
+        }
+    }
+
+    private static void DrawLowerBar(Graphics g, Colors c)
+    {
+        g.Clear(c.Background);
+        using (var line = new Pen(c.Accent, 2))
+            g.DrawLine(line, 0, 0, MainWidth, 0);
+        using (var f = new Font("Segoe UI", 10, FontStyle.Bold))
+        using (var fg = new SolidBrush(c.Text))
+        using (var accent = new SolidBrush(c.AccentLight))
+        {
+            g.DrawString("PRO WRESTLING REVOLUTION", f, fg, 26, 29);
+            g.DrawString("DESKTOP EDITION  |  v0.4.0", f, accent, MainWidth - 315, 29);
+        }
+        using var thin = new Pen(Color.FromArgb(75, c.Accent));
+        g.DrawLine(thin, 0, LowerHeight - 1, MainWidth, LowerHeight - 1);
+    }
+
+    private static void DrawActionButton(Graphics g, Colors c, bool hover)
+    {
+        g.Clear(hover ? c.Accent : c.Surface);
+        using var border = new Pen(hover ? c.AccentLight : c.Accent, 2);
+        g.DrawRectangle(border, 1, 1, 237, 43);
+        using var font = new Font("Segoe UI", 11, FontStyle.Bold);
+        using var brush = new SolidBrush(hover ? c.Background : c.Text);
+        using var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString("SELECT", font, brush, new RectangleF(0, 0, 240, 46), format);
+    }
+
+    private static void DrawBackdrop(Graphics g, int width, int height, string caption, Colors c)
+    {
+        using (var bg = new LinearGradientBrush(new Rectangle(0, 0, width, height), c.Surface, c.Background, 35f))
+            g.FillRectangle(bg, 0, 0, width, height);
+        using (var pen = new Pen(Color.FromArgb(90, c.Accent), 3))
+        {
+            g.DrawLine(pen, 0, 0, width / 3, height);
+            g.DrawLine(pen, width - width / 3, 0, width, height);
+        }
+        using var font = new Font("Segoe UI", Math.Min(21, Math.Max(11, width / 27f)), FontStyle.Bold);
+        using var brush = new SolidBrush(c.AccentLight);
+        using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString(caption, font, brush, new RectangleF(10, 0, width - 20, height), sf);
     }
 
     private static void Generate(string folder, string name, int width, int height, Action<Graphics> action)
@@ -174,7 +289,7 @@ public static class SkinArt
             g.FillRectangle(label, 539, 5, 288, 22);
         }
         using (var font = new Font("Segoe UI", 9, FontStyle.Bold))
-            CenterTop(g, "PRO WRESTLING REVOLUTION   •   0.3.0", font,
+            CenterTop(g, "PRO WRESTLING REVOLUTION   •   0.4.0", font,
                 Color.FromArgb(24, 24, 32), 682, 16);
         DrawTopCircle(g, 1218, 16, soundOn ? "on" : "off", c);
         DrawTopCircle(g, 1257, 16, "help", c);
