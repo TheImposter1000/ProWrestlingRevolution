@@ -31,13 +31,13 @@ public sealed class LauncherForm : Form
         _skin = paths.LoadSkin(paths.ReadSetting("Skin", "Obsidian"));
         Text = "Pro Wrestling Revolution";
         AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.CenterScreen;
+        Font = new Font("Segoe UI", 10);
         ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
         MinimumSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
         MaximumSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
         KeyPreview = true;
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.None;
-        Font = new Font("Segoe UI", 10);
         DoubleBuffered = true;
         BuildChrome();
         ShowHome();

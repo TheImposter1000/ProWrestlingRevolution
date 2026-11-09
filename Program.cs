@@ -57,7 +57,9 @@ internal static class Program
             {
                 if (launcher.ClientSize.Width != SkinArt.WindowWidth ||
                     launcher.ClientSize.Height != SkinArt.WindowHeight)
-                    throw new Exception("Launcher client dimensions must be 1366 x 768.");
+                    throw new Exception(
+                        "Launcher client dimensions must be 1366 x 768, received " +
+                        launcher.ClientSize.Width + " x " + launcher.ClientSize.Height + ".");
                 if (launcher.FormBorderStyle != FormBorderStyle.None)
                     throw new Exception("Launcher must not use a resizable standard border.");
             }
