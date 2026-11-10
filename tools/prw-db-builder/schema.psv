@@ -1,4 +1,4 @@
-# PRW native Access MDB v0.3, simple company identity and worker scope: exactly 11 tables.
+# PRW native Access MDB v0.3, simple company identity and worker scope: 14 tables.
 # Format Table|PrimaryKey|Field:Type[:size], with L=Long, T=Text, M=Memo, D=Date, Y=Yes/No, C=Currency, A=Autonumber.
 tblFed|UID|UID:L:A,Name:T:150,Initials:T:20,Profile:M,Logo:T:240,Backdrop:T:240,Website:T:240,HomeRegion:T:100,SetToOpen:D,ClosedOn:D,Money:C,Prestige:L,Momentum:L,FanLoyalty:L,EmployerReputation:L,MaxSize:T:35,ScheduleStrategy:T:40
 tblWorker|UID|UID:L:A,Name:T:150,ShortName:T:80,Picture:T:240,BiographyType:T:30,Born:D,SetToDebut:D,DeathDate:D,Regenerates:T:30,GenderID:T:50,Pronouns:T:40,Sexuality:T:40,Relationship:T:40,Race:T:60,Nationality:T:80,BasedIn:T:80,GameStatus:T:35,InRingStatus:T:35,Celebrity:Y,Style:T:50,BodyType:T:40,HeightInches:L,WeightPounds:L,MinWeightPounds:L,MaxWeightPounds:L,LoyaltyWorkerUID:L,LoyaltyType:T:40,Freelance:Y,UserCharacter:Y,CompetesVs:T:40,RoleWrestler:Y,RolePartTimeWrestler:Y,RoleManager:Y,RoleOnScreenPersonality:Y,RolePlayByPlay:Y,RoleColour:Y,RoleReferee:Y,RoleProducer:Y,DefaultMoveSet:T:150,FaceGimmick:T:150,FaceGimmickBasis:T:60,HeelGimmick:T:150,HeelGimmickBasis:T:60,Mask:T:35,Hair:Y,MaturityAge:L,DeclineAge:L,RelevancyAge:L,RetirementAge:L,CareerGoal:T:60,ActiveUSA:Y,ActiveCanada:Y,ActiveMexico:Y,ActiveBritishIsles:Y,ActiveJapan:Y,ActiveEurope:Y,ActiveOceania:Y,ActiveIndia:Y,LanguageEnglish:L,LanguageJapanese:L,LanguageFrench:L,LanguageSpanish:L,LanguageMediterranean:L,LanguageGermanic:L,LanguageSlavic:L,LanguageHindi:L
@@ -11,6 +11,9 @@ tblContract|UID|UID:L:A,WorkerUID:L,FedUID:L,EmployerInitials:T:20,Name:T:150,Sh
 tblContractBio|ContractUID|ContractUID:L,Biography:M
 tblWorkerAttributes|UID|UID:L:A,WorkerUID:L,AttributeName:T:120,SourceTEWCode:L,Hidden:Y,Permanent:Y
 tblAlternative|UID|UID:L:A,WorkerUID:L,RecordName:T:150,CompanyScope:T:30,FedUID:L,CompanyInitials:T:20,RegionCode:T:60,Usage:L,Name:T:150,ShortName:T:80,Picture:T:240,Biography:M,MoveSet:T:150,Gimmick:T:150,GimmickBasis:T:60,Mask:T:35,MinAge:L,MaxAge:L
+tblMatch|UID|UID:L:A,RecordName:T:150,Name:T:150,Description:M,MatchType:L,MatchContent_Risk:L,MatchInjury_Risk:L,MatchPrestige:L,MinFedSize:L,Location:L,Rules:L,Entrance:L,NonWrestling_Time:L,MinimumMatch_Time:L,MaximumMatch_Time:L,Special:Y,Default:Y,Basic:Y
+tblMatchRingSetup|MatchUID|MatchUID:L,RingSetup1:Y,RingSetup2:Y,RingSetup3:Y,RingSetup4:Y,RingSetup5:Y,RingSetup6:Y,RingSetup7:Y,RingSetup8:Y,RingSetup9:Y,RingSetup10:Y,RingSetup11:Y,RingSetup12:Y,RingSetup13:Y,RingSetup14:Y,RingSetup15:Y,RingSetup16:Y,RingSetup17:Y,RingSetup18:Y,RingSetup19:Y,RingSetup20:Y
+tblMatchFinishes|MatchUID|MatchUID:L,Finish1:Y,Finish2:Y,Finish3:Y,Finish4:Y,Finish5:Y,Finish6:Y,Finish7:Y,Finish8:Y,Finish9:Y,Finish10:Y,Finish11:Y,Finish12:Y,Finish13:Y,Finish14:Y,Finish15:Y,Finish16:Y,Finish17:Y,Finish18:Y,Finish19:Y
 FK|tblWorker|tblWorkerBio|UID|WorkerUID
 FK|tblWorker|tblWorkerBusiness|UID|WorkerUID
 FK|tblWorker|tblWorkerOver|UID|WorkerUID
@@ -21,3 +24,5 @@ FK|tblContract|tblContractBio|UID|ContractUID
 FK|tblWorker|tblWorkerAttributes|UID|WorkerUID
 FK|tblWorker|tblAlternative|UID|WorkerUID
 FK|tblFed|tblContract|UID|FedUID
+FK|tblMatch|tblMatchRingSetup|UID|MatchUID
+FK|tblMatch|tblMatchFinishes|UID|MatchUID
