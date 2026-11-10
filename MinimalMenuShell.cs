@@ -12,6 +12,7 @@ public sealed partial class LauncherForm
     private readonly Dictionary<string, SidebarMenuRow> _menuRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
+    private readonly Label _editorPageTitle = new();
     private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
@@ -100,8 +101,18 @@ public sealed partial class LauncherForm
         _versionText.ForeColor = _skin.Muted;
         _versionText.Font = new Font("Segoe UI", 9.5f);
 
+        _editorPageTitle.Text = "DATABASE EDITOR";
+        _editorPageTitle.Location = new Point(452, 0);
+        _editorPageTitle.Size = new Size(275, _topbar.Height - 1);
+        _editorPageTitle.TextAlign = ContentAlignment.MiddleLeft;
+        _editorPageTitle.BackColor = Color.Transparent;
+        _editorPageTitle.ForeColor = _skin.Foreground;
+        _editorPageTitle.Font = new Font("Segoe UI", 13, FontStyle.Bold | FontStyle.Italic);
+        _editorPageTitle.Visible = false;
+
         _topbar.Controls.Add(_titleText);
         _topbar.Controls.Add(_versionText);
+        _topbar.Controls.Add(_editorPageTitle);
         _topbar.MouseDown += DragWindow;
         _titleText.MouseDown += DragWindow;
         _versionText.MouseDown += DragWindow;
@@ -232,6 +243,7 @@ public sealed partial class LauncherForm
         SuspendLayout();
         _sidebar.Visible = false;
         _topbar.Visible = false;
+        _editorPageTitle.Visible = false;
         ClearPageContent();
 
         var title = new TitleScreenView
@@ -334,6 +346,7 @@ public sealed partial class LauncherForm
             button.UpdatePalette(_skin);
         _page.BackColor = _skin.Background;
         _titleText.ForeColor = _skin.Foreground;
+        _editorPageTitle.ForeColor = _skin.Foreground;
         _versionText.ForeColor = _skin.Muted;
         RenderSidebar();
     }
