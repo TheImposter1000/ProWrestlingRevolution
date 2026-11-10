@@ -87,8 +87,8 @@ internal sealed class TitleScreenView : Control
 
         foreach (MenuItem item in Menu)
             DrawMenuButton(g, item,
-                (_hoverKey is null && Menu[_keyboardIndex].Key == item.Key) ||
-                _hoverKey == item.Key);
+                ((_hoverKey is null || Array.FindIndex(Menu, m => m.Key == _hoverKey) < 0)
+                  && Menu[_keyboardIndex].Key == item.Key) || _hoverKey == item.Key);
 
         DrawUpdate(g, _hoverKey == "updates");
         g.Restore(original);
@@ -123,7 +123,7 @@ internal sealed class TitleScreenView : Control
             StringFormat.GenericTypographic);
     }
 
-    private static void DrawIdentity(Graphics g)
+    private void DrawIdentity(Graphics g)
     {
         PointF[] corners =
         [
@@ -148,14 +148,9 @@ internal sealed class TitleScreenView : Control
 
         DrawText(g, "PRO WRESTLING", 114, 69, 22, Color.White, FontStyle.Bold | FontStyle.Italic);
         DrawText(g, "REVOLUTION", 114, 93, 22, Color.White, FontStyle.Bold | FontStyle.Italic);
-        DrawText(g, VersionTagPlaceholder, 114, 127, 16, Color.FromArgb(185, 204, 219));
+        DrawText(g, VersionText, 114, 127, 16, Color.FromArgb(185, 204, 219));
     }
 
-    // The version field is painted separately to avoid shipping a fixed version number.
-    private const string VersionTagPlaceholder = "";
-
-    private void DrawVersion(Graphics g) =>
-        DrawText(g, VersionText, 114, 127, 16, Color.FromArgb(188, 206, 222));
 
     private void DrawUtility(Graphics g)
     {
@@ -182,7 +177,6 @@ internal sealed class TitleScreenView : Control
             using var mutePen = new Pen(Color.FromArgb(255, 33, 74), 3);
             g.DrawLine(mutePen, 1424, 40, 1441, 57);
         }
-        DrawVersion(g);
     }
 
     private static void DrawLowerArchitecture(Graphics g)
