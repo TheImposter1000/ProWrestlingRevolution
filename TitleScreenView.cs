@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -37,21 +38,33 @@ internal sealed class TitleScreenView : Control
 
     // Optional pixel-exact approved menu image. Buttons still use live hit testing.
     // This is not the skin background: it is a full-sized title-screen UI composite.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal Image? ExactLayout
     {
         get => _exactLayout;
         set { _exactLayout = value; Invalidate(); }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal Image? Artwork
     {
         get => _artwork;
         set { _artwork = value; Invalidate(); }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal string VersionText { get; set; } = "v0.5.4";
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal string UpdateText { get; set; } = "Check for Updates";
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal bool UpdateEnabled { get; set; } = true;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal bool SoundEnabled { get; set; } = true;
     internal event Action<string>? CommandInvoked;
 
