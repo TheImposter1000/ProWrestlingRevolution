@@ -11,6 +11,8 @@ namespace ProWrestlingRevolution;
 public sealed class TitleArtworkView : Control
 {
     private Image? _artwork;
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    [System.ComponentModel.Browsable(false)]
     internal Image? Artwork
     {
         get => _artwork;
