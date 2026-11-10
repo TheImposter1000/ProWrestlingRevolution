@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.15 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.16 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -50,12 +50,12 @@ jobs:
             }
           }
           if (-not (Test-Path "publish/System/PRWDefault.mdb")) { throw "Local default template was not installed" }
-          if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 335872) { throw "Default template size is incorrect" }
-          if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "B4F728D091AA4113D3CE03BBFC51DE230DF7845A4DF69646177D857AE6054130") {
+          if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 434176) { throw "Default template size is incorrect" }
+          if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.15 portable game ZIP
+      - name: Assemble the Version 0.5.16 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -72,7 +72,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.15 game ZIP
+      - name: Upload complete Version 0.5.16 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -82,15 +82,25 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.15
-          name: Pro Wrestling Revolution 0.5.15 - Quality of Life
+          tag_name: v0.5.16
+          name: Pro Wrestling Revolution 0.5.16 - Expanded Default Database
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-           made a quality of life update, readding the icon
-           updated the sidebars so that the loading and database
-           editors can work properly
+            This update replaces the base PRWDefault.mdb using the supplied
+            PRW_Default(2).mdb, with 14 native tables and 12 relationships.
+            New tables cover federations, match definitions, match ring setups,
+            and match finishes.
+
+            On installation, an existing System/PRWDefault.mdb is copied into
+            System/TemplateBackups before being replaced. Databases, career
+            saves, pictures, skins, settings, and custom assets remain intact.
+            New Database uses the expanded template; existing universes are
+            not modified. Subsequent manual edits to the current base are kept.
+
+            The previous version 0.5.15 interface and MDB settings support
+            remain in place. Native MDB record access requires Windows ACE.
           files: ProWrestlingRevolution-Windows-x64.zip
