@@ -1,0 +1,53 @@
+name: Build PRW Default Access MDB
+
+on:
+  push:
+    branches:
+      - database/prw-default-mdb
+    paths:
+      - ".github/workflows/build-prw-default-mdb.yml"
+      - "tools/prw-db-builder/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-and-verify-mdb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated database branch
+        uses: actions/checkout@v4
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: tools/prw-db-builder/pom.xml
+      - name: Generate actual Access 2000 MDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd tools/prw-db-builder
+          mvn -B -q dependency:copy-dependencies compile
+          mkdir -p ../../Database/Default
+          java -cp "target/classes:target/dependency/*" PrwDatabaseBuilder ../../Database/Default/PRW_Default.mdb
+          file ../../Database/Default/PRW_Default.mdb
+      - name: Save verified MDB to branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "PRW Database Builder"
+          git config user.email "prw-database-builder@users.noreply.github.com"
+          git add Database/Default/PRW_Default.mdb
+          if ! git diff --cached --quiet; then
+            git commit -m "Build native PRW default test MDB"
+            git push origin HEAD:database/prw-default-mdb
+          fi
+      - name: Publish downloadable database
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRW-Default-MDB
+          path: Database/Default/PRW_Default.mdb
+          if-no-files-found: error
