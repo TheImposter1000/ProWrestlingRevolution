@@ -13,6 +13,7 @@ public sealed partial class LauncherForm
     private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
     private readonly Label _versionText = new();
+    private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
     private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
 
@@ -65,6 +66,27 @@ public sealed partial class LauncherForm
             _sidebar.Controls.Add(item);
         }
 
+        // The updater lives below the navigation and is visible on every page.
+        // A verified release is installed only after the user confirms.
+        _updateButton.Name = "CheckUpdatesButton";
+        _updateButton.Text = "↻  Check for Updates";
+        _updateButton.Dock = DockStyle.Bottom;
+        _updateButton.Height = 46;
+        _updateButton.FlatStyle = FlatStyle.Flat;
+        _updateButton.BackColor = _skin.Button;
+        _updateButton.ForeColor = _skin.Foreground;
+        _updateButton.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        _updateButton.Cursor = Cursors.Hand;
+        _updateButton.TabStop = true;
+        _updateButton.AccessibleRole = AccessibleRole.PushButton;
+        _updateButton.AccessibleName = "Check for Updates";
+        _updateButton.FlatAppearance.BorderSize = 1;
+        _updateButton.FlatAppearance.BorderColor = _skin.Border;
+        _updateButton.Click += async (_, _) =>
+            await GameUpdate.CheckAndInstallAsync(this, _updateButton);
+        _sidebar.Controls.Add(_updateButton);
+        _updateButton.BringToFront();
+
         // Brushed-metal chrome replaces the separate raster button strip.
         // Every utility button is clickable, keyboard-accessible and has a tooltip name.
         _titleText.Text = "PRO WRESTLING REVOLUTION";
@@ -75,7 +97,7 @@ public sealed partial class LauncherForm
         _titleText.ForeColor = _skin.Foreground;
         _titleText.Font = new Font("Segoe UI", 11.5f, FontStyle.Bold);
 
-        _versionText.Text = "v0.5.3";
+        _versionText.Text = "v" + GameUpdate.DisplayVersion;
         _versionText.Location = new Point(326, 0);
         _versionText.Size = new Size(75, _topbar.Height - 1);
         _versionText.TextAlign = ContentAlignment.MiddleLeft;
@@ -216,6 +238,9 @@ public sealed partial class LauncherForm
         _sidebar.BackColor = _skin.Sidebar;
         _sidebar.UpdatePalette(_skin);
         _menuHeader.ForeColor = _skin.Muted;
+        _updateButton.BackColor = _skin.Button;
+        _updateButton.ForeColor = _skin.Foreground;
+        _updateButton.FlatAppearance.BorderColor = _skin.Border;
         _topbar.BackColor = _skin.Surface;
         _topbar.UpdatePalette(_skin);
         foreach (var button in _topbar.Controls.OfType<TopUtilityButton>())

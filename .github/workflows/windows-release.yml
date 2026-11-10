@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.3 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.4 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Version 0.5.3 portable game ZIP
+      - name: Assemble the Version 0.5.4 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.3 game ZIP
+      - name: Upload complete Version 0.5.4 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,22 +76,23 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.3
-          name: Pro Wrestling Revolution 0.5.3 - Reference Layout
+          tag_name: v0.5.4
+          name: Pro Wrestling Revolution 0.5.4 - In-App Updater
           target_commitish: main
-          prerelease: true
+          prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Reference-layout correction. Seven navigation rows now occupy one evenly spaced
-            vertical group; Achievements and Credits no longer sit at the bottom of the screen.
-            Selected New Game is a beveled blue metal blade with a slanted luminous right edge.
-            The navy metallic title bar has the reference proportions, red slash, etched divider,
-            updated version label and four fully working keyboard-accessible vector controls.
-            The old raster icon strips are not displayed. Native .NET 10 WinForms, Windows x64.
-            No image files, custom logos, taglines, Access databases, saves or skins are changed.
-            Skin discovery, database import, editor, independent careers and backups remain.
-            Download and extract into a writable directory. Install your own skin in Skins.
-            Gameplay simulation is not connected to MDB yet.
+            Automatic in-app Windows updater. Use Check for Updates at the bottom of
+            the sidebar to find future stable releases, verify their SHA-256 digest,
+            download the portable ZIP, install the new executable and restart.
+            The temporary updater waits for the current game to close and saves
+            an executable backup in .pwr-updates before replacing anything.
+            Database universes, saved careers, skins, pictures, settings and
+            custom title art are not touched.
+            This is the first stable release, so /releases/latest now works.
+            IMPORTANT: For existing v0.5.3 installs, extract this release once
+            to add the in-app updater. Future stable releases update in place.
+            The updater replaces only the executable, not assets or data folders.
           files: ProWrestlingRevolution-Windows-x64.zip

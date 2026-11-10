@@ -1,6 +1,6 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.3 (Reference Layout) redesigns the navigation without replacing your title screen artwork.
+An original Windows desktop wrestling management project. Version 0.5.4 (In-App Updater) redesigns the navigation without replacing your title screen artwork.
 
 ## Windows application
 
@@ -70,3 +70,30 @@ The Windows smoke test checks that the sidebar is 200 pixels wide, contains all 
 ## Version 0.5.3 changes
 
 The seven main-menu entries now form a continuous, evenly spaced navigation group; the former blank gap before Achievements has been removed. The MAIN MENU heading and thin line, New Game's blue blade shape, icons, label positions and top bar align more closely with the reference. No title-screen JPG, logo, tagline or crowd artwork has been edited. Because the original user artwork is intentionally preserved, its embedded logo can still have a different size or composition from the reference mockup. All file paths, Access data handling and skin selection remain unchanged.
+
+## In-app updates (version 0.5.4 and later)
+
+Click **Check for Updates** at the bottom of the sidebar. The game uses GitHub's
+**latest stable release** and checks it against the version embedded in the
+Windows executable. If newer, it asks for your approval, downloads the official
+portable ZIP from this repository, verifies the release asset SHA-256 digest,
+and checks that the ZIP contains a newer Windows executable. It extracts **only**
+the root \`ProWrestlingRevolution.exe\` and starts a temporary copy of the
+current executable, which waits for the game to exit, replaces the installed
+executable, and restarts Pro Wrestling Revolution.
+
+The updater does **not** unpack or overwrite Databases, SaveGames, Skins,
+Pictures, System or user settings. Each successful replacement keeps a copy
+of the former executable in \`.pwr-updates/\` for recovery. If a download or
+digest check fails, the running game is unaffected. If Windows cannot replace
+the executable (for example, because of permissions), the user sees an error.
+
+The game must be installed in a **writable folder**. Automatic updates do not
+write into protected Program Files directories or elevate privileges. The
+installer deliberately updates **application executable only**; future releases
+which require external runtime dependencies must extend this protocol.
+
+**Migration:** v0.5.3 and earlier have no automatic updater. Install v0.5.4
+once from GitHub, preserving your existing data folders, to enable automatic
+updates for subsequent stable versions. Releases must use non-prerelease tags
+such as \`v0.5.5\` for the GitHub latest endpoint.
