@@ -99,8 +99,11 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     {
         private bool _hover;
         private bool _active;
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal string Glyph { get; set; } = "";
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal bool Important { get; set; }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal bool Active
         {
             get => _active;
@@ -916,7 +919,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         details.Columns.Add("field", "Field");
         details.Columns.Add("value", "Value");
         foreach (DataColumn col in entry.Row.Table.Columns)
-            details.Rows.Add(col.ColumnName, Convert.ToString(entry.Row[col]));
+            details.Rows.Add(col.ColumnName, Convert.ToString(entry.Row[col]) ?? "");
         dialog.Controls.Add(details);
 
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 57 };
