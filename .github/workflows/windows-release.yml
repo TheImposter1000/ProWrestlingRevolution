@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.13 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.14 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -55,7 +55,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.13 portable game ZIP
+      - name: Assemble the Version 0.5.14 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -72,7 +72,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.13 game ZIP
+      - name: Upload complete Version 0.5.14 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -82,8 +82,8 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.13
-          name: Pro Wrestling Revolution 0.5.13 - Native Database Creation
+          tag_name: v0.5.14
+          name: Pro Wrestling Revolution 0.5.14 - MDB Settings Migration
           target_commitish: main
           prerelease: false
           make_latest: true
@@ -97,7 +97,7 @@ jobs:
             an executable backup in .pwr-updates before replacing anything.
             Database universes, saved careers, skins, pictures, settings and
             custom title art are not touched.
-            Version 0.5.13 adds Create Database using the built-in PRWDefault.mdb
+            Version 0.5.14 adds Create Database using the built-in PRWDefault.mdb
             template. The game installs the base MDB in its own System folder,
             creates independent universe copies in Databases, and reads database
             files, saves, skins, pictures, and settings relative to the installed

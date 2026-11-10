@@ -8,18 +8,19 @@ public sealed record CareerEntry(string Name, string UniverseName, string MdbPat
 public sealed class AppPaths
 {
     private readonly string _root;
-    private readonly string _settings;
+    private readonly GameSettings _settings;
     public string Root => _root;
     public string Databases => Path.Combine(_root, "Databases");
     public string Pictures => Path.Combine(_root, "Pictures");
     public string SkinsRoot => Path.Combine(_root, "Skins");
     public string SystemRoot => Path.Combine(_root, "System");
     public string DefaultDatabase => Path.Combine(SystemRoot, PrwDefaultTemplate.Filename);
+    public string SettingsDatabase => _settings.DatabaseFile;
 
     public AppPaths(string root)
     {
         _root = Path.GetFullPath(root);
-        _settings = Path.Combine(SystemRoot, "settings.ini");
+        _settings = new GameSettings(SystemRoot);
     }
 
     public void EnsureLayout()
@@ -43,9 +44,7 @@ public sealed class AppPaths
                 SkinArt.MigrateFlatPack(folder);
         }
 
-        if (!File.Exists(_settings))
-            File.WriteAllText(_settings, "Skin=Obsidian\nDatabase=\n", Encoding.UTF8);
-    }
+     }
 
     // Every folder is selectable, including a work-in-progress skin with
     // only one image. Missing assets are resolved by the launcher against
@@ -63,14 +62,10 @@ public sealed class AppPaths
     }
 
     public string ReadSetting(string key, string fallback) =>
-        Ini.Read(_settings).TryGetValue(key, out var value) ? value : fallback;
+        _settings.Read(key, fallback);
 
-    public void WriteSetting(string key, string value)
-    {
-        var values = Ini.Read(_settings);
-        values[key] = value;
-        Ini.Write(_settings, values);
-    }
+    public void WriteSetting(string key, string value) =>
+        _settings.Write(key, value);
 
     public IReadOnlyList<UniverseEntry> Universes()
     {

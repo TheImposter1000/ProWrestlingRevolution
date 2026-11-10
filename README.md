@@ -1,6 +1,12 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.13 adds portable native database creation, local application file paths, and linked worker record browsing while retaining the existing interface.
+An original Windows desktop wrestling management project. Version 0.5.14 migrates skin and selected-database preferences into a genuine Access MDB, retaining the native universe database workflow.
+
+## Version 0.5.14: native MDB settings
+
+The game's settings are stored in `System/PWRSettings.mdb`, in a `tblSettings` table with `SettingKey` and `SettingValue` columns. On first successful creation, existing `System/settings.ini` values, including the selected Skin and Database, are imported exactly; the INI is retained as `System/settings.ini.migrated` for recovery. Existing settings databases are never replaced.
+
+Creating and editing the MDB requires the Windows 64-bit Access Database Engine and ADOX. If creation is unavailable, the existing INI continues to work temporarily, without discarding any preferences, until the required components are installed. On Windows installations with ACE, confirm the new settings MDB exists before removing any backup files.
 
 ## Windows application
 

@@ -95,7 +95,21 @@ internal static class Program
         try
         {
             var paths = new AppPaths(root);
+            Directory.CreateDirectory(paths.SystemRoot);
+            var originalIni = Path.Combine(paths.SystemRoot, "settings.ini");
+            File.WriteAllText(originalIni, "Skin=Real\nDatabase=MDB\n", Encoding.UTF8);
             paths.EnsureLayout();
+            if (paths.ReadSetting("Skin", "") != "Real" ||
+                paths.ReadSetting("Database", "") != "MDB")
+                throw new Exception("Original skin and database preferences were not migrated.");
+            if (File.Exists(paths.SettingsDatabase))
+            {
+                if (!AccessDatabase.LooksLikeMdb(paths.SettingsDatabase) ||
+                    !File.Exists(originalIni + ".migrated"))
+                    throw new Exception("Native settings MDB or legacy recovery file is missing.");
+            }
+            else if (!File.Exists(originalIni))
+                throw new Exception("Legacy settings were deleted without MDB support.");
             // Simulate the exact player layout without touching user files.
             // VS Debug must read the game root outside Repos; a portable build
             // must always retain its own executable directory.

@@ -11,3 +11,4 @@ dist/
 *.laccdb
 *.tmp
 System/settings.ini
+System/settings.ini.migrated
