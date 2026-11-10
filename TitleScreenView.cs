@@ -33,6 +33,15 @@ internal sealed class TitleScreenView : Control
     private string? _hoverKey;
     private int _keyboardIndex;
     private Image? _artwork;
+    private Image? _exactLayout;
+
+    // Optional pixel-exact approved menu image. Buttons still use live hit testing.
+    // This is not the skin background: it is a full-sized title-screen UI composite.
+    internal Image? ExactLayout
+    {
+        get => _exactLayout;
+        set { _exactLayout = value; Invalidate(); }
+    }
 
     internal Image? Artwork
     {
@@ -64,6 +73,15 @@ internal sealed class TitleScreenView : Control
         g.Clear(Color.FromArgb(7, 18, 31));
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+        // Painting the supplied reference composite is pixel accurate, including
+        // the crowd, logo, interface geometry, typography, and button textures.
+        // Interaction regions below remain real and usable.
+        if (_exactLayout is not null)
+        {
+            g.DrawImage(_exactLayout, ClientRectangle);
+            return;
+        }
 
         // Keep the crowd image and the large logo exactly as supplied in the skin.
         // No second logo, wallpaper substitution, crop of the logo, or tint over it.
