@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.4 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.5 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Version 0.5.4 portable game ZIP
+      - name: Assemble the Version 0.5.5 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.4 game ZIP
+      - name: Upload complete Version 0.5.5 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,8 +76,8 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.4
-          name: Pro Wrestling Revolution 0.5.4 - In-App Updater
+          tag_name: v0.5.5
+          name: Pro Wrestling Revolution 0.5.5 - Reference Title Screen
           target_commitish: main
           prerelease: false
           make_latest: true
@@ -91,7 +91,7 @@ jobs:
             an executable backup in .pwr-updates before replacing anything.
             Database universes, saved careers, skins, pictures, settings and
             custom title art are not touched.
-            This is the first stable release, so /releases/latest now works.
+            This release adds the reference title screen and preserves the in-app updater.
             IMPORTANT: For existing v0.5.3 installs, extract this release once
             to add the in-app updater. Future stable releases update in place.
             The updater replaces only the executable, not assets or data folders.
