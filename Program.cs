@@ -208,7 +208,47 @@ internal static class Program
             try { paths.CreateCareer(world, "../bad"); }
             catch (ArgumentException) { unsafeRejected = true; }
             if (!unsafeRejected) throw new Exception("Unsafe path was allowed.");
-            Console.WriteLine("Phase One smoke tests passed.");
+            // Reusable popup shell and both modal flows must be real controls,
+            // not full-screen replacements of the title/game pages.
+            using (var selector = new DatabaseSelectorDialog(paths, skin))
+            using (var saves = new LoadGameDialog(paths, skin))
+            {
+                foreach (var popup in new Form[] { selector, saves })
+                {
+                    if (popup.FormBorderStyle != FormBorderStyle.None ||
+                        popup.Controls.Find("PopupWorkspace", true).Length != 1 ||
+                        popup.Controls.Find("PopupItemList", true).Length != 1 ||
+                        popup.Controls.Find("PopupInformation", true).Length != 1 ||
+                        popup.Controls.Find("PopupActions", true).Length != 1)
+                        throw new Exception("Shared utility popup layout is missing.");
+                    popup.PerformLayout();
+                }
+                if (selector.Controls.Find("ActionUseThisDatabase", true).Length != 1)
+                    throw new Exception("Database selection action is missing.");
+                var load = saves.Controls.Find("ActionLoad", true).SingleOrDefault() as Button;
+                if (load is null || load.Enabled)
+                    throw new Exception("Unimplemented gameplay loading must stay disabled.");
+            }
+
+            // Exercise safe save operations using a file-management fixture.
+            var renamed = paths.RenameCareer(career, "Renamed Career");
+            if (!File.Exists(renamed.MdbPath) || File.Exists(career.MdbPath))
+                throw new Exception("Rename did not move the career safely.");
+            var copied = paths.CopyCareer(renamed, "Copied Career");
+            if (!File.Exists(copied.MdbPath) ||
+                !File.Exists(Path.Combine(Path.GetDirectoryName(copied.MdbPath)!,
+                    "Backups", "initial.mdb")))
+                throw new Exception("Career copy did not retain its recovery data.");
+            File.WriteAllBytes(renamed.MdbPath, [1, 2, 3, 4, 5]);
+            string preserved = paths.RestoreCareerInitialBackup(renamed);
+            if (!File.Exists(preserved) || !AccessDatabase.LooksLikeMdb(renamed.MdbPath))
+                throw new Exception("Recovery did not preserve and restore MDB files.");
+            string archived = paths.ArchiveCareer(renamed);
+            if (!Directory.Exists(archived) || File.Exists(renamed.MdbPath) ||
+                !File.Exists(copied.MdbPath))
+                throw new Exception("Archive must preserve the removed save and other careers.");
+
+            Console.WriteLine("Popup and save-management smoke tests passed.");
         }
         finally
         {
