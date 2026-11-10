@@ -101,7 +101,7 @@ internal static class Program
                 if (rows.Any(row => row.AccessibleRole != AccessibleRole.PushButton))
                     throw new Exception("Navigation row is not accessible as a button.");
                 var topbar = launcher.Controls.OfType<MetalTopBar>().SingleOrDefault();
-                if (topbar is null || topbar.Height != 36)
+                if (topbar is null || topbar.Height != 40)
                     throw new Exception("The metallic utility bar must be 36 pixels high.");
                 var controls = topbar.Controls.OfType<TopUtilityButton>().ToList();
                 if (controls.Count != 4 ||
@@ -109,6 +109,28 @@ internal static class Program
                     throw new Exception("Four accessible top utility buttons are required.");
                 if (topbar.Controls.OfType<PictureBox>().Any())
                     throw new Exception("The old raster top utility strip must not be displayed.");
+
+                var newRow = rows.Single(row => row.Name == "Menu_new");
+                var creditsRow = rows.Single(row => row.Name == "Menu_credits");
+                if (newRow.Left != 0 || newRow.Top != 97 ||
+                    newRow.Width != sidebar.Width ||
+                    creditsRow.Top != 433 || creditsRow.Left != 0)
+                    throw new Exception("Menu rows must be flush and evenly spaced.");
+                foreach (var key in new[]
+                {
+                    "new", "load", "database", "editor", "skins",
+                    "achievements", "credits"
+                }.Select((key, i) => (key, i)))
+                {
+                    var row = rows.Single(r => r.Name == "Menu_" + key.key);
+                    if (row.Top != 97 + key.i * 56 || row.Height != 54)
+                        throw new Exception("Incorrect spacing for " + key.key);
+                }
+                if (controls.Any(button => button.Width != 50 || button.Height != 40))
+                    throw new Exception("Top utility controls must match the 50 x 40 reference.");
+                if (controls.OrderBy(button => button.Left).First().Left !=
+                    SkinArt.WindowWidth - 200)
+                    throw new Exception("Top controls are incorrectly aligned.");
             }
 
             var fixture = Path.Combine(root, "sample.mdb");

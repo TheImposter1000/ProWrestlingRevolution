@@ -18,6 +18,15 @@ internal static class MetalColors
             (int)Math.Round(first.G * (1 - amount) + second.G * amount),
             (int)Math.Round(first.B * (1 - amount) + second.B * amount));
     }
+
+    internal static Color SidebarLeft(SkinPalette palette) =>
+        Mix(palette.Sidebar, Color.FromArgb(5, 13, 25), 0.72);
+
+    internal static Color SidebarRight(SkinPalette palette) =>
+        Mix(palette.Sidebar, Color.FromArgb(12, 33, 57), 0.62);
+
+    internal static Color TopRight(SkinPalette palette) =>
+        Mix(palette.Surface, Color.FromArgb(7, 19, 35), 0.78);
 }
 
 internal sealed class MetalTopBar : Panel
@@ -28,7 +37,7 @@ internal sealed class MetalTopBar : Panel
     {
         _palette = palette;
         Dock = DockStyle.Top;
-        Height = 36;
+        Height = 40;
         DoubleBuffered = true;
         ResizeRedraw = true;
     }
@@ -41,12 +50,21 @@ internal sealed class MetalTopBar : Panel
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        if (Width <= 0 || Height <= 0) return;
-        using var brushed = new LinearGradientBrush(ClientRectangle,
-            MetalColors.Mix(_palette.Surface, Color.FromArgb(75, 88, 106), 0.27),
-            MetalColors.Mix(_palette.Surface, Color.FromArgb(5, 9, 19), 0.36),
-            LinearGradientMode.Vertical);
-        e.Graphics.FillRectangle(brushed, ClientRectangle);
+        if (Width < 1 || Height < 1) return;
+        using var metal = new LinearGradientBrush(ClientRectangle,
+            MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 18, 34), 0.75),
+            MetalColors.TopRight(_palette), LinearGradientMode.Horizontal);
+        metal.InterpolationColors = new ColorBlend
+        {
+            Colors =
+            [
+                MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 16, 29), 0.80),
+                MetalColors.Mix(_palette.Surface, Color.FromArgb(12, 38, 63), 0.77),
+                MetalColors.TopRight(_palette)
+            ],
+            Positions = [0f, 0.49f, 1f]
+        };
+        e.Graphics.FillRectangle(metal, ClientRectangle);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -55,25 +73,23 @@ internal sealed class MetalTopBar : Panel
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        // An etched reflection at the top and a continuous cool edge below.
-        using var shine = new Pen(Color.FromArgb(78, 195, 214, 230));
-        using var line = new Pen(Color.FromArgb(160, _palette.AccentSecondary));
-        g.DrawLine(shine, 0, 0, Width, 0);
-        g.DrawLine(line, 0, Height - 1, Width, Height - 1);
+        using var upperReflection = new Pen(Color.FromArgb(90, 172, 199, 225), 1);
+        using var accentLine = new Pen(Color.FromArgb(145, _palette.AccentSecondary), 1);
+        g.DrawLine(upperReflection, 0, 0, Width - 1, 0);
+        g.DrawLine(accentLine, 0, Height - 1, Width - 1, Height - 1);
 
-        // Small original red slash emblem, distinct from the title JPG.
-        using var red = new SolidBrush(Color.FromArgb(237, 39, 65));
-        using var gleam = new Pen(Color.FromArgb(255, 128, 141), 1);
+        // Only the small chrome emblem is drawn here; the main JPG is untouched.
+        using var red = new SolidBrush(Color.FromArgb(239, 36, 65));
+        using var gleam = new Pen(Color.FromArgb(245, 144, 155), 1);
         g.FillPolygon(red,
         [
-            new Point(17, 9), new Point(24, 9),
-            new Point(17, 27), new Point(10, 27)
+            new Point(34, 12), new Point(43, 12),
+            new Point(36, 29), new Point(27, 29)
         ]);
-        g.DrawLine(gleam, 17, 9, 24, 9);
+        g.DrawLine(gleam, 34, 12, 43, 12);
 
-        // Thin engraved separator between the app name and its version.
-        using var divider = new Pen(Color.FromArgb(115, 170, 189, 205));
-        g.DrawLine(divider, 342, 9, 342, 27);
+        using var divider = new Pen(Color.FromArgb(165, 173, 196, 217), 1);
+        g.DrawLine(divider, 310, 11, 310, 29);
     }
 }
 
@@ -100,8 +116,8 @@ internal sealed class MetalSidebar : Panel
     {
         if (Width <= 0 || Height <= 0) return;
         using var brushed = new LinearGradientBrush(ClientRectangle,
-            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(39, 51, 70), 0.30),
-            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(2, 7, 15), 0.26),
+            MetalColors.SidebarLeft(_palette),
+            MetalColors.SidebarRight(_palette),
             LinearGradientMode.Horizontal);
         e.Graphics.FillRectangle(brushed, ClientRectangle);
     }
@@ -109,14 +125,24 @@ internal sealed class MetalSidebar : Panel
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using var edge = new Pen(Color.FromArgb(105, _palette.Border));
-        using var light = new Pen(Color.FromArgb(32, _palette.AccentSecondary));
-        e.Graphics.DrawLine(edge, Width - 1, 0, Width - 1, Height);
-        e.Graphics.DrawLine(light, 0, 0, 0, Height);
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        // Very subtle angled steel detail near the lower corner.
-        using var facet = new Pen(Color.FromArgb(24, 180, 197, 215));
-        e.Graphics.DrawLine(facet, 0, Height - 54, 54, Height);
+        // Geometric, translucent steel facet below the seven menu entries.
+        using var facet = new SolidBrush(Color.FromArgb(44, 30, 66, 105));
+        g.FillPolygon(facet,
+        [
+            new Point(0, Height - 1),
+            new Point(Width - 1, Height - 182),
+            new Point(Width - 1, Height - 1)
+        ]);
+        using var facetEdge = new Pen(Color.FromArgb(44, 111, 150, 190), 1);
+        g.DrawLine(facetEdge, 0, Height - 1, Width - 1, Height - 182);
+
+        using var border = new Pen(Color.FromArgb(100, _palette.Border), 1);
+        using var coolEdge = new Pen(Color.FromArgb(35, _palette.AccentSecondary), 1);
+        g.DrawLine(border, Width - 1, 0, Width - 1, Height - 1);
+        g.DrawLine(coolEdge, 0, 0, 0, Height - 1);
     }
 }
 
@@ -132,7 +158,7 @@ internal sealed class TopUtilityButton : Control
     {
         _kind = kind;
         _palette = palette;
-        Size = new Size(44, 36);
+        Size = new Size(50, 40);
         Cursor = Cursors.Hand;
         TabStop = true;
         AccessibleRole = AccessibleRole.PushButton;
@@ -191,9 +217,11 @@ internal sealed class TopUtilityButton : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        var baseColor = MetalColors.Mix(_palette.Surface,
-            Color.FromArgb(5, 9, 17), _hovered ? 0.18 : 0.58);
-        g.Clear(baseColor);
+        using (var back = new LinearGradientBrush(ClientRectangle,
+            MetalColors.TopRight(_palette),
+            MetalColors.Mix(MetalColors.TopRight(_palette), Color.Black, 0.14),
+            LinearGradientMode.Vertical))
+            g.FillRectangle(back, ClientRectangle);
 
         if (_hovered)
         {
@@ -202,10 +230,11 @@ internal sealed class TopUtilityButton : Control
         }
 
         using var divider = new Pen(Color.FromArgb(75, 159, 179, 198));
-        using var bottom = new Pen(Color.FromArgb(160, _palette.AccentSecondary));
+        using var bottom = new Pen(Color.FromArgb(145, _palette.AccentSecondary));
         g.DrawLine(divider, 0, 7, 0, Height - 7);
         g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
 
+        g.TranslateTransform(3, 2);
         var color = _kind == "close" ? Color.FromArgb(248, 62, 78)
             : _hovered ? _palette.AccentSecondary : Color.FromArgb(235, 240, 247);
         using var pen = new Pen(color, 1.9f)
@@ -253,6 +282,8 @@ internal sealed class TopUtilityButton : Control
                 g.DrawLine(pen, 29, 12, 16, 25);
                 break;
         }
+
+        g.ResetTransform();
 
         if (Focused)
         {

@@ -13,8 +13,8 @@ public sealed partial class LauncherForm
     private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
     private readonly Label _versionText = new();
-    private readonly Font _navFont = new("Segoe UI", 9.5f, FontStyle.Regular);
-    private readonly Font _navFontActive = new("Segoe UI", 9.5f, FontStyle.Bold);
+    private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
+    private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
 
     private void BuildChrome()
     {
@@ -28,28 +28,35 @@ public sealed partial class LauncherForm
         // One unified row per menu option: vector icon, text and click target.
         // The previous 57px TEW-style image strip is deliberately not added.
         _menuHeader.Text = "M A I N   M E N U";
-        _menuHeader.Location = new Point(24, 75);
-        _menuHeader.Size = new Size(_sidebar.Width - 38, 28);
+        _menuHeader.Location = new Point(28, 51);
+        _menuHeader.Size = new Size(_sidebar.Width - 36, 28);
         _menuHeader.TextAlign = ContentAlignment.MiddleLeft;
         _menuHeader.BackColor = Color.Transparent;
         _menuHeader.ForeColor = _skin.Muted;
         _menuHeader.Font = new Font("Segoe UI", 9, FontStyle.Regular);
+        _menuHeader.Paint += (_, e) =>
+        {
+            using var rule = new Pen(Color.FromArgb(100, _skin.AccentSecondary), 1);
+            e.Graphics.DrawLine(rule, 111, 14, _menuHeader.Width - 4, 14);
+        };
         _sidebar.Controls.Add(_menuHeader);
 
-        foreach (var (key, label, y) in SkinArt.MenuIcons)
+        int menuIndex = 0;
+        foreach (var (key, label, _) in SkinArt.MenuIcons)
         {
             var text = key switch
             {
                 "back" => "Home",
-                "database" => "Database Selector",
-                "editor" => "Database Editor",
+                "database" => "Database",
+                "editor" => "Editor",
                 _ => label
             };
+            int center = key == "back" ? 63 : 124 + (menuIndex++ * 56);
             var item = new SidebarMenuRow(key, text, _skin, _navFont, _navFontActive)
             {
                 Name = "Menu_" + key,
-                Location = new Point(6, y - 27),
-                Width = _sidebar.Width - 12
+                Location = new Point(0, center - 27),
+                Width = _sidebar.Width
             };
             item.MouseEnter += (_, _) => SetHoverIcon(key);
             item.MouseLeave += (_, _) => SetHoverIcon(null);
@@ -61,15 +68,15 @@ public sealed partial class LauncherForm
         // Brushed-metal chrome replaces the separate raster button strip.
         // Every utility button is clickable, keyboard-accessible and has a tooltip name.
         _titleText.Text = "PRO WRESTLING REVOLUTION";
-        _titleText.Location = new Point(30, 0);
-        _titleText.Size = new Size(301, _topbar.Height - 1);
+        _titleText.Location = new Point(56, 0);
+        _titleText.Size = new Size(250, _topbar.Height - 1);
         _titleText.TextAlign = ContentAlignment.MiddleLeft;
         _titleText.BackColor = Color.Transparent;
         _titleText.ForeColor = _skin.Foreground;
-        _titleText.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        _titleText.Font = new Font("Segoe UI", 11.5f, FontStyle.Bold);
 
-        _versionText.Text = "v0.5.2";
-        _versionText.Location = new Point(357, 0);
+        _versionText.Text = "v0.5.3";
+        _versionText.Location = new Point(326, 0);
         _versionText.Size = new Size(75, _topbar.Height - 1);
         _versionText.TextAlign = ContentAlignment.MiddleLeft;
         _versionText.BackColor = Color.Transparent;
@@ -91,7 +98,7 @@ public sealed partial class LauncherForm
         for (int i = 0; i < utility.Length; i++)
         {
             utility[i].Location = new Point(
-                SkinArt.WindowWidth - (utility.Length - i) * 44, 0);
+                SkinArt.WindowWidth - (utility.Length - i) * utility[i].Width, 0);
             _topbar.Controls.Add(utility[i]);
         }
 
@@ -129,7 +136,7 @@ public sealed partial class LauncherForm
     {
         bool isHome = _currentPage == "HOME";
         _menuHeader.Visible = isHome;
-        _menuHeader.BackColor = _skin.Sidebar;
+        _menuHeader.BackColor = Color.Transparent;
         _menuHeader.ForeColor = _skin.Muted;
 
         string? active = _currentPage switch

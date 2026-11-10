@@ -30,7 +30,7 @@ internal sealed class SidebarMenuRow : Control
         BackColor = palette.Sidebar;
         ForeColor = palette.Foreground;
         Cursor = Cursors.Hand;
-        Size = new Size(228, 54);
+        Size = new Size(200, 54);
         TabStop = true;
         AccessibleName = caption;
         AccessibleRole = AccessibleRole.PushButton;
@@ -64,62 +64,76 @@ internal sealed class SidebarMenuRow : Control
         base.OnPaint(e);
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        // Align the idle row with the sidebar's subtle metallic finish.
+
+        // Use exactly the same fill as the parent so idle items form one
+        // continuous sidebar rather than seven individual dark rectangles.
         using (var baseMetal = new LinearGradientBrush(ClientRectangle,
-            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(39, 51, 70), 0.30),
-            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(2, 7, 15), 0.26),
+            MetalColors.SidebarLeft(_palette), MetalColors.SidebarRight(_palette),
             LinearGradientMode.Horizontal))
             g.FillRectangle(baseMetal, ClientRectangle);
-        bool highlighted = _hovered || _selected;
 
+        bool highlighted = _hovered || _selected;
         if (highlighted)
         {
-            using var metal = new LinearGradientBrush(
-                ClientRectangle,
-                Color.FromArgb(55, 77, 99),
-                Color.FromArgb(15, 25, 43),
-                LinearGradientMode.Horizontal
-            );
+            // The reference uses a diagonal metal blade, not a flat rectangle.
+            var shape =
+                new[]
+                {
+                    new Point(0, 0),
+                    new Point(Width - 1, 0),
+                    new Point(Width - 20, Height - 1),
+                    new Point(0, Height - 1)
+                };
 
-            g.FillRectangle(metal, ClientRectangle);
+            using var fill = new LinearGradientBrush(ClientRectangle,
+                Color.FromArgb(22, 40, 62), Color.FromArgb(27, 85, 135),
+                LinearGradientMode.Horizontal);
+            fill.InterpolationColors = new ColorBlend
+            {
+                Colors =
+                [
+                    MetalColors.Mix(Color.FromArgb(23, 41, 64), _palette.Accent, 0.06),
+                    MetalColors.Mix(Color.FromArgb(33, 69, 110), _palette.Accent, 0.10),
+                    MetalColors.Mix(Color.FromArgb(28, 91, 151), _palette.Accent, 0.14)
+                ],
+                Positions = [0f, 0.67f, 1f]
+            };
+            g.FillPolygon(fill, shape);
 
-            using var shine = new Pen(
-                Color.FromArgb(150, 185, 210, 225), 1
-            );
+            using var topReflection = new Pen(Color.FromArgb(158, 193, 222, 244), 1);
+            using var bottomReflection = new Pen(Color.FromArgb(92, 121, 168, 204), 1);
+            g.DrawLine(topReflection, 1, 0, Width - 2, 0);
+            g.DrawLine(bottomReflection, 1, Height - 1, Width - 20, Height - 1);
 
-            g.DrawLine(shine, 1, 1, Width - 2, 1);
+            using var outerGlow = new Pen(Color.FromArgb(70, _palette.AccentSecondary), 7);
+            using var brightEdge = new Pen(_palette.AccentSecondary, 2);
+            g.DrawLine(outerGlow, Width - 2, 1, Width - 20, Height - 2);
+            g.DrawLine(brightEdge, Width - 2, 1, Width - 20, Height - 2);
 
-            using var shadow = new Pen(
-                Color.FromArgb(80, 5, 12, 24), 1
-            );
-
-            g.DrawLine(
-                shadow, 1, Height - 2,
-                Width - 2, Height - 2
-            );
-
-            using var accent = new Pen(
-                _palette.AccentSecondary, 3
-            );
-
-            g.DrawLine(accent, 1, 4, 1, Height - 5);
-            using var reflectedEdge = new Pen(Color.FromArgb(100, _palette.AccentSecondary), 1);
-            g.DrawLine(reflectedEdge, Width - 2, 3, Width - 2, Height - 4);
+            using var innerSheen = new Pen(Color.FromArgb(95, 235, 248, 255), 1);
+            g.DrawLine(innerSheen, Width - 6, 3, Width - 23, Height - 4);
         }
 
-        var foreground = highlighted ? _palette.AccentSecondary : _palette.Foreground;
-        g.TranslateTransform(12, (Height - 26) / 2f);
+        // Reflected silver remains readable above the bright blue blade.
+        var foreground = _palette.Foreground;
+        g.TranslateTransform(27, (Height - 26) / 2f);
         DrawIcon(g, _key, foreground);
         g.ResetTransform();
-        var textRect = new Rectangle(49, 0, Width - 53, Height);
-        TextRenderer.DrawText(g, _caption, highlighted ? _activeFont : _normalFont,
+
+        var textRect = new Rectangle(75, 0, Width - 80, Height);
+        TextRenderer.DrawText(g, _caption,
+            highlighted ? _activeFont : _normalFont,
             textRect, foreground,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
             TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+
         if (Focused)
         {
-            using var outline = new Pen(_palette.AccentSecondary, 1) { DashStyle = DashStyle.Dot };
-            g.DrawRectangle(outline, 5, 4, Width - 11, Height - 9);
+            using var focus = new Pen(_palette.AccentSecondary, 1)
+            {
+                DashStyle = DashStyle.Dot
+            };
+            g.DrawRectangle(focus, 4, 4, Width - 26, Height - 9);
         }
     }
 
@@ -165,29 +179,29 @@ internal sealed class SidebarMenuRow : Control
                 break;
 
             case "skins":
+                // A tag silhouette mirrors the source mockup.
                 g.DrawPolygon(pen,
                 [
-                    new Point(13, 2), new Point(24, 8),
-                    new Point(13, 14), new Point(2, 8)
+                    new Point(2, 12), new Point(12, 2),
+                    new Point(24, 2), new Point(24, 14),
+                    new Point(14, 24)
                 ]);
-                g.DrawLines(pen,
-                [
-                    new Point(2, 13), new Point(13, 19), new Point(24, 13)
-                ]);
-                g.DrawLines(pen,
-                [
-                    new Point(2, 18), new Point(13, 24), new Point(24, 18)
-                ]);
+                g.DrawEllipse(pen, 17, 6, 3, 3);
                 break;
 
             case "achievements":
-                g.DrawArc(pen, 6, 2, 15, 16, 0, 180);
-                g.DrawLine(pen, 6, 5, 2, 5);
-                g.DrawArc(pen, 0, 5, 9, 11, 0, 145);
-                g.DrawLine(pen, 21, 5, 25, 5);
-                g.DrawArc(pen, 18, 5, 9, 11, 35, 145);
-                g.DrawLine(pen, 13, 18, 13, 22);
-                g.DrawLine(pen, 8, 23, 18, 23);
+                // Trophy cup with handles, stem and plinth.
+                g.DrawLines(pen,
+                [
+                    new Point(5, 4), new Point(7, 13),
+                    new Point(13, 18), new Point(19, 13),
+                    new Point(21, 4)
+                ]);
+                g.DrawLine(pen, 5, 4, 21, 4);
+                g.DrawArc(pen, 0, 5, 10, 10, 75, 205);
+                g.DrawArc(pen, 16, 5, 10, 10, 260, 205);
+                g.DrawLine(pen, 13, 18, 13, 23);
+                g.DrawLine(pen, 9, 23, 17, 23);
                 break;
 
             case "credits":
