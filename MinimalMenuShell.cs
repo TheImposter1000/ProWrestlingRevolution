@@ -13,6 +13,7 @@ public sealed partial class LauncherForm
     private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
     private readonly Label _versionText = new();
+    private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
     private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
 
@@ -65,36 +66,6 @@ public sealed partial class LauncherForm
             _sidebar.Controls.Add(item);
         }
 
-        var updateButton = new Button
-        {
-            Name = "CheckUpdatesButton",
-            Text = "↻  Check for Updates",
-            Dock = DockStyle.Bottom,
-            Height = 46,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = _skin.Button,
-            ForeColor = _skin.Foreground,
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-
-        updateButton.FlatAppearance.BorderColor = _skin.Border;
-        updateButton.FlatAppearance.BorderSize = 1;
-
-        updateButton.Click += (_, _) =>
-        {
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "https://github.com/TheImposter1000/ProWrestlingRevolution/releases/latest",
-                    UseShellExecute = true
-                }
-            );
-        };
-
-        _sidebar.Controls.Add(updateButton);
-        updateButton.BringToFront();
-
         // Brushed-metal chrome replaces the separate raster button strip.
         // Every utility button is clickable, keyboard-accessible and has a tooltip name.
         _titleText.Text = "PRO WRESTLING REVOLUTION";
@@ -105,7 +76,7 @@ public sealed partial class LauncherForm
         _titleText.ForeColor = _skin.Foreground;
         _titleText.Font = new Font("Segoe UI", 11.5f, FontStyle.Bold);
 
-        _versionText.Text = "v0.5.3";
+        _versionText.Text = "v" + GameUpdate.DisplayVersion;
         _versionText.Location = new Point(326, 0);
         _versionText.Size = new Size(75, _topbar.Height - 1);
         _versionText.TextAlign = ContentAlignment.MiddleLeft;
@@ -246,6 +217,9 @@ public sealed partial class LauncherForm
         _sidebar.BackColor = _skin.Sidebar;
         _sidebar.UpdatePalette(_skin);
         _menuHeader.ForeColor = _skin.Muted;
+        _updateButton.BackColor = _skin.Button;
+        _updateButton.ForeColor = _skin.Foreground;
+        _updateButton.FlatAppearance.BorderColor = _skin.Border;
         _topbar.BackColor = _skin.Surface;
         _topbar.UpdatePalette(_skin);
         foreach (var button in _topbar.Controls.OfType<TopUtilityButton>())

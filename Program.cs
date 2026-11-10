@@ -10,6 +10,10 @@ internal static class Program
     {
         try
         {
+            if (args.Length > 0 &&
+                args[0].Equals("--apply-update", StringComparison.OrdinalIgnoreCase))
+                return GameUpdate.ApplyFromHelper(args);
+
             if (args.Contains("--generate-assets", StringComparer.OrdinalIgnoreCase))
             {
                 var workingDirectory = new AppPaths(Directory.GetCurrentDirectory());
@@ -93,6 +97,11 @@ internal static class Program
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
                 if (sidebar is null || sidebar.Width != 200)
                     throw new Exception("Unified navigation width must be 240.");
+                var updateButton = sidebar.Controls.OfType<Button>()
+                    .SingleOrDefault(button => button.Name == "CheckUpdatesButton");
+                if (updateButton is null || updateButton.Dock != DockStyle.Bottom ||
+                    updateButton.Height != 46)
+                    throw new Exception("Check for Updates must be docked at sidebar bottom.");
                 if (sidebar.Controls.OfType<PictureBox>().Any())
                     throw new Exception("Old graphical icon strip was still added to sidebar.");
                 var rows = sidebar.Controls.OfType<SidebarMenuRow>().ToList();
@@ -132,6 +141,24 @@ internal static class Program
                     SkinArt.WindowWidth - 200)
                     throw new Exception("Top controls are incorrectly aligned.");
             }
+
+            // Updates may carry game data files in the ZIP, but the installer
+            // must extract only the executable and never touch those files.
+            var sampleArchive = Path.Combine(root, "update-test.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(
+                sampleArchive, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                using (var output = archive.CreateEntry(
+                    "ProWrestlingRevolution.exe").Open())
+                    output.Write(new byte[] { 0x4D, 0x5A, 0, 0 });
+                using (var output = archive.CreateEntry(
+                    "Databases/ShouldNotBeExtracted.mdb").Open())
+                    output.Write(new byte[] { 0x41 });
+            }
+            GameUpdate.ExtractApplication(sampleArchive,
+                Path.Combine(root, "sample-new.exe"));
+            if (File.Exists(Path.Combine(root, "Databases", "ShouldNotBeExtracted.mdb")))
+                throw new Exception("Updater extracted game data files.");
 
             var fixture = Path.Combine(root, "sample.mdb");
             var header = new byte[2048];
