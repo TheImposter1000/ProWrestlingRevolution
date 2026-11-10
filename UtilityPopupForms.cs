@@ -68,6 +68,82 @@ internal abstract class UtilityPopupForm : Form
         BuildChrome();
     }
 
+    // Main-menu navigation is a permanent part of the utility screen chrome.
+    // Reuse the exact icon-and-text buttons from the launcher.
+    internal void AttachMainNavigation(string activeSection)
+    {
+        if (Controls.Find("PopupMainNavigation", false).Length > 0) return;
+        var sidebar = new MetalSidebar(Palette)
+        {
+            Name = "PopupMainNavigation",
+            Dock = DockStyle.Left,
+            Width = 200
+        };
+        var normal = new Font("Segoe UI", 10.5f);
+        var selectedFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        Disposed += (_, _) => { normal.Dispose(); selectedFont.Dispose(); };
+        sidebar.Controls.Add(new Label
+        {
+            Text = "M A I N   M E N U", Location = new Point(28, 8),
+            Size = new Size(168, 24), ForeColor = Palette.Muted,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9f)
+        });
+        int index = 0;
+        foreach (var (key, label, _) in SkinArt.MenuIcons)
+        {
+            string caption = key switch
+            {
+                "back" => "Home",
+                "database" => "Database",
+                "editor" => "Editor",
+                _ => label
+            };
+            int center = key == "back" ? 63 : 124 + index++ * 56;
+            var row = new SidebarMenuRow(key, caption, Palette, normal, selectedFont)
+            {
+                Name = "Menu_" + key,
+                Location = new Point(0, center - 27),
+                Width = sidebar.Width
+            };
+            row.UpdateAppearance(Palette, false, activeSection == key);
+            row.Click += (_, _) => RequestMainNavigation(key);
+            sidebar.Controls.Add(row);
+        }
+        var updates = new Button
+        {
+            Name = "CheckUpdatesButton", Text = "↻  Check for Updates",
+            Dock = DockStyle.Bottom, Height = 46,
+            FlatStyle = FlatStyle.Flat, BackColor = Palette.Button,
+            ForeColor = Palette.Foreground,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        updates.FlatAppearance.BorderColor = Palette.Border;
+        updates.Click += (_, _) => RequestMainNavigation("updates");
+        sidebar.Controls.Add(updates);
+        updates.BringToFront();
+        Controls.Add(sidebar);
+        sidebar.BringToFront();
+    }
+
+    internal string? RequestedMainNavigation { get; private set; }
+
+    private void RequestMainNavigation(string section)
+    {
+        RequestedMainNavigation = section;
+        DialogResult = DialogResult.Cancel;
+        Close();
+    }
+
+    internal void FillLauncherWindow(Form launcher)
+    {
+        StartPosition = FormStartPosition.Manual;
+        MinimumSize = Size.Empty;
+        MaximumSize = Size.Empty;
+        Bounds = launcher.Bounds;
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
@@ -864,21 +940,6 @@ internal sealed class LoadGameDialog : UtilityPopupForm
         Items.DisplayMember = nameof(SaveItem.DisplayName);
         Items.SelectedIndexChanged += (_, _) => UpdateDetails();
         RefreshSaves();
-    }
-
-    /// <summary>
-    /// Show the approved Option A Load Game layout as an independent,
-    /// game-sized window. This covers rather than floats over the title screen.
-    /// </summary>
-    internal void FillLauncherWindow(Form launcher)
-    {
-        // Use the actual outer bounds, not the nominal logical canvas. Windows
-        // may clamp the launcher when the desktop working area is smaller.
-        // A borderless form matching those bounds covers the parent exactly.
-        StartPosition = FormStartPosition.Manual;
-        MinimumSize = Size.Empty;
-        MaximumSize = Size.Empty;
-        Bounds = launcher.Bounds;
     }
 
     private sealed record SaveItem(CareerEntry Career)

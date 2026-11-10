@@ -77,6 +77,7 @@ public sealed partial class LauncherForm : Form
         switch (key)
         {
             case "back": if (_currentPage != "HOME") ShowHome(); break;
+            case "updates": _ = GameUpdate.CheckAndInstallAsync(this, _updateButton); break;
             case "new": ShowNewGame(); break;
             case "load": ShowLoadGame(); break;
             case "database": ShowDatabaseSelector(); break;
@@ -210,10 +211,17 @@ public sealed partial class LauncherForm : Form
 
     private void ShowDatabaseSelector()
     {
-        // Utility operation: retain the current underlying page.
         using var dialog = new DatabaseSelectorDialog(_paths, _skin);
-        if (dialog.ShowDialog(this) == DialogResult.OK && _currentPage == "NEW GAME")
-            ShowNewGame(); // Refresh the New Game world's list after selection.
+        dialog.FillLauncherWindow(this);
+        dialog.AttachMainNavigation("database");
+        var result = dialog.ShowDialog(this);
+        if (dialog.RequestedMainNavigation is string requested)
+        {
+            Navigate(requested);
+            return;
+        }
+        if (result == DialogResult.OK && _currentPage == "NEW GAME")
+            ShowNewGame();
     }
 
     private void ShowNewGame()
@@ -260,16 +268,20 @@ public sealed partial class LauncherForm : Form
         // Gameplay loading remains unavailable until the engine is connected.
         using var dialog = new LoadGameDialog(_paths, _skin);
         dialog.FillLauncherWindow(this);
+        dialog.AttachMainNavigation("load");
         dialog.ShowDialog(this);
+        if (dialog.RequestedMainNavigation is string requested)
+            Navigate(requested);
     }
 
     private void ShowDatabaseEditor()
     {
         // This is the simple directory screen, not a record editing form.
-        // Hide the ordinary sidebar to give records and notes the full width.
+        // Main menu stays visible while the editor owns the content area.
         _currentPage = "DATABASE EDITOR";
         _hoverIcon = null;
-        _sidebar.Visible = false;
+        _sidebar.Visible = true;
+        RenderSidebar();
         _topbar.Visible = true;
         _editorPageTitle.Visible = true;
         ClearPageContent();

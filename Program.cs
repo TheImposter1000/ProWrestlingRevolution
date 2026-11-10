@@ -154,8 +154,12 @@ internal static class Program
                     System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
                 var workspace = titleCanvas!.Controls
                     .OfType<DatabaseEditorWorkspace>().SingleOrDefault();
-                if (workspace is null || sidebar.Visible)
-                    throw new Exception("Database editor workspace must replace the interior sidebar.");
+                // The smoke test intentionally never shows the launcher.
+                // Control.Visible is false while its parent Form is hidden,
+                // even if the sidebar is explicitly enabled on the editor.
+                if (workspace is null || sidebar.Dock != DockStyle.Left ||
+                    sidebar.Controls.OfType<SidebarMenuRow>().Count() != SkinArt.MenuIcons.Length)
+                    throw new Exception("Database editor must retain the main menu sidebar.");
                 static IEnumerable<Control> Descendants(Control parent) =>
                     parent.Controls.Cast<Control>().SelectMany(child =>
                         new[] { child }.Concat(Descendants(child)));
@@ -213,8 +217,17 @@ internal static class Program
             using (var selector = new DatabaseSelectorDialog(paths, skin))
             using (var saves = new LoadGameDialog(paths, skin))
             {
-                foreach (var popup in new Form[] { selector, saves })
+                foreach (var popup in new UtilityPopupForm[] { selector, saves })
                 {
+                    popup.AttachMainNavigation(popup == saves ? "load" : "database");
+                    var nav = popup.Controls.Find("PopupMainNavigation", false)
+                        .SingleOrDefault() as MetalSidebar;
+                    if (nav is null || nav.Width != 200 ||
+                        nav.Controls.OfType<SidebarMenuRow>().Count() != SkinArt.MenuIcons.Length ||
+                        nav.Controls.Find("Menu_back", false).Length != 1 ||
+                        nav.Controls.Find("Menu_load", false).Length != 1 ||
+                        nav.Controls.Find("Menu_database", false).Length != 1)
+                        throw new Exception("The main menu must appear on every utility screen.");
                     if (popup.FormBorderStyle != FormBorderStyle.None ||
                         popup.Controls.Find("PopupWorkspace", true).Length != 1 ||
                         popup.Controls.Find("PopupItemList", true).Length != 1 ||
