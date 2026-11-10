@@ -1,31 +1,24 @@
 # Pro Wrestling Revolution
 
-A native Windows professional wrestling management game project. This release focuses on matching the structure and footprint of the reference title screen.
+An original Windows desktop wrestling management project. Version 0.5.0 (Minimal Edition) redesigns the navigation without replacing your title screen artwork.
 
-## Download
+## Windows application
 
-Get the latest ZIP from [GitHub Releases](https://github.com/TheImposter1000/ProWrestlingRevolution/releases), extract the ZIP to a writable folder, and launch ProWrestlingRevolution.exe. No Python or separate .NET installation.
+Download the portable ZIP from https://github.com/TheImposter1000/ProWrestlingRevolution/releases. Extract it to a writable directory and run ProWrestlingRevolution.exe. No Python or separate .NET installation is required.
 
-## Exact title-screen layout
+## Minimal Edition title screen
 
-The logical client area is **1366 by 768**. The interface uses an original, image-based title design and a narrow image-sidebar with clickable regions. To match the apparent Windows display-scaled size of older desktop applications more closely, the executable now uses **DpiUnawareGdiScaled** mode. Windows scales the physical pixels according to your system display settings. As a result, a screen capture may have a larger physical footprint than 1366 by 768 at 125% scaling. We have not claimed the two applications will appear identically sized in every browser zoom or monitor configuration.
+The logical client area is 1366 x 768, with the same Windows display scaling configuration as v0.4.
 
-The title screen is composed of separate files:
- 
-| Folder and image | Asset size | Function |
-| --- | --- | --- |
-| Backgrounds/Title_Screen.jpg | 1314 x 649 | Main central artwork |
-| LowerBars/Title_Screen.jpg | 1314 x 87 | Bottom artwork |
-| SideBars/Title_Screen_Alt.jpg | 57 x 736 | Main menu toolbar |
-| SideBars/Title_Screen.jpg | 57 x 736 | Inner-screen toolbar with Back |
-| TopBars/Title_Screen_On.jpg | 1370 x 32 | Upper title bar, sound enabled icon |
-| TopBars/Title_Screen_Off.jpg | 1370 x 32 | Upper title bar, sound muted icon |
+The main menu has a slim top utility bar with the title and one version label. The top-right sound, help, minimize and close controls remain functional. The 215-pixel sidebar has the existing skin-defined 57-pixel graphical icon strip plus clean text labels, including New Game, Load Game, Database Selector, Database Editor, Skins, Achievements and Credits. The Back icon returns to Home from internal pages.
 
-Images are drawn without stretching; the few extra pixels in the reference 1314/1370 files are cropped to the client's available width where needed. Hit regions keep the expected TEW-style navigation order.
+The center displays the selected skin's original Backgrounds/Title_Screen.jpg with no second logo, added slogan, or redundant information footer. The picture is resized proportionally to fit the available width; the dark bottom edge extends to the bottom of the window. The original JPG is never modified. The LowerBars/Title_Screen.jpg file is NOT drawn on the home screen.
 
-## Complete image skin directory standard
+The inner management screens remain available. This version does not implement full wrestling simulation gameplay.
 
-Each skin is an independently replaceable folder. The two original bundled image packs, **Obsidian** and **Steel**, are organized as:
+## Skins
+
+Every direct folder in Skins appears in the selector, even if it has just one image. Missing images fall back to the built-in Obsidian artwork. The existing eight-category structure is retained:
 
     Skins/
         Obsidian/
@@ -38,36 +31,34 @@ Each skin is an independently replaceable folder. The two original bundled image
             SideBars/
             TopBars/
         Steel/
-            [same eight directories]
+            [same categories]
+        YourCustomSkin/
+            Backgrounds/
+                Title_Screen.jpg
 
-A third skin can be added by placing an image pack with those folders under Skins. The game discovers packs by checking the title-screen components. No skin.ini or theme-color configuration is required for the visual title screen. The icon hotspot coordinates stay the same, so user-supplied artwork must put its icons at the expected positions.
+The LowerBars directory is retained for compatibility with later screens, but not used on the title screen. Custom artwork files are not uploaded to GitHub or overwritten by the game.
 
-Obsidian and Steel include original generated graphic files in all eight categories, although many gameplay-specific images will only be populated as those screens are developed.
+IMPORTANT: If you install this release in a fresh folder, copy your own skin and MDB data into that folder. When launching through Visual Studio, the runtime skin folder is normally under bin/Debug/net10.0-windows/ rather than the source directory. Use the game's Open Skins Folder button to confirm the actual path.
 
-If an older game folder contains v0.3 images directly inside a skin root, those image files are automatically copied to the correct categories when the game starts, without removing the originals. Custom artwork already present in category folders is never overwritten.
-
-## Application and databases
-
-The application starts at its image-based menu: New Game, Load Game, Database Selector, Database Editor, Skins, with Achievements and Credits below.
-
-Microsoft Access MDB universes live separately from career saves:
+## MDB structure
 
     ProWrestlingRevolution.exe
     Databases/
-        Default/
+        MyWorld/
             PWR.mdb
             SaveGames/
                 MyCareer/
                     PWRSave.mdb
-                    Backups/initial.mdb
+                    Backups/
+                        initial.mdb
     Pictures/
     Skins/
     System/
 
-The application can import your own MDB and create independent career and backup copies, but this version does not yet implement a fully connected gameplay simulation based on the MDB schema. The read-only database preview needs a compatible 64-bit ACE provider. Microsoft's Access application or its driver is not bundled.
+MDB import and career copying preserve each starting universe. Read-only table previews need a compatible 64-bit Microsoft ACE provider.
 
-## What passed
+## Building and status
 
-The GitHub Windows pipeline compiles a self-contained executable, generates all original raster graphics, verifies that the correct images and categorized directories exist, checks image dimensions and MDB file handling, and publishes a complete ZIP.
+Built with C#, .NET 10, Windows Forms and Microsoft Access OLE DB. GitHub Actions performs Windows smoke checks, publishes a self-contained x64 executable and creates a portable ZIP. This is a UI and application-shell milestone, not the complete wrestling simulator.
 
-No TEW images, CornellVerse data, or protected TEW database files are redistributed. The original TEW game and its developer are not affiliated with this project.
+No copyrighted TEW artwork, protected CornellVerse data or proprietary databases are bundled.

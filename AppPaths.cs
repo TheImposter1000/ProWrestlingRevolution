@@ -42,11 +42,11 @@ public sealed class AppPaths
             File.WriteAllText(_settings, "Skin=Obsidian\nDatabase=\n", Encoding.UTF8);
     }
 
-    // The complete Febreeze-style folder structure defines a usable skin.
-    // A copied custom skin folder is immediately selectable without an INI file.
+    // Every folder is selectable, including a work-in-progress skin with
+    // only one image. Missing assets are resolved by the launcher against
+    // the built-in Obsidian image pack.
     public IReadOnlyList<string> Skins() =>
         Directory.EnumerateDirectories(SkinsRoot)
-            .Where(SkinArt.HasRequiredImages)
             .Select(x => Path.GetFileName(x)!)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
 

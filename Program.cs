@@ -50,6 +50,8 @@ internal static class Program
             if (skin.Accent.IsEmpty) throw new Exception("Skin palette could not load.");
             paths.WriteSetting("Skin", "Steel");
             if (paths.ReadSetting("Skin", "") != "Steel") throw new Exception("Skin setting failed.");
+            // Exercise rendering with an empty custom folder: Obsidian must supply its artwork.
+            paths.WriteSetting("Skin", "WorkInProgress");
             // Construct the actual launcher (without showing a window) and verify its
             // fixed logical canvas. This catches regressions in the native menu layout.
             ApplicationConfiguration.Initialize();

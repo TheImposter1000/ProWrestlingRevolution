@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Phase One smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Phase One portable game ZIP
+      - name: Assemble the Version 0.5 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Phase One game ZIP
+      - name: Upload complete Version 0.5 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,20 +76,21 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.4.0
-          name: Pro Wrestling Revolution 0.4.0 - Full Skin Folder System and DPI Fix
+          tag_name: v0.5.0
+          name: Pro Wrestling Revolution 0.5.0 - Minimal Main Menu
           target_commitish: main
           prerelease: true
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Eight-category raster skin folders: Backgrounds, Buttons, Graphics, Loading_NoProfile,
-            Loading_Profile, LowerBars, SideBars, TopBars.
-            The 1366 x 768 logical client area now uses Windows DPI scaling similar to older wrestling sims.
-            Title uses four independent image layers including an 87px lower bar.
-            Image-based hit regions remain fully clickable; the legacy flat artwork is migrated locally.
-            MDB universe import, career copies, backups and database editor remain available.
+            Minimal Edition title-screen update. Your skin's Backgrounds/Title_Screen.jpg is
+            preserved, with no duplicated logos, taglines or lower information bar.
+            A clean utility title bar displays the version once, while readable navigation labels
+            sit beside the existing per-skin image icons.
+            Eight-category skin folders remain supported and incomplete folders are selectable;
+            missing assets fall back to Obsidian instead of failing.
+            MDB universe import, database editor, career copies and backups are unchanged.
             Download the ZIP, extract into a writable folder and launch ProWrestlingRevolution.exe.
             Includes no third-party databases or images. Your own MDB is imported from Database Selector.
             Access table preview requires a matching Microsoft ACE OLE DB driver; direct file import/copy does not.

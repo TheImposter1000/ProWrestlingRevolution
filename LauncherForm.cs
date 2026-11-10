@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 namespace ProWrestlingRevolution;
 
-public sealed class LauncherForm : Form
+public sealed partial class LauncherForm : Form
 {
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle, int message, int wparam, int lparam);
@@ -13,10 +13,10 @@ public sealed class LauncherForm : Form
     private readonly AppPaths _paths;
     private SkinPalette _skin;
     private readonly Panel _page = new() { Dock = DockStyle.Fill };
-    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = SkinArt.SidebarWidth };
-    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = SkinArt.TopHeight };
-    private readonly PictureBox _sidebarImage = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Normal };
-    private readonly PictureBox _topImage = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 215 };
+    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 38 };
+    private readonly PictureBox _sidebarImage = new() { Dock = DockStyle.Left, Width = SkinArt.SidebarWidth, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly PictureBox _topImage = new() { Dock = DockStyle.Right, Width = 180, SizeMode = PictureBoxSizeMode.Normal };
     private readonly Dictionary<string, Image> _assetCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ToolTip _iconTips = new();
     private string? _hoverIcon;
@@ -43,74 +43,6 @@ public sealed class LauncherForm : Form
         ShowHome();
         FormClosed += (_, _) => ClearAssetCache();
         KeyDown += HandleShortcut;
-    }
-
-    private void BuildChrome()
-    {
-        _page.BackColor = _skin.Background;
-        _sidebar.BackColor = _skin.Sidebar;
-        _topbar.BackColor = _skin.Surface;
-        Controls.Add(_page);
-        Controls.Add(_sidebar);
-        Controls.Add(_topbar);
-
-        // Entire sidebar and top bar are image assets. The click regions are transparent.
-        _sidebar.Controls.Add(_sidebarImage);
-        _topbar.Controls.Add(_topImage);
-
-        _sidebarImage.MouseMove += (_, e) =>
-        {
-            var key = IconAt(e.Y);
-            if (key != _hoverIcon)
-            {
-                _hoverIcon = key;
-                RenderSidebar();
-                var label = SkinArt.MenuIcons.FirstOrDefault(x => x.Key == key).Label;
-                _iconTips.SetToolTip(_sidebarImage, label ?? "");
-            }
-            _sidebarImage.Cursor = key is null ? Cursors.Default : Cursors.Hand;
-        };
-        _sidebarImage.MouseLeave += (_, _) =>
-        {
-            _hoverIcon = null;
-            RenderSidebar();
-        };
-        _sidebarImage.MouseClick += (_, e) =>
-        {
-            if (e.Button != MouseButtons.Left) return;
-            var key = IconAt(e.Y);
-            if (key is not null) RunSafe(() => Navigate(key));
-        };
-
-        _topImage.MouseDown += (_, e) =>
-        {
-            // Drag only the title-bar surface; don't intercept its real controls.
-            if (e.Button == MouseButtons.Left && e.X < 1196)
-                DragWindow(_topImage, e);
-        };
-        _topImage.MouseClick += (_, e) =>
-        {
-            if (e.Button != MouseButtons.Left) return;
-            if (e.X is >= 1201 and < 1238)
-            {
-                _soundEnabled = !_soundEnabled;
-                RenderTop();
-            }
-            else if (e.X is >= 1238 and < 1278)
-                MessageBox.Show(this,
-                    "Select the images on the left to navigate.\n\n" +
-                    "New Game creates a separate Access MDB career.\n" +
-                    "Database Selector imports an existing MDB universe.\n" +
-                    "Skins changes the complete image pack.",
-                    "Main Menu Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            else if (e.X is >= 1278 and < 1318)
-                WindowState = FormWindowState.Minimized;
-            else if (e.X >= 1318)
-                Close();
-        };
-
-        RenderSidebar();
-        RenderTop();
     }
 
     private void HandleShortcut(object? sender, KeyEventArgs e)
@@ -162,39 +94,6 @@ public sealed class LauncherForm : Form
             if (Math.Abs(y - cy) <= 24 && !(key == "back" && _currentPage == "HOME"))
                 return key;
         return null;
-    }
-
-    private Image LoadArt(string filename, string fallback)
-    {
-        var path = _skin.Asset(filename);
-        if (!File.Exists(path)) path = _skin.Asset(fallback);
-        if (_assetCache.TryGetValue(path, out var cached)) return cached;
-        using var stream = File.OpenRead(path);
-        using var bitmap = Image.FromStream(stream);
-        var copy = new Bitmap(bitmap);
-        _assetCache[path] = copy;
-        return copy;
-    }
-
-    private void RenderSidebar()
-    {
-        bool home = _currentPage == "HOME";
-        var baseFile = home ? "Title_Screen_Alt.jpg" : "Title_Screen.jpg";
-        var hover = _hoverIcon is null ? baseFile
-            : (home ? "Title_Screen_Alt_Hover_" : "Title_Screen_Hover_") + _hoverIcon + ".jpg";
-        _sidebarImage.Image = LoadArt(Path.Combine("SideBars", hover), Path.Combine("SideBars", baseFile));
-    }
-
-    private void RenderTop() =>
-        _topImage.Image = LoadArt(Path.Combine("TopBars", _soundEnabled ? "Title_Screen_On.jpg" : "Title_Screen_Off.jpg"),
-            Path.Combine("TopBars", "Title_Screen_On.jpg"));
-
-    private void ClearAssetCache()
-    {
-        _sidebarImage.Image = null;
-        _topImage.Image = null;
-        foreach (var item in _assetCache.Values) item.Dispose();
-        _assetCache.Clear();
     }
 
     private void DragWindow(object? sender, MouseEventArgs args)
@@ -312,38 +211,6 @@ public sealed class LauncherForm : Form
             BackColor = _skin.Surface, ForeColor = _skin.Foreground,
             BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 12)
         };
-    }
-
-    private void ShowHome()
-    {
-        _currentPage = "HOME";
-        _hoverIcon = null;
-        RenderSidebar();
-        _page.Controls.Clear();
-
-        // Three independent skin graphics compose the home screen:
-        // Backgrounds/Title_Screen, LowerBars/Title_Screen and SideBars/Title_Screen_Alt.
-        // The upper title strip comes from TopBars. Assets are never scaled inside WinForms.
-        var background = new PictureBox
-        {
-            Dock = DockStyle.Top,
-            Height = SkinArt.MainHeight,
-            BackColor = _skin.Background,
-            Image = LoadArt(Path.Combine("Backgrounds", "Title_Screen.jpg"),
-                Path.Combine("Backgrounds", "Title_Screen.jpg")),
-            SizeMode = PictureBoxSizeMode.Normal
-        };
-        var lower = new PictureBox
-        {
-            Dock = DockStyle.Fill,
-            Height = SkinArt.LowerHeight,
-            BackColor = _skin.Background,
-            Image = LoadArt(Path.Combine("LowerBars", "Title_Screen.jpg"),
-                Path.Combine("LowerBars", "Title_Screen.jpg")),
-            SizeMode = PictureBoxSizeMode.Normal
-        };
-        _page.Controls.Add(lower);
-        _page.Controls.Add(background);
     }
 
     private void ShowDatabaseSelector()
@@ -544,8 +411,9 @@ public sealed class LauncherForm : Form
             if (skins.SelectedItem is string selected)
                 information.Text = "Selected: " + selected +
                     "\nActive: " + _skin.Id +
-                    "\n\nCustom skins: create a folder with skin.ini. Optionally add " +
-                    "background.png and logo.png and set BackgroundImage and LogoImage.";
+                    "\n\nCustom skins are folders inside Skins. Add images in " +
+                    "Backgrounds, SideBars, TopBars or other category folders. " +
+                    "Missing images use Obsidian artwork automatically.";
         };
         foreach (var skinName in _paths.Skins()) skins.Items.Add(skinName);
         var selectedIndex = skins.Items.IndexOf(_skin.Id);
@@ -573,16 +441,6 @@ public sealed class LauncherForm : Form
         label.Dock = DockStyle.Top;
         label.Height = 280;
         content.Controls.Add(label);
-    }
-
-    private void ApplySkin()
-    {
-        ClearAssetCache();
-        _sidebar.BackColor = _skin.Sidebar;
-        _topbar.BackColor = _skin.Surface;
-        _page.BackColor = _skin.Background;
-        RenderSidebar();
-        RenderTop();
     }
 
     private static SplitContainer MakeSplit(Control left, Control right, int width = 380)

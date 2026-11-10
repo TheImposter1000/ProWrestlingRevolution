@@ -144,7 +144,7 @@ public static class SkinArt
         using (var accent = new SolidBrush(c.AccentLight))
         {
             g.DrawString("PRO WRESTLING REVOLUTION", f, fg, 26, 29);
-            g.DrawString("DESKTOP EDITION  |  v0.4.0", f, accent, MainWidth - 315, 29);
+            g.DrawString("PRO WRESTLING REVOLUTION", f, accent, MainWidth - 315, 29);
         }
         using var thin = new Pen(Color.FromArgb(75, c.Accent));
         g.DrawLine(thin, 0, LowerHeight - 1, MainWidth, LowerHeight - 1);
