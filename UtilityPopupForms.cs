@@ -66,11 +66,29 @@ internal abstract class UtilityPopupForm : Form
 
     private void BuildChrome()
     {
+        // Explicit rows avoid docking-order overlap on Windows display scaling.
+        var frame = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Margin = new Padding(0),
+            Padding = new Padding(1),
+            BackColor = Color.FromArgb(7, 19, 31)
+        };
+        frame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 47));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
+        frame.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+        Controls.Add(frame);
+
         var header = new Panel
         {
             Name = "PopupHeader",
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
             Height = 47,
+            Margin = new Padding(0),
             BackColor = Color.FromArgb(9, 25, 42)
         };
         header.Paint += (_, e) =>
@@ -86,7 +104,7 @@ internal abstract class UtilityPopupForm : Form
                 new Point(22, 34), new Point(10, 34)
             ]);
         };
-        Controls.Add(header);
+        frame.Controls.Add(header, 0, 0);
 
         var label = new Label
         {
@@ -116,8 +134,9 @@ internal abstract class UtilityPopupForm : Form
 
         var contextPanel = new Panel
         {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
             Height = 45,
+            Margin = new Padding(0),
             Padding = new Padding(23, 7, 18, 0),
             BackColor = Color.FromArgb(8, 20, 34)
         };
@@ -127,12 +146,13 @@ internal abstract class UtilityPopupForm : Form
         Context.Font = new Font("Segoe UI", 10, FontStyle.Bold);
         Context.TextAlign = ContentAlignment.MiddleLeft;
         contextPanel.Controls.Add(Context);
-        Controls.Add(contextPanel);
+        frame.Controls.Add(contextPanel, 0, 1);
 
         var footer = new Panel
         {
-            Dock = DockStyle.Bottom,
+            Dock = DockStyle.Fill,
             Height = 66,
+            Margin = new Padding(0),
             BackColor = Color.FromArgb(9, 23, 38),
             Padding = new Padding(15, 11, 12, 9)
         };
@@ -142,12 +162,13 @@ internal abstract class UtilityPopupForm : Form
         Actions.AutoScroll = true;
         Actions.BackColor = Color.Transparent;
         footer.Controls.Add(Actions);
-        Controls.Add(footer);
+        frame.Controls.Add(footer, 0, 3);
 
         var workspace = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             Name = "PopupWorkspace",
+            Margin = new Padding(0),
             Padding = new Padding(20, 13, 20, 15),
             ColumnCount = 2,
             RowCount = 1,
@@ -156,7 +177,7 @@ internal abstract class UtilityPopupForm : Form
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43));
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57));
         workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        Controls.Add(workspace);
+        frame.Controls.Add(workspace, 0, 2);
 
         var left = Pane("PopupListPane", _listHeading);
         var right = Pane("PopupInformationPane", _infoHeading);
@@ -172,7 +193,7 @@ internal abstract class UtilityPopupForm : Form
         Items.BackColor = Color.FromArgb(4, 13, 24);
         Items.ForeColor = Color.White;
         Items.SelectionMode = SelectionMode.One;
-        left.Controls.Add(Items);
+        left.Controls.Add(Items, 0, 1);
 
         Information.Name = "PopupInformation";
         Information.Dock = DockStyle.Fill;
@@ -184,26 +205,28 @@ internal abstract class UtilityPopupForm : Form
         Information.Font = new Font("Segoe UI", 10.5f);
         Information.DetectUrls = false;
         Information.TabStop = false;
-        right.Controls.Add(Information);
+        right.Controls.Add(Information, 0, 1);
 
         workspace.Controls.Add(left, 0, 0);
         workspace.Controls.Add(right, 1, 0);
 
-        // Enforce docking order: header/context above, footer below, workspace in between.
-        workspace.BringToFront();
-        contextPanel.BringToFront();
-        header.BringToFront();
     }
 
-    private static Panel Pane(string name, string heading)
+    private static TableLayoutPanel Pane(string name, string heading)
     {
-        var outer = new Panel
+        var outer = new TableLayoutPanel
         {
             Name = name,
             Dock = DockStyle.Fill,
             BackColor = Color.FromArgb(12, 27, 42),
-            Padding = new Padding(2)
+            Margin = new Padding(0),
+            Padding = new Padding(2),
+            ColumnCount = 1,
+            RowCount = 2
         };
+        outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+        outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         outer.Paint += (_, e) =>
         {
             using var border = new Pen(Color.FromArgb(71, 127, 154));
@@ -212,15 +235,15 @@ internal abstract class UtilityPopupForm : Form
         var caption = new Label
         {
             Text = heading.ToUpperInvariant(),
-            Dock = DockStyle.Top,
-            Height = 35,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0),
             Padding = new Padding(12, 0, 0, 0),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 44, 62),
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
-        outer.Controls.Add(caption);
+        outer.Controls.Add(caption, 0, 0);
         return outer;
     }
 
