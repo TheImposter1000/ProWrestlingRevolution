@@ -75,8 +75,8 @@ public sealed partial class LauncherForm
         // The shared update button is also used by the title screen updater.
         // Do not add a second button with the same Name: the smoke test and
         // accessibility tree require exactly one update action in the sidebar.
-        _updateButton.Text = "↻";
-        _updateButton.Font = new Font("Segoe UI", 18, FontStyle.Bold);
+        _updateButton.Text = "Check for Updates";
+        _updateButton.Font = new Font("Roboto", 18, FontStyle.Bold);
         _updateButton.AccessibleName = "Check for Updates";
         navTooltips.SetToolTip(_updateButton, "Check for Updates");
         _updateButton.BringToFront();
