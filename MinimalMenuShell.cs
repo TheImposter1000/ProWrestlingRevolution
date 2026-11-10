@@ -65,6 +65,36 @@ public sealed partial class LauncherForm
             _sidebar.Controls.Add(item);
         }
 
+        var updateButton = new Button
+        {
+            Name = "CheckUpdatesButton",
+            Text = "↻  Check for Updates",
+            Dock = DockStyle.Bottom,
+            Height = 46,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = _skin.Button,
+            ForeColor = _skin.Foreground,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+
+        updateButton.FlatAppearance.BorderColor = _skin.Border;
+        updateButton.FlatAppearance.BorderSize = 1;
+
+        updateButton.Click += (_, _) =>
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/TheImposter1000/ProWrestlingRevolution/releases/latest",
+                    UseShellExecute = true
+                }
+            );
+        };
+
+        _sidebar.Controls.Add(updateButton);
+        updateButton.BringToFront();
+
         // Brushed-metal chrome replaces the separate raster button strip.
         // Every utility button is clickable, keyboard-accessible and has a tooltip name.
         _titleText.Text = "PRO WRESTLING REVOLUTION";
