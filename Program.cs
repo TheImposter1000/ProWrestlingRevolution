@@ -42,9 +42,51 @@ internal static class Program
         }
     }
 
-    // All installed assets and data are resolved from the executable's folder.
-    // Never infer a data directory from a parent called Repos.
-    private static string FindGameRoot() => Path.GetFullPath(AppContext.BaseDirectory);
+    // Published games are portable: assets and data live beside the executable.
+    // Visual Studio Debug builds may instead use the player's game folder above
+    // a source checkout named Repos, so custom skins and settings do not reset.
+    private static string FindGameRoot()
+    {
+        string executableRoot = Path.GetFullPath(AppContext.BaseDirectory);
+#if DEBUG
+        return ResolveGameRoot(executableRoot, useDevelopmentFolders: true);
+#else
+        return executableRoot;
+#endif
+    }
+
+    private static string ResolveGameRoot(string executableFolder, bool useDevelopmentFolders)
+    {
+        string executableRoot = Path.GetFullPath(executableFolder);
+        if (!useDevelopmentFolders)
+            return executableRoot;
+
+        for (DirectoryInfo? folder = new(executableRoot); folder is not null; folder = folder.Parent)
+        {
+            if (!folder.Name.Equals("Repos", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Only match a real Visual Studio build output under this checkout.
+            // A normal installed executable must never be redirected to a parent.
+            string relative = Path.GetRelativePath(folder.FullName, executableRoot);
+            string[] components = relative.Split(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (components.Length < 3 ||
+                !components[0].Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+                !components[1].Equals("Debug", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(Path.Combine(folder.FullName, "ProWrestlingRevolution.csproj")))
+                return executableRoot;
+
+            string? gameFolder = folder.Parent?.FullName;
+            if (gameFolder is not null &&
+                new[] { "Databases", "Pictures", "Skins", "System" }
+                    .All(name => Directory.Exists(Path.Combine(gameFolder, name))))
+                return Path.GetFullPath(gameFolder);
+
+            return executableRoot;
+        }
+        return executableRoot;
+    }
 
     private static void SmokeTest()
     {
@@ -54,9 +96,34 @@ internal static class Program
         {
             var paths = new AppPaths(root);
             paths.EnsureLayout();
-            if (!FindGameRoot().Equals(Path.GetFullPath(AppContext.BaseDirectory),
-                    StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Runtime root must be the executable directory.");
+            // Simulate the exact player layout without touching user files.
+            // VS Debug must read the game root outside Repos; a portable build
+            // must always retain its own executable directory.
+            var developmentGame = Path.Combine(root, "DevelopmentLayout");
+            var sourceCheckout = Path.Combine(developmentGame, "Repos");
+            var debugOutput = Path.Combine(sourceCheckout, "bin", "Debug", "net10.0-windows");
+            Directory.CreateDirectory(debugOutput);
+            File.WriteAllText(Path.Combine(sourceCheckout,
+                "ProWrestlingRevolution.csproj"), "<Project />");
+            foreach (var name in new[] { "Databases", "Pictures", "Skins", "System" })
+                Directory.CreateDirectory(Path.Combine(developmentGame, name));
+
+            static bool SameDirectory(string a, string b) =>
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)).Equals(
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (!SameDirectory(ResolveGameRoot(debugOutput, true), developmentGame))
+                throw new Exception("Visual Studio Debug build lost the player's game folder.");
+            if (!SameDirectory(ResolveGameRoot(debugOutput, false), debugOutput))
+                throw new Exception("Portable builds must use their executable directory.");
+            Directory.Delete(Path.Combine(developmentGame, "Skins"));
+            if (!SameDirectory(ResolveGameRoot(debugOutput, true), debugOutput))
+                throw new Exception("Missing game folders must not redirect runtime files.");
+            var standaloneOutput = Path.Combine(root, "PortableGame");
+            Directory.CreateDirectory(standaloneOutput);
+            if (!SameDirectory(ResolveGameRoot(standaloneOutput, true), standaloneOutput))
+                throw new Exception("Standalone games must not use a repository folder.");
             if (!File.Exists(paths.DefaultDatabase) ||
                 !AccessDatabase.LooksLikeMdb(paths.DefaultDatabase) ||
                 new FileInfo(paths.DefaultDatabase).Length != 335872)
