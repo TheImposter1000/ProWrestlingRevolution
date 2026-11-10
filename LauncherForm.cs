@@ -168,7 +168,7 @@ public sealed partial class LauncherForm : Form
         _sidebar.Visible = true;
         _topbar.Visible = true;
         RenderSidebar();
-        _page.Controls.Clear();
+        ClearPageContent();
         _page.BackColor = _skin.Background;
         var root = new Panel { Dock = DockStyle.Fill, BackColor = _skin.Background };
         var header = new Panel { Dock = DockStyle.Top, Height = 125, BackColor = _skin.Background };
