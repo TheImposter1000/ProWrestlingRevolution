@@ -14,6 +14,7 @@ public sealed class AppPaths
     public string Pictures => Path.Combine(_root, "Pictures");
     public string SkinsRoot => Path.Combine(_root, "Skins");
     public string SystemRoot => Path.Combine(_root, "System");
+    public string DefaultDatabase => Path.Combine(SystemRoot, PrwDefaultTemplate.Filename);
 
     public AppPaths(string root)
     {
@@ -25,6 +26,10 @@ public sealed class AppPaths
     {
         foreach (var dir in new[] { Databases, Pictures, SkinsRoot, SystemRoot })
             Directory.CreateDirectory(dir);
+
+        // The bundled base MDB is installed locally once. Never read from a
+        // repository checkout or overwrite a user-maintained template.
+        PrwDefaultTemplate.EnsureInstalled(SystemRoot);
 
         // Build missing, original raster skin assets; existing user artwork is never overwritten.
         SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Obsidian"), "Obsidian");
@@ -96,6 +101,37 @@ public sealed class AppPaths
             }
         }
         return result.OrderBy(x => x.UniverseName).ThenBy(x => x.Name).ToList();
+    }
+
+    /// <summary>
+    /// Creates an independent game universe from the local PRWDefault.mdb.
+    /// Every subsequent read and edit uses Databases/{Name}/PWR.mdb, not the
+    /// bundled template and never the source repository.
+    /// </summary>
+    public UniverseEntry CreateUniverse(string displayName)
+    {
+        string name = SafeName(displayName);
+        string template = PrwDefaultTemplate.EnsureInstalled(SystemRoot);
+        if (!AccessDatabase.LooksLikeMdb(template))
+            throw new InvalidDataException("The local default database is invalid.");
+
+        string folder = Path.Combine(Databases, name);
+        if (Directory.Exists(folder) || File.Exists(folder))
+            throw new IOException("A database with that name already exists.");
+
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string target = Path.Combine(folder, "PWR.mdb");
+            File.Copy(template, target);
+            Directory.CreateDirectory(Path.Combine(folder, "SaveGames"));
+            return new UniverseEntry(name, target, folder);
+        }
+        catch
+        {
+            Directory.Delete(folder, recursive: true);
+            throw;
+        }
     }
 
     public UniverseEntry ImportUniverse(string sourceFile, string displayName)
