@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace ProWrestlingRevolution;
 
-public static class AccessDatabase
+public static partial class AccessDatabase
 {
     public static bool LooksLikeMdb(string file)
     {
