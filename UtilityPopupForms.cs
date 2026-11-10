@@ -913,17 +913,62 @@ internal sealed class LoadGameDialog : UtilityPopupForm
         var dir = Path.GetDirectoryName(save.MdbPath)!;
         var initial = Path.Combine(dir, "Backups", "initial.mdb");
         bool validHeader = AccessDatabase.LooksLikeMdb(save.MdbPath);
-        Information.Text =
-            save.Name + "\n\n" +
-            "Universe: " + save.UniverseName + "\n" +
-            "Save file: " + file.Name + "\n" +
-            "File size: " + (file.Length / 1048576d).ToString("N2") + " MB\n" +
-            "Last modified: " + file.LastWriteTime.ToString("g") + "\n" +
-            "MDB header: " + (validHeader ? "Recognized" : "Not recognized") + "\n" +
-            "Initial recovery file: " + (File.Exists(initial) ? "Available" : "Unavailable") +
-            "\n\nLocation:\n" + dir + "\n\n" +
-            "Gameplay loading will become available once the simulation engine " +
-            "is connected. This window manages existing save files now.";
+        RenderSaveInformation(save, file, dir, validHeader, File.Exists(initial));
+    }
+
+    /// <summary>
+    /// Render existing MDB/file metadata as the structured information rows in
+    /// Option A. Never synthesize in-game dates, roster totals or avatar data.
+    /// </summary>
+    private void RenderSaveInformation(CareerEntry save, FileInfo file,
+        string directory, bool validHeader, bool hasRecovery)
+    {
+        Information.Clear();
+        Information.SelectionTabs = [148];
+        using var headingFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        using var labelFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+        using var valueFont = new Font("Segoe UI", 10f, FontStyle.Regular);
+        var highlight = Color.FromArgb(113, 211, 241);
+        var muted = Color.FromArgb(159, 193, 213);
+        var text = Color.FromArgb(232, 241, 247);
+
+        void Write(string value, Font font, Color color)
+        {
+            Information.SelectionStart = Information.TextLength;
+            Information.SelectionLength = 0;
+            Information.SelectionFont = font;
+            Information.SelectionColor = color;
+            Information.AppendText(value);
+        }
+        void Heading(string value)
+        {
+            Write(value + "\n\n", headingFont, highlight);
+        }
+        void Field(string label, string value)
+        {
+            Write(label.ToUpperInvariant() + "\t", labelFont, muted);
+            Write(value + "\n", valueFont, text);
+        }
+
+        Heading("CAREER DETAILS");
+        Field("Career name", save.Name);
+        Field("Database", save.UniverseName);
+        Field("Save file", file.Name);
+        Write("\n", valueFont, text);
+        Heading("SAVE STATUS");
+        Field("Last modified", file.LastWriteTime.ToString("g"));
+        Field("File size", (file.Length / 1048576d).ToString("N2") + " MB");
+        Field("MDB header", validHeader ? "Recognized" : "Not recognized");
+        Field("Recovery file", hasRecovery ? "Available" : "Unavailable");
+        Write("\n", valueFont, text);
+        Heading("SAVE LOCATION");
+        Write(directory + "\n\n", valueFont, text);
+        Write("Gameplay loading is not yet available. The existing save file " +
+            "management actions remain operational.", valueFont, muted);
+
+        Information.SelectionStart = 0;
+        Information.SelectionLength = 0;
+        Information.ScrollToCaret();
     }
 
     private void Rename()
