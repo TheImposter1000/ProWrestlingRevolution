@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Forms;
 
 namespace ProWrestlingRevolution;
@@ -65,6 +65,31 @@ public sealed partial class LauncherForm
             _menuRows.Add(key, item);
             _sidebar.Controls.Add(item);
         }
+
+        var updateButton = new Button
+        {
+            Name = "CheckUpdatesButton",
+            Text = "↻  Check for Updates",
+            Dock = DockStyle.Bottom,
+            Height = 46,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = _skin.Button,
+            ForeColor = _skin.Foreground,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            AccessibleName = "Check for Updates"
+        };
+
+        updateButton.FlatAppearance.BorderColor = _skin.Border;
+        updateButton.FlatAppearance.BorderSize = 1;
+
+        updateButton.Click += async (_, _) =>
+        {
+            await GameUpdate.CheckAndInstallAsync(this, updateButton);
+        };
+
+        _sidebar.Controls.Add(updateButton);
+        updateButton.BringToFront();
 
         // Brushed-metal chrome replaces the separate raster button strip.
         // Every utility button is clickable, keyboard-accessible and has a tooltip name.
