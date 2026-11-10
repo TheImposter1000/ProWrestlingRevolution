@@ -3,7 +3,8 @@ All editable game data is stored beside the running ProWrestlingRevolution.exe,
 never in a GitHub repository checkout or the process working directory.
 
 On first launch the executable installs its built-in PRWDefault.mdb template
-as System/PRWDefault.mdb. It never overwrites a template already present there.
+as System/PRWDefault.mdb. When a newer base ships, the existing template is backed up in
+System/TemplateBackups before replacement. This base has 14 native tables.
 
 Use DATABASE SELECTOR > Create Database to make a new universe based on that
 local template. Each independent universe has this layout:
