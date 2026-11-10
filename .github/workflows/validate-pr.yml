@@ -1,0 +1,22 @@
+name: Validate Windows title screen
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build Windows Forms game
+        run: dotnet build ProWrestlingRevolution.csproj -c Release
+      - name: Run application smoke tests
+        run: dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
