@@ -211,6 +211,16 @@ public sealed partial class LauncherForm
         _assetCache.Clear();
     }
 
+    private void ClearPageContent()
+    {
+        // Disposing the previous title view also detaches its update events.
+        foreach (Control child in _page.Controls.Cast<Control>().ToArray())
+        {
+            _page.Controls.Remove(child);
+            child.Dispose();
+        }
+    }
+
     private void ShowHome()
     {
         _currentPage = "HOME";
@@ -222,7 +232,7 @@ public sealed partial class LauncherForm
         SuspendLayout();
         _sidebar.Visible = false;
         _topbar.Visible = false;
-        _page.Controls.Clear();
+        ClearPageContent();
 
         var title = new TitleScreenView
         {
@@ -261,7 +271,7 @@ public sealed partial class LauncherForm
                     Close();
                     break;
                 case "updates":
-                    _updateButton.PerformClick();
+                    _ = GameUpdate.CheckAndInstallAsync(this, _updateButton);
                     break;
                 default:
                     RunSafe(() => Navigate(command));
