@@ -30,7 +30,7 @@ internal sealed class SidebarMenuRow : Control
         BackColor = palette.Sidebar;
         ForeColor = palette.Foreground;
         Cursor = Cursors.Hand;
-        Size = new Size(200, 54);
+        Size = new Size(200, 55);
         TabStop = true;
         AccessibleName = caption;
         AccessibleRole = AccessibleRole.PushButton;
@@ -65,53 +65,65 @@ internal sealed class SidebarMenuRow : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        // Use exactly the same fill as the parent so idle items form one
-        // continuous sidebar rather than seven individual dark rectangles.
-        using (var baseMetal = new LinearGradientBrush(ClientRectangle,
-            MetalColors.SidebarLeft(_palette), MetalColors.SidebarRight(_palette),
-            LinearGradientMode.Horizontal))
+        // One continuous dark sidebar, with no visible individual row tiles.
+        if (!SkinChromeArt.Draw(g, _palette,
+            Path.Combine("Buttons", "Title_Idle.png"), ClientRectangle))
+        {
+            using var baseMetal = new LinearGradientBrush(ClientRectangle,
+                MetalColors.SidebarLeft(_palette), MetalColors.SidebarRight(_palette),
+                LinearGradientMode.Horizontal);
             g.FillRectangle(baseMetal, ClientRectangle);
+        }
 
         bool highlighted = _hovered || _selected;
         if (highlighted)
         {
-            // The reference uses a diagonal metal blade, not a flat rectangle.
-            var shape =
-                new[]
-                {
-                    new Point(0, 0),
-                    new Point(Width - 1, 0),
-                    new Point(Width - 20, Height - 1),
-                    new Point(0, Height - 1)
-                };
-
-            using var fill = new LinearGradientBrush(ClientRectangle,
-                Color.FromArgb(22, 40, 62), Color.FromArgb(27, 85, 135),
-                LinearGradientMode.Horizontal);
-            fill.InterpolationColors = new ColorBlend
+            // Allow custom skins to supply just the 200 x 55 blade background;
+            // the text, icon, accessibility and click area remain live controls.
+            string asset = Path.Combine("Buttons",
+                _hovered ? "Title_Hover.png" : "Title_Selected.png");
+            bool custom = SkinChromeArt.Draw(g, _palette, asset, ClientRectangle);
+            if (!custom && _hovered)
+                custom = SkinChromeArt.Draw(g, _palette,
+                    Path.Combine("Buttons", "Title_Selected.png"), ClientRectangle);
+            if (!custom)
             {
-                Colors =
-                [
-                    MetalColors.Mix(Color.FromArgb(23, 41, 64), _palette.Accent, 0.06),
-                    MetalColors.Mix(Color.FromArgb(33, 69, 110), _palette.Accent, 0.10),
-                    MetalColors.Mix(Color.FromArgb(28, 91, 151), _palette.Accent, 0.14)
-                ],
-                Positions = [0f, 0.67f, 1f]
-            };
-            g.FillPolygon(fill, shape);
+                using var blade = new GraphicsPath();
+                blade.AddLine(0, 0, Width - 1, 0);
+                blade.AddLine(Width - 1, 0, Width - 19, Height - 7);
+                blade.AddBezier(Width - 19, Height - 7,
+                    Width - 21, Height - 1, Width - 24, Height - 1, Width - 25, Height - 1);
+                blade.AddLine(Width - 25, Height - 1, 0, Height - 1);
+                blade.CloseFigure();
 
-            using var topReflection = new Pen(Color.FromArgb(158, 193, 222, 244), 1);
-            using var bottomReflection = new Pen(Color.FromArgb(92, 121, 168, 204), 1);
-            g.DrawLine(topReflection, 1, 0, Width - 2, 0);
-            g.DrawLine(bottomReflection, 1, Height - 1, Width - 20, Height - 1);
+                using var fill = new LinearGradientBrush(ClientRectangle,
+                    Color.FromArgb(18, 36, 56), Color.FromArgb(32, 82, 129),
+                    LinearGradientMode.Horizontal);
+                fill.InterpolationColors = new ColorBlend
+                {
+                    Colors =
+                    [
+                        MetalColors.Mix(Color.FromArgb(20, 38, 60), _palette.Accent, 0.02),
+                        MetalColors.Mix(Color.FromArgb(29, 60, 99), _palette.Accent, 0.04),
+                        MetalColors.Mix(Color.FromArgb(34, 88, 144), _palette.Accent, 0.10)
+                    ],
+                    Positions = [0f, 0.59f, 1f]
+                };
+                g.FillPath(fill, blade);
 
-            using var outerGlow = new Pen(Color.FromArgb(70, _palette.AccentSecondary), 7);
-            using var brightEdge = new Pen(_palette.AccentSecondary, 2);
-            g.DrawLine(outerGlow, Width - 2, 1, Width - 20, Height - 2);
-            g.DrawLine(brightEdge, Width - 2, 1, Width - 20, Height - 2);
+                // Soft glossy upper edge and an electric blue slanted tip.
+                using var topReflection = new Pen(Color.FromArgb(132, 171, 202, 227), 1);
+                using var lowerReflection = new Pen(Color.FromArgb(94, 118, 162, 205), 1);
+                g.DrawLine(topReflection, 0, 0, Width - 2, 0);
+                g.DrawLine(lowerReflection, 0, Height - 1, Width - 25, Height - 1);
 
-            using var innerSheen = new Pen(Color.FromArgb(95, 235, 248, 255), 1);
-            g.DrawLine(innerSheen, Width - 6, 3, Width - 23, Height - 4);
+                using var halo = new Pen(Color.FromArgb(55, _palette.AccentSecondary), 9f);
+                using var edge = new Pen(_palette.AccentSecondary, 1.8f);
+                g.DrawLine(halo, Width - 2, 2, Width - 20, Height - 6);
+                g.DrawLine(edge, Width - 2, 2, Width - 20, Height - 6);
+                using var innerSheen = new Pen(Color.FromArgb(160, 191, 237, 255), 1);
+                g.DrawLine(innerSheen, Width - 5, 4, Width - 23, Height - 6);
+            }
         }
 
         // Reflected silver remains readable above the bright blue blade.
@@ -120,12 +132,13 @@ internal sealed class SidebarMenuRow : Control
         DrawIcon(g, _key, foreground);
         g.ResetTransform();
 
-        var textRect = new Rectangle(75, 0, Width - 80, Height);
+        var textRect = new Rectangle(74, 0, Width - 79, Height);
         TextRenderer.DrawText(g, _caption,
             highlighted ? _activeFont : _normalFont,
             textRect, foreground,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
-            TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding |
+            TextFormatFlags.EndEllipsis);
 
         if (Focused)
         {
