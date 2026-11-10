@@ -13,9 +13,9 @@ public sealed partial class LauncherForm : Form
     private readonly AppPaths _paths;
     private SkinPalette _skin;
     private readonly Panel _page = new() { Dock = DockStyle.Fill };
-    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 240 };
-    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 38 };
-    private readonly PictureBox _topImage = new() { Dock = DockStyle.Right, Width = 180, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 200 };
+    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 36 };
+    private readonly PictureBox _topImage = new() { Dock = DockStyle.Right, Width = 240, SizeMode = PictureBoxSizeMode.Normal };
     private readonly Dictionary<string, Image> _assetCache = new(StringComparer.OrdinalIgnoreCase);
     private string? _hoverIcon;
     private bool _soundEnabled = true;

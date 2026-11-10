@@ -66,13 +66,38 @@ internal sealed class SidebarMenuRow : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(_palette.Sidebar);
         bool highlighted = _hovered || _selected;
+
         if (highlighted)
         {
-            using var fill = new LinearGradientBrush(ClientRectangle,
-                _palette.Button, _palette.Sidebar, LinearGradientMode.Horizontal);
-            g.FillRectangle(fill, ClientRectangle);
-            using var accent = new SolidBrush(_palette.AccentSecondary);
-            g.FillRectangle(accent, 0, 5, 3, Height - 10);
+            using var metal = new LinearGradientBrush(
+                ClientRectangle,
+                Color.FromArgb(55, 77, 99),
+                Color.FromArgb(15, 25, 43),
+                LinearGradientMode.Horizontal
+            );
+
+            g.FillRectangle(metal, ClientRectangle);
+
+            using var shine = new Pen(
+                Color.FromArgb(150, 185, 210, 225), 1
+            );
+
+            g.DrawLine(shine, 1, 1, Width - 2, 1);
+
+            using var shadow = new Pen(
+                Color.FromArgb(80, 5, 12, 24), 1
+            );
+
+            g.DrawLine(
+                shadow, 1, Height - 2,
+                Width - 2, Height - 2
+            );
+
+            using var accent = new Pen(
+                _palette.AccentSecondary, 3
+            );
+
+            g.DrawLine(accent, 1, 4, 1, Height - 5);
         }
 
         var foreground = highlighted ? _palette.AccentSecondary : _palette.Foreground;

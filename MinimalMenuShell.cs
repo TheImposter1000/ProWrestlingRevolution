@@ -75,12 +75,48 @@ public sealed partial class LauncherForm
         _versionText.ForeColor = _skin.Muted;
         _versionText.Font = new Font("Segoe UI", 9.5f);
 
+
+        var brandAccent = new Panel
+        {
+            Location = new Point(10, 12),
+            Size = new Size(9, 15),
+            BackColor = _skin.Surface
+        };
+
+        brandAccent.Paint += (_, e) =>
+        {
+            using var brush = new SolidBrush(
+                Color.FromArgb(239, 36, 65));
+
+            e.Graphics.FillPolygon(brush, new[]
+            {
+        new Point(5, 0),
+        new Point(9, 0),
+        new Point(4, 15),
+        new Point(0, 15)
+    });
+        };
+
+        _topbar.Controls.Add(brandAccent);
+        brandAccent.BringToFront();
+
         _topbar.Controls.Add(_titleText);
         _topbar.Controls.Add(_versionText);
         _topbar.Controls.Add(_topImage);
         _topImage.BringToFront();
-        // Retain the user's existing TopBars button art without its old title
-        // pill by displaying just the controls in the last 180 pixels.
+
+
+        var topAccent = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 1,
+            BackColor = _skin.AccentSecondary
+        };
+
+        _topbar.Controls.Add(topAccent);
+        topAccent.BringToFront();
+
+
         _topImage.Paint += (_, e) =>
         {
             if (_topArt is null) return;
@@ -139,6 +175,7 @@ public sealed partial class LauncherForm
 
         string? active = _currentPage switch
         {
+            "HOME" => "new",
             "NEW GAME" => "new",
             "LOAD GAME" => "load",
             "DATABASE SELECTOR" => "database",

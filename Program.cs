@@ -23,7 +23,7 @@ internal static class Program
             }
 
             ApplicationConfiguration.Initialize();
-            var paths = new AppPaths(AppContext.BaseDirectory);
+            var paths = new AppPaths(FindGameRoot());
             paths.EnsureLayout();
             Application.Run(new LauncherForm(paths));
             return 0;
@@ -36,6 +36,31 @@ internal static class Program
                     "Pro Wrestling Revolution", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
+    }
+
+    private static string FindGameRoot()
+    {
+        DirectoryInfo? folder =
+            new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (folder != null)
+        {
+            if (folder.Name.Equals(
+                    "Repos",
+                    StringComparison.OrdinalIgnoreCase)
+                && folder.Parent is DirectoryInfo gameFolder
+                && Directory.Exists(
+                    Path.Combine(gameFolder.FullName, "Skins"))
+                && Directory.Exists(
+                    Path.Combine(gameFolder.FullName, "Databases")))
+            {
+                return gameFolder.FullName;
+            }
+
+            folder = folder.Parent;
+        }
+
+        return AppContext.BaseDirectory;
     }
 
     private static void SmokeTest()

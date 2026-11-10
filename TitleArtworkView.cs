@@ -25,33 +25,35 @@ public sealed class TitleArtworkView : Control
         ResizeRedraw = true;
     }
 
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        if (_artwork is null || Width < 1 || Height < 1) return;
-        var g = e.Graphics;
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        int fittedHeight = (int)Math.Ceiling((double)Width * _artwork.Height / _artwork.Width);
-        if (fittedHeight >= Height)
-        {
-            // Do not distort the artwork, even if future window dimensions change.
-            var sourceHeight = Math.Min(_artwork.Height,
-                (int)Math.Ceiling((double)Height * _artwork.Width / Width));
-            g.DrawImage(_artwork, new Rectangle(0, 0, Width, Height),
-                new Rectangle(0, (_artwork.Height - sourceHeight) / 2,
-                    _artwork.Width, sourceHeight), GraphicsUnit.Pixel);
-            return;
-        }
 
-        // Show the complete artwork without stretching or repeating its lettering.
-        // Any remaining space uses the theme background with a subtle fade.
-        g.DrawImage(_artwork, new Rectangle(0, 0, Width, fittedHeight));
-        int fadeHeight = Math.Min(48, fittedHeight);
-        var fadeBounds = new Rectangle(0, fittedHeight - fadeHeight, Width,
-            Height - fittedHeight + fadeHeight);
-        using var fade = new LinearGradientBrush(fadeBounds,
-            Color.FromArgb(0, BackColor), BackColor, LinearGradientMode.Vertical);
-        g.FillRectangle(fade, fadeBounds);
+        if (_artwork is null || Width <= 0 || Height <= 0)
+            return;
+
+        var g = e.Graphics;
+
+        g.Clear(BackColor);
+        g.InterpolationMode =
+            InterpolationMode.HighQualityBicubic;
+
+        double scale = Math.Min(
+            (double)Width / _artwork.Width,
+            (double)Height / _artwork.Height
+        );
+
+        int imageWidth = (int)(_artwork.Width * scale);
+        int imageHeight = (int)(_artwork.Height * scale);
+
+        int x = (Width - imageWidth) / 2;
+        int y = (Height - imageHeight) / 2;
+
+        g.DrawImage(
+            _artwork,
+            new Rectangle(x, y, imageWidth, imageHeight)
+        );
     }
+
 }
