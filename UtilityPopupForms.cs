@@ -872,13 +872,13 @@ internal sealed class LoadGameDialog : UtilityPopupForm
     /// </summary>
     internal void FillLauncherWindow(Form launcher)
     {
+        // Use the actual outer bounds, not the nominal logical canvas. Windows
+        // may clamp the launcher when the desktop working area is smaller.
+        // A borderless form matching those bounds covers the parent exactly.
         StartPosition = FormStartPosition.Manual;
         MinimumSize = Size.Empty;
         MaximumSize = Size.Empty;
-        ClientSize = launcher.ClientSize;
-        Location = launcher.PointToScreen(Point.Empty);
-        MinimumSize = Size;
-        MaximumSize = Size;
+        Bounds = launcher.Bounds;
     }
 
     private sealed record SaveItem(CareerEntry Career)

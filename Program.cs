@@ -235,14 +235,11 @@ internal static class Program
                     ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight)
                 };
                 saves.FillLauncherWindow(launcherBounds);
-                if (saves.ClientSize != launcherBounds.ClientSize ||
-                    saves.StartPosition != FormStartPosition.Manual ||
-                    saves.MinimumSize != saves.Size ||
-                    saves.MaximumSize != saves.Size)
+                if (saves.Bounds != launcherBounds.Bounds ||
+                    saves.StartPosition != FormStartPosition.Manual)
                     throw new Exception(
-                        "Load Game must occupy the whole launcher, not a floating popup. " +
-                        $"Load client={saves.ClientSize}; Launcher client={launcherBounds.ClientSize}; " +
-                        $"Load window={saves.Size}; Min={saves.MinimumSize}; Max={saves.MaximumSize}; " +
+                        "Load Game must cover the whole launcher, not a floating popup. " +
+                        $"Load bounds={saves.Bounds}; Launcher bounds={launcherBounds.Bounds}; " +
                         $"Start={saves.StartPosition}.");
             }
 
