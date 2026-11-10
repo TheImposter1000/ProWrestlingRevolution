@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.12 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.13 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -50,8 +50,12 @@ jobs:
             }
           }
           if (-not (Test-Path "publish/System/PRWDefault.mdb")) { throw "Local default template was not installed" }
+          if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 335872) { throw "Default template size is incorrect" }
+          if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "B4F728D091AA4113D3CE03BBFC51DE230DF7845A4DF69646177D857AE6054130") {
+            throw "Bundled default template checksum did not match PRWDefault.mdb"
+          }
 
-      - name: Assemble the Version 0.5.12 portable game ZIP
+      - name: Assemble the Version 0.5.13 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -68,7 +72,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.12 game ZIP
+      - name: Upload complete Version 0.5.13 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -78,8 +82,8 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.12
-          name: Pro Wrestling Revolution 0.5.12 - Compact Main Menu Icon Rail
+          tag_name: v0.5.13
+          name: Pro Wrestling Revolution 0.5.13 - Native Database Creation
           target_commitish: main
           prerelease: false
           make_latest: true
@@ -93,7 +97,14 @@ jobs:
             an executable backup in .pwr-updates before replacing anything.
             Database universes, saved careers, skins, pictures, settings and
             custom title art are not touched.
-            Version 0.5.12 replaces the duplicated full-width sidebar with a compact icon-only main-menu rail on the left of the editor and utility screens. It keeps the approved Option A Load Game interface, all save management functions, and the existing application navigation. The executable's version has also been corrected so automatic updates can detect this release.
+            Version 0.5.13 adds Create Database using the built-in PRWDefault.mdb
+            template. The game installs the base MDB in its own System folder,
+            creates independent universe copies in Databases, and reads database
+            files, saves, skins, pictures, and settings relative to the installed
+            executable rather than a repository folder. Worker records can be
+            browsed with linked skills, biographies, contracts, and popularity.
+            Existing database universes, saves, skins, and settings are preserved.
+            Gameplay simulation and full category editing are still in development.
             IMPORTANT: For existing v0.5.3 installs, extract this release once
             to add the in-app updater. Future stable releases update in place.
             The updater replaces only the executable, not assets or data folders.

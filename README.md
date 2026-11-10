@@ -1,6 +1,6 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.4 (In-App Updater) redesigns the navigation without replacing your title screen artwork.
+An original Windows desktop wrestling management project. Version 0.5.13 adds portable native database creation, local application file paths, and linked worker record browsing while retaining the existing interface.
 
 ## Windows application
 
@@ -29,7 +29,7 @@ This screen's design is independent of the controls used by the other game pages
 The screenshot PNG is a user-provided asset; it must be installed separately
 unless included in a local skin pack or a release containing that asset.
 
-## Local database creation and runtime paths
+## Version 0.5.13: local database creation and runtime paths
 
 The default database is the user's original PRWDefault.mdb, embedded losslessly
 in the executable. On first launch, the game extracts it into
