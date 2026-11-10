@@ -27,11 +27,13 @@ internal abstract class UtilityPopupForm : Form
     private readonly string _helpText;
     private readonly string _listHeading;
     private readonly string _infoHeading;
+    private readonly bool _modernLoadLook;
 
     protected UtilityPopupForm(AppPaths paths, SkinPalette palette,
         string title, string listHeading, string infoHeading, string helpText,
-        int width, int height)
+        int width, int height, bool modernLoadLook = false)
     {
+        _modernLoadLook = modernLoadLook;
         Paths = paths;
         Palette = palette;
         _title = title;
@@ -69,12 +71,20 @@ internal abstract class UtilityPopupForm : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using var border = new Pen(Color.FromArgb(86, 173, 199), 1);
-        e.Graphics.DrawRectangle(border, 0, 0, Width - 1, Height - 1);
+        using var border = new Pen(_modernLoadLook
+            ? Color.FromArgb(73, 178, 229) : Color.FromArgb(86, 173, 199),
+            _modernLoadLook ? 2f : 1f);
+        e.Graphics.DrawRectangle(border, 1, 1, Width - 3, Height - 3);
     }
 
     private void BuildChrome()
     {
+        if (_modernLoadLook)
+        {
+            BuildModernLoadChrome();
+            return;
+        }
+
         // Explicit rows avoid docking-order overlap on Windows display scaling.
         var frame = new TableLayoutPanel
         {
@@ -221,6 +231,342 @@ internal abstract class UtilityPopupForm : Form
 
     }
 
+
+    /// <summary>
+    /// Dedicated Option A chrome for Load Game. This stays a centered, borderless,
+    /// modal Form rather than occupying the launcher content page. The database
+    /// selector retains the original shared popup design.
+    /// </summary>
+    private void BuildModernLoadChrome()
+    {
+        BackColor = Color.FromArgb(7, 16, 27);
+        var frame = new TableLayoutPanel
+        {
+            Name = "LoadGameFrame",
+            Dock = DockStyle.Fill,
+            ColumnCount = 1, RowCount = 4,
+            Padding = new Padding(3),
+            Margin = Padding.Empty,
+            BackColor = Color.FromArgb(7, 16, 27)
+        };
+        frame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 105));
+        frame.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+        Controls.Add(frame);
+
+        var header = new Panel
+        {
+            Name = "PopupHeader", Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.FromArgb(11, 27, 43)
+        };
+        header.Paint += (_, e) =>
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var bounds = new Rectangle(0, 0, Math.Max(1, header.Width), Math.Max(1, header.Height));
+            using (var fill = new LinearGradientBrush(bounds,
+                Color.FromArgb(15, 39, 57), Color.FromArgb(5, 17, 30),
+                LinearGradientMode.Horizontal))
+                g.FillRectangle(fill, bounds);
+            using var edge = new Pen(Color.FromArgb(73, 160, 205), 1);
+            g.DrawLine(edge, 0, header.Height - 1, header.Width, header.Height - 1);
+            using var red = new SolidBrush(Color.FromArgb(245, 48, 76));
+            g.FillPolygon(red, [
+                new Point(23, 12), new Point(35, 12),
+                new Point(24, 35), new Point(12, 35)
+            ]);
+        };
+        frame.Controls.Add(header, 0, 0);
+
+        var brand = new Label
+        {
+            Name = "PopupBrand",
+            Text = "PRO WRESTLING REVOLUTION",
+            Dock = DockStyle.Fill, Padding = new Padding(46, 0, 0, 0),
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(239, 245, 250),
+            Font = new Font("Segoe UI", 10.4f, FontStyle.Bold),
+            BackColor = Color.Transparent
+        };
+        header.Controls.Add(brand);
+        var close = HeaderButton("×", "Close this window", Color.FromArgb(242, 89, 107));
+        close.Dock = DockStyle.Right;
+        close.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+        header.Controls.Add(close);
+        var help = HeaderButton("?", "Help", Color.FromArgb(230, 241, 249));
+        help.Dock = DockStyle.Right;
+        help.Click += (_, _) => MessageBox.Show(this, _helpText,
+            _title + " Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        header.Controls.Add(help);
+        close.BringToFront();
+        help.BringToFront();
+        header.MouseDown += Drag;
+        brand.MouseDown += Drag;
+
+        var hero = new Panel
+        {
+            Name = "LoadGameTitle",
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.FromArgb(10, 28, 44)
+        };
+        hero.Paint += (_, e) =>
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var bounds = new Rectangle(0, 0, Math.Max(1, hero.Width), Math.Max(1, hero.Height));
+            using (var fill = new LinearGradientBrush(bounds,
+                Color.FromArgb(15, 49, 73), Color.FromArgb(7, 23, 38),
+                LinearGradientMode.Horizontal))
+                g.FillRectangle(fill, bounds);
+            using var stripe = new SolidBrush(Color.FromArgb(21, 105, 169));
+            int x = hero.Width - 153;
+            g.FillPolygon(stripe, [
+                new Point(x, 0), new Point(x + 40, 0),
+                new Point(x - 12, 61), new Point(x - 52, 61)
+            ]);
+            g.FillPolygon(stripe, [
+                new Point(x + 56, 0), new Point(x + 91, 0),
+                new Point(x + 39, 61), new Point(x + 4, 61)
+            ]);
+            using var folderPen = new Pen(Color.FromArgb(115, 220, 248), 2f)
+            {
+                LineJoin = LineJoin.Round
+            };
+            g.DrawLines(folderPen, [
+                new Point(23, 35), new Point(23, 20), new Point(34, 20),
+                new Point(40, 26), new Point(56, 26), new Point(56, 47),
+                new Point(23, 47), new Point(23, 35)
+            ]);
+            using var cyan = new Pen(Color.FromArgb(62, 168, 215));
+            g.DrawLine(cyan, 18, 61, hero.Width - 18, 61);
+        };
+        frame.Controls.Add(hero, 0, 1);
+
+        var title = new Label
+        {
+            Text = "LOAD GAME",
+            Location = new Point(76, 8),
+            Size = new Size(350, 48),
+            Font = new Font("Segoe UI", 21, FontStyle.Bold | FontStyle.Italic),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        hero.Controls.Add(title);
+        Context.Name = "PopupContext";
+        Context.Location = new Point(22, 66);
+        Context.Size = new Size(Width - 55, 33);
+        Context.ForeColor = Color.FromArgb(190, 211, 228);
+        Context.BackColor = Color.Transparent;
+        Context.Font = new Font("Segoe UI", 9.8f, FontStyle.Bold);
+        Context.TextAlign = ContentAlignment.MiddleLeft;
+        hero.Controls.Add(Context);
+
+        var workspace = new TableLayoutPanel
+        {
+            Name = "PopupWorkspace",
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty, Padding = new Padding(17, 10, 17, 11),
+            ColumnCount = 2, RowCount = 1,
+            BackColor = Color.FromArgb(7, 16, 27)
+        };
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+        workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        frame.Controls.Add(workspace, 0, 2);
+
+        var left = ModernLoadPane("PopupListPane", _listHeading);
+        var right = ModernLoadPane("PopupInformationPane", _infoHeading);
+        left.Margin = new Padding(0, 0, 13, 0);
+        right.Margin = Padding.Empty;
+
+        Items.Name = "PopupItemList";
+        Items.Dock = DockStyle.Fill;
+        Items.BorderStyle = BorderStyle.None;
+        Items.IntegralHeight = false;
+        Items.Font = new Font("Segoe UI", 10.5f);
+        Items.ItemHeight = 27;
+        Items.Margin = new Padding(9, 9, 9, 9);
+        Items.BackColor = Color.FromArgb(6, 17, 28);
+        Items.ForeColor = Color.FromArgb(235, 246, 253);
+        Items.SelectionMode = SelectionMode.One;
+        left.Controls.Add(Items, 0, 1);
+
+        Information.Name = "PopupInformation";
+        Information.Dock = DockStyle.Fill;
+        Information.Margin = new Padding(15, 12, 12, 12);
+        Information.ReadOnly = true;
+        Information.BorderStyle = BorderStyle.None;
+        Information.ScrollBars = RichTextBoxScrollBars.Vertical;
+        Information.BackColor = Color.FromArgb(9, 25, 39);
+        Information.ForeColor = Color.FromArgb(225, 236, 245);
+        Information.Font = new Font("Segoe UI", 10f);
+        Information.DetectUrls = false;
+        Information.TabStop = false;
+        right.Controls.Add(Information, 0, 1);
+        workspace.Controls.Add(left, 0, 0);
+        workspace.Controls.Add(right, 1, 0);
+
+        var footer = new Panel
+        {
+            Name = "PopupActionBar",
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            Padding = new Padding(15, 12, 10, 10),
+            BackColor = Color.FromArgb(12, 27, 42)
+        };
+        footer.Paint += (_, e) =>
+        {
+            var bounds = new Rectangle(0, 0, Math.Max(1, footer.Width), Math.Max(1, footer.Height));
+            using (var fill = new LinearGradientBrush(bounds,
+                Color.FromArgb(25, 47, 64), Color.FromArgb(9, 20, 33),
+                LinearGradientMode.Vertical))
+                e.Graphics.FillRectangle(fill, bounds);
+            using var shine = new Pen(Color.FromArgb(60, 150, 185));
+            e.Graphics.DrawLine(shine, 0, 0, footer.Width, 0);
+        };
+        Actions.Name = "PopupActions";
+        Actions.Dock = DockStyle.Fill;
+        Actions.WrapContents = false;
+        Actions.AutoScroll = false;
+        Actions.BackColor = Color.Transparent;
+        footer.Controls.Add(Actions);
+        frame.Controls.Add(footer, 0, 3);
+    }
+
+    private static TableLayoutPanel ModernLoadPane(string name, string heading)
+    {
+        var outer = new TableLayoutPanel
+        {
+            Name = name, Dock = DockStyle.Fill,
+            Margin = Padding.Empty, Padding = new Padding(2),
+            ColumnCount = 1, RowCount = 2,
+            BackColor = Color.FromArgb(13, 33, 49)
+        };
+        outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 39));
+        outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        outer.Paint += (_, e) =>
+        {
+            using var border = new Pen(Color.FromArgb(61, 121, 153));
+            e.Graphics.DrawRectangle(border, 0, 0, outer.Width - 1, outer.Height - 1);
+        };
+        var strip = new Panel
+        {
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.FromArgb(22, 52, 73)
+        };
+        strip.Paint += (_, e) =>
+        {
+            var b = new Rectangle(0, 0, Math.Max(1, strip.Width), Math.Max(1, strip.Height));
+            using var gradient = new LinearGradientBrush(b,
+                Color.FromArgb(36, 77, 102), Color.FromArgb(19, 47, 68),
+                LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(gradient, b);
+            using var glow = new Pen(Color.FromArgb(74, 168, 208));
+            e.Graphics.DrawLine(glow, 0, strip.Height - 1, strip.Width, strip.Height - 1);
+        };
+        var caption = new Label
+        {
+            Text = heading.ToUpperInvariant(),
+            Dock = DockStyle.Fill,
+            Padding = new Padding(14, 0, 0, 0),
+            Font = new Font("Segoe UI", 10.25f, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        strip.Controls.Add(caption);
+        outer.Controls.Add(strip, 0, 0);
+        return outer;
+    }
+
+    private sealed class ModernLoadButton : Button
+    {
+        private readonly bool _primary;
+        private readonly bool _destructive;
+        private bool _hovered;
+
+        internal ModernLoadButton(bool primary, bool destructive)
+        {
+            _primary = primary;
+            _destructive = destructive;
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            Cursor = Cursors.Hand;
+            UseVisualStyleBackColor = false;
+            ForeColor = Color.White;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hovered = false;
+            Invalidate();
+        }
+
+        protected override void OnEnabledChanged(EventArgs e)
+        {
+            base.OnEnabledChanged(e);
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Parent?.BackColor ?? Color.FromArgb(12, 27, 42));
+            if (Width < 5 || Height < 5) return;
+
+            var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
+            using var path = new GraphicsPath();
+            const int radius = 5;
+            path.AddArc(bounds.Left, bounds.Top, radius * 2, radius * 2, 180, 90);
+            path.AddArc(bounds.Right - radius * 2, bounds.Top, radius * 2, radius * 2, 270, 90);
+            path.AddArc(bounds.Right - radius * 2, bounds.Bottom - radius * 2, radius * 2, radius * 2, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - radius * 2, radius * 2, radius * 2, 90, 90);
+            path.CloseFigure();
+
+            bool active = Enabled && (_hovered || _primary);
+            Color upper = active ? Color.FromArgb(42, 101, 143) : Color.FromArgb(35, 58, 76);
+            Color lower = active ? Color.FromArgb(16, 61, 96) : Color.FromArgb(15, 32, 48);
+            if (!Enabled)
+            {
+                upper = Color.FromArgb(26, 40, 53);
+                lower = Color.FromArgb(19, 32, 43);
+            }
+            using (var fill = new LinearGradientBrush(bounds, upper, lower, LinearGradientMode.Vertical))
+                g.FillPath(fill, path);
+            using (var outline = new Pen(active
+                ? Color.FromArgb(96, 219, 248) : Color.FromArgb(73, 133, 160), 1f))
+                g.DrawPath(outline, path);
+            if (Enabled)
+            {
+                using var shine = new Pen(Color.FromArgb(70, 191, 227), 1);
+                g.DrawLine(shine, 8, 2, Width - 10, 2);
+            }
+            var foreground = !Enabled
+                ? Color.FromArgb(122, 146, 161)
+                : _destructive ? Color.FromArgb(255, 99, 119) : Color.White;
+            TextRenderer.DrawText(g, Text, Font, bounds, foreground,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(bounds, -5, -4));
+        }
+    }
+
     private static TableLayoutPanel Pane(string name, string heading)
     {
         var outer = new TableLayoutPanel
@@ -284,6 +630,20 @@ internal abstract class UtilityPopupForm : Form
     protected Button AddAction(string label, Action onClick,
         bool primary = false, bool destructive = false, int width = 133)
     {
+        if (_modernLoadLook)
+        {
+            var modern = new ModernLoadButton(primary, destructive)
+            {
+                Name = "Action" + string.Concat(label.Where(char.IsLetterOrDigit)),
+                Text = label,
+                Size = new Size(width, 39),
+                Margin = new Padding(0, 1, 7, 0)
+            };
+            modern.Click += (_, _) => RunSafely(onClick);
+            Actions.Controls.Add(modern);
+            return modern;
+        }
+
         var button = new Button
         {
             Name = "Action" + string.Concat(label.Where(char.IsLetterOrDigit)),
@@ -489,18 +849,18 @@ internal sealed class LoadGameDialog : UtilityPopupForm
             "separate safety copy. Delete archives the whole save folder outside " +
             "SaveGames, so it is not permanently erased. Loading the simulation " +
             "is not available until the gameplay engine is connected.",
-            1110, 615)
+            1010, 630, modernLoadLook: true)
     {
         Name = "LoadGameDialog";
         _load = AddAction("Load", () => Explain(
-            "The save file exists, but resuming gameplay is not implemented yet."), true, width: 105);
-        _rename = AddAction("Rename", Rename, width: 112);
-        _copy = AddAction("Copy", Copy, width: 104);
-        _recovery = AddAction("Recovery", Recover, width: 117);
-        _delete = AddAction("Delete", Archive, destructive: true, width: 112);
-        _check = AddAction("Check Save", Check, width: 123);
-        _folder = AddAction("Open Folder", OpenSaveFolder, width: 132);
-        AddAction("Close", () => Close(), width: 105);
+            "The save file exists, but resuming gameplay is not implemented yet."), true, width: 92);
+        _rename = AddAction("Rename", Rename, width: 101);
+        _copy = AddAction("Copy", Copy, width: 85);
+        _recovery = AddAction("Recovery", Recover, width: 104);
+        _delete = AddAction("Delete", Archive, destructive: true, width: 87);
+        _check = AddAction("Check Save", Check, width: 115);
+        _folder = AddAction("Open Folder", OpenSaveFolder, width: 118);
+        AddAction("Close", () => Close(), width: 88);
         Items.DisplayMember = nameof(SaveItem.DisplayName);
         Items.SelectedIndexChanged += (_, _) => UpdateDetails();
         RefreshSaves();
