@@ -29,6 +29,33 @@ This screen's design is independent of the controls used by the other game pages
 The screenshot PNG is a user-provided asset; it must be installed separately
 unless included in a local skin pack or a release containing that asset.
 
+## Database editor workspace (v0.5.6)
+
+The Database Editor main page is a browsing hub, NOT the detailed editor for an
+individual worker or company. It uses the PWR dark navy, cyan and red styling,
+without the large "Editing Database" banner. The **active database name is
+the heading directly above the record list**. There is no redundant database
+dropdown in the left actions column; Change Database is in the bottom toolbar.
+
+The left column has the actual MDB table categories and the action buttons.
+The **Mass Edit** field dropdown is immediately underneath the Mass Edit button,
+not embedded in the button or placed elsewhere. The centre lists actual record
+names with search and sort, and the right column has Notes and Database Summary
+tabs. Double-click a record for a full read-only field inspection, with the
+option to open the MDB in Access.
+
+Working tools include database switching, MDB import, details, basic schema
+accessibility check, External Editing, and text-field Mass Edit. Mass Edit
+requires an Access table with exactly one declared primary key, asks for
+confirmation, creates a backup under the database's Backups folder, and applies
+the update in a transaction. Unsupported tables are rejected rather than
+updated by guessed row positions. Add, Copy, Delete, and Import Items remain
+disabled until their category-specific editing workflows are implemented.
+
+For large tables, the browser loads the first 10,000 rows and displays the
+actual total. The interface uses Microsoft ACE OLE DB; a 64-bit compatible
+Microsoft Access Database Engine is required for reading and updating MDBs.
+
 ## Minimal Edition title screen
 
 The logical client area is 1366 x 768, with the same Windows display scaling configuration as v0.4.

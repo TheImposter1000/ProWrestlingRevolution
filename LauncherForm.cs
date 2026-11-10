@@ -165,6 +165,7 @@ public sealed partial class LauncherForm : Form
         _currentPage = pageName;
         _hoverIcon = null;
         // Interior pages need the regular navigation; the title hides it.
+        _editorPageTitle.Visible = false;
         _sidebar.Visible = true;
         _topbar.Visible = true;
         RenderSidebar();
@@ -332,51 +333,16 @@ public sealed partial class LauncherForm : Form
 
     private void ShowDatabaseEditor()
     {
-        NewPage("DATABASE EDITOR", "Inspect MDB tables without modifying data, or open the selected file in Access.", out var content);
-        var worlds = StyledList();
-        var tables = StyledList();
-        tables.Width = 350;
-        tables.Dock = DockStyle.Left;
-        var grid = new DataGridView
-        {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false, RowHeadersVisible = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
-            BackgroundColor = _skin.Surface, GridColor = _skin.Border,
-            ForeColor = Color.Black, BorderStyle = BorderStyle.None
-        };
-        var password = StyledInput(secret: true);
-        password.Width = 170;
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 102, AutoScroll = true };
-        actions.Controls.Add(TextLabel("MDB password (optional)", 10, color: _skin.Muted));
-        actions.Controls.Add(password);
-        actions.Controls.Add(ActionButton("LIST TABLES", () =>
-        {
-            if (worlds.SelectedItem is not UniverseEntry world)
-                throw new InvalidOperationException("Select a universe first.");
-            tables.Items.Clear();
-            foreach (var table in AccessDatabase.TableNames(world.MdbPath, password.Text))
-                tables.Items.Add(table);
-            grid.DataSource = null;
-        }, true));
-        actions.Controls.Add(ActionButton("PREVIEW 100 ROWS", () =>
-        {
-            if (worlds.SelectedItem is not UniverseEntry world || tables.SelectedItem is not string table) return;
-            grid.DataSource = AccessDatabase.Preview(world.MdbPath, table, password.Text);
-        }));
-        actions.Controls.Add(ActionButton("EDIT IN ACCESS", () =>
-        {
-            if (worlds.SelectedItem is UniverseEntry world)
-                AccessDatabase.OpenInMicrosoftAccess(world.MdbPath);
-        }));
-        var right = new Panel { Dock = DockStyle.Fill };
-        right.Controls.Add(grid);
-        right.Controls.Add(tables);
-        right.Controls.Add(actions);
-        foreach (var world in _paths.Universes()) worlds.Items.Add(world);
-        if (worlds.Items.Count > 0) worlds.SelectedIndex = 0;
-        worlds.SelectedIndexChanged += (_, _) => { tables.Items.Clear(); grid.DataSource = null; };
-        content.Controls.Add(MakeSplit(worlds, right, 270));
+        // This is the simple directory screen, not a record editing form.
+        // Hide the ordinary sidebar to give records and notes the full width.
+        _currentPage = "DATABASE EDITOR";
+        _hoverIcon = null;
+        _sidebar.Visible = false;
+        _topbar.Visible = true;
+        _editorPageTitle.Visible = true;
+        ClearPageContent();
+        _page.BackColor = Color.FromArgb(7, 18, 30);
+        _page.Controls.Add(new DatabaseEditorWorkspace(_paths, _skin, ShowHome));
     }
 
     private void ShowSkins()
