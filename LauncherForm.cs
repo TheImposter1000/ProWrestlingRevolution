@@ -210,54 +210,10 @@ public sealed partial class LauncherForm : Form
 
     private void ShowDatabaseSelector()
     {
-        NewPage("DATABASE SELECTOR", "Each universe has its own independent Microsoft Access MDB file.", out var content);
-        var worlds = StyledList();
-        var details = TextLabel("", 11, color: _skin.Muted);
-        details.Dock = DockStyle.Top;
-        details.Height = 90;
-        var right = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Padding = new Padding(27, 10, 0, 0), AutoScroll = true
-        };
-        right.Controls.Add(ActionButton("SELECT DATABASE", () =>
-        {
-            if (worlds.SelectedItem is not UniverseEntry entry) return;
-            _paths.WriteSetting("Database", entry.Name);
-            MessageBox.Show(this, "Active database: " + entry.Name, "Database Selected");
-            ShowDatabaseSelector();
-        }, true));
-        right.Controls.Add(ActionButton("IMPORT MDB", () =>
-        {
-            using var dialog = new OpenFileDialog
-            {
-                Title = "Import an existing Access MDB universe",
-                Filter = "Access database (*.mdb)|*.mdb", CheckFileExists = true
-            };
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            var name = Prompt("Universe Name", "Name this wrestling universe", Path.GetFileNameWithoutExtension(dialog.FileName));
-            if (name is null) return;
-            var imported = _paths.ImportUniverse(dialog.FileName, name);
-            _paths.WriteSetting("Database", imported.Name);
-            ShowDatabaseSelector();
-        }));
-        right.Controls.Add(ActionButton("OPEN DATABASE FOLDER", () =>
-            OpenFolder(_paths.Databases)));
-        right.Controls.Add(details);
-        worlds.SelectedIndexChanged += (_, _) =>
-        {
-            if (worlds.SelectedItem is UniverseEntry x)
-                details.Text = "Folder: " + x.DirectoryPath + Environment.NewLine +
-                               "MDB: " + Path.GetFileName(x.MdbPath);
-        };
-        foreach (var world in _paths.Universes()) worlds.Items.Add(world);
-        string selected = _paths.ReadSetting("Database", "");
-        for (int i = 0; i < worlds.Items.Count; i++)
-            if (((UniverseEntry)worlds.Items[i]!).Name == selected) { worlds.SelectedIndex = i; break; }
-        if (worlds.SelectedIndex < 0 && worlds.Items.Count > 0) worlds.SelectedIndex = 0;
-        if (worlds.Items.Count == 0) details.Text = "No universes yet. Import your own .mdb to begin.";
-        var split = MakeSplit(worlds, right);
-        content.Controls.Add(split);
+        // Utility operation: retain the current underlying page.
+        using var dialog = new DatabaseSelectorDialog(_paths, _skin);
+        if (dialog.ShowDialog(this) == DialogResult.OK && _currentPage == "NEW GAME")
+            ShowNewGame(); // Refresh the New Game world's list after selection.
     }
 
     private void ShowNewGame()
@@ -299,36 +255,10 @@ public sealed partial class LauncherForm : Form
 
     private void ShowLoadGame()
     {
-        NewPage("LOAD GAME", "Browse all saved careers organized beneath their parent universe.", out var content);
-        var careers = StyledList();
-        var right = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, AutoScroll = true, Padding = new Padding(26, 15, 0, 0)
-        };
-        var details = TextLabel("Select a career to see its files.", 10, color: _skin.Muted);
-        details.Size = new Size(370, 110);
-        right.Controls.Add(ActionButton("OPEN SAVE IN ACCESS", () =>
-        {
-            if (careers.SelectedItem is not CareerItem item) return;
-            AccessDatabase.OpenInMicrosoftAccess(item.Data.MdbPath);
-        }, true));
-        right.Controls.Add(ActionButton("OPEN SAVE FOLDER", () =>
-        {
-            if (careers.SelectedItem is not CareerItem item) return;
-            OpenFolder(Path.GetDirectoryName(item.Data.MdbPath)!);
-        }));
-        right.Controls.Add(details);
-        careers.SelectedIndexChanged += (_, _) =>
-        {
-            if (careers.SelectedItem is CareerItem item)
-                details.Text = "Universe: " + item.Data.UniverseName + "\nCareer: " + item.Data.Name +
-                    "\nFile: " + item.Data.MdbPath +
-                    "\n\nGameplay loading will be connected after the new simulation schema is built.";
-        };
-        foreach (var entry in _paths.Careers()) careers.Items.Add(new CareerItem(entry));
-        if (careers.Items.Count > 0) careers.SelectedIndex = 0;
-        content.Controls.Add(MakeSplit(careers, right));
+        // The save manager does not claim to resume gameplay. Loading becomes
+        // available only once the simulation engine is connected.
+        using var dialog = new LoadGameDialog(_paths, _skin);
+        dialog.ShowDialog(this);
     }
 
     private void ShowDatabaseEditor()
