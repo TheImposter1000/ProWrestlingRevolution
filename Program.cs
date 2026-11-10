@@ -93,10 +93,16 @@ internal static class Program
                         launcher.ClientSize.Width + " x " + launcher.ClientSize.Height + ".");
                 if (launcher.FormBorderStyle != FormBorderStyle.None)
                     throw new Exception("Launcher must not use a resizable standard border.");
+                var titleCanvas = launcher.Controls.OfType<Panel>()
+                    .SingleOrDefault(panel => panel.Dock == DockStyle.Fill);
+                var titleScreen = titleCanvas?.Controls.OfType<TitleScreenView>().SingleOrDefault();
+                if (titleScreen is null || titleScreen.Dock != DockStyle.Fill ||
+                    titleScreen.Artwork is null)
+                    throw new Exception("Full-bleed, functional bottom-menu title screen is missing.");
                 var sidebar = launcher.Controls.OfType<Panel>()
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
                 if (sidebar is null || sidebar.Width != 200)
-                    throw new Exception("Unified navigation width must be 240.");
+                    throw new Exception("Interior navigation width must be 200.");
                 var updateButton = sidebar.Controls.OfType<Button>()
                     .SingleOrDefault(button => button.Name == "CheckUpdatesButton");
                 if (updateButton is null || updateButton.Dock != DockStyle.Bottom ||
@@ -140,6 +146,31 @@ internal static class Program
                 if (controls.OrderBy(button => button.Left).First().Left !=
                     SkinArt.WindowWidth - 200)
                     throw new Exception("Top controls are incorrectly aligned.");
+                
+                // The editor is a full-width directory. The name of the MDB is the
+                // central heading, and the mass-edit dropdown sits beneath its button.
+                typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
+                var workspace = titleCanvas!.Controls
+                    .OfType<DatabaseEditorWorkspace>().SingleOrDefault();
+                if (workspace is null || sidebar.Visible)
+                    throw new Exception("Database editor workspace must replace the interior sidebar.");
+                static IEnumerable<Control> Descendants(Control parent) =>
+                    parent.Controls.Cast<Control>().SelectMany(child =>
+                        new[] { child }.Concat(Descendants(child)));
+                var descendants = Descendants(workspace).ToArray();
+                var databaseName = descendants.SingleOrDefault(c => c.Name == "ActiveDatabaseName");
+                var massButton = descendants.SingleOrDefault(c => c.Name == "MassEditButton");
+                var massField = descendants.SingleOrDefault(c => c.Name == "MassEditFieldSelector");
+                var categories = descendants.SingleOrDefault(c => c.Name == "EditorCategorySelector");
+                var notes = descendants.SingleOrDefault(c => c.Name == "EditorNotes");
+                if (databaseName is null || categories is null || notes is null)
+                    throw new Exception("Editor directory sections are missing.");
+                if (massButton is null || massField is null ||
+                    massField.Top <= massButton.Top)
+                    throw new Exception("Mass edit dropdown must be under the mass edit button.");
+
             }
 
             // Updates may carry game data files in the ZIP, but the installer
@@ -177,7 +208,47 @@ internal static class Program
             try { paths.CreateCareer(world, "../bad"); }
             catch (ArgumentException) { unsafeRejected = true; }
             if (!unsafeRejected) throw new Exception("Unsafe path was allowed.");
-            Console.WriteLine("Phase One smoke tests passed.");
+            // Reusable popup shell and both modal flows must be real controls,
+            // not full-screen replacements of the title/game pages.
+            using (var selector = new DatabaseSelectorDialog(paths, skin))
+            using (var saves = new LoadGameDialog(paths, skin))
+            {
+                foreach (var popup in new Form[] { selector, saves })
+                {
+                    if (popup.FormBorderStyle != FormBorderStyle.None ||
+                        popup.Controls.Find("PopupWorkspace", true).Length != 1 ||
+                        popup.Controls.Find("PopupItemList", true).Length != 1 ||
+                        popup.Controls.Find("PopupInformation", true).Length != 1 ||
+                        popup.Controls.Find("PopupActions", true).Length != 1)
+                        throw new Exception("Shared utility popup layout is missing.");
+                    popup.PerformLayout();
+                }
+                if (selector.Controls.Find("ActionUseThisDatabase", true).Length != 1)
+                    throw new Exception("Database selection action is missing.");
+                var load = saves.Controls.Find("ActionLoad", true).SingleOrDefault() as Button;
+                if (load is null || load.Enabled)
+                    throw new Exception("Unimplemented gameplay loading must stay disabled.");
+            }
+
+            // Exercise safe save operations using a file-management fixture.
+            var renamed = paths.RenameCareer(career, "Renamed Career");
+            if (!File.Exists(renamed.MdbPath) || File.Exists(career.MdbPath))
+                throw new Exception("Rename did not move the career safely.");
+            var copied = paths.CopyCareer(renamed, "Copied Career");
+            if (!File.Exists(copied.MdbPath) ||
+                !File.Exists(Path.Combine(Path.GetDirectoryName(copied.MdbPath)!,
+                    "Backups", "initial.mdb")))
+                throw new Exception("Career copy did not retain its recovery data.");
+            File.WriteAllBytes(renamed.MdbPath, [1, 2, 3, 4, 5]);
+            string preserved = paths.RestoreCareerInitialBackup(renamed);
+            if (!File.Exists(preserved) || !AccessDatabase.LooksLikeMdb(renamed.MdbPath))
+                throw new Exception("Recovery did not preserve and restore MDB files.");
+            string archived = paths.ArchiveCareer(renamed);
+            if (!Directory.Exists(archived) || File.Exists(renamed.MdbPath) ||
+                !File.Exists(copied.MdbPath))
+                throw new Exception("Archive must preserve the removed save and other careers.");
+
+            Console.WriteLine("Popup and save-management smoke tests passed.");
         }
         finally
         {

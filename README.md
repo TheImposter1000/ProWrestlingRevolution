@@ -6,6 +6,81 @@ An original Windows desktop wrestling management project. Version 0.5.4 (In-App 
 
 Download the portable ZIP from https://github.com/TheImposter1000/ProWrestlingRevolution/releases. Extract it to a writable directory and run ProWrestlingRevolution.exe. No Python or separate .NET installation is required.
 
+## Approved full-width title screen
+
+The home screen now uses the approved reference composition: a compact upper-left
+identity panel, a four-icon utility cluster at upper right, and seven functional
+menu tiles in two rows along the bottom. Check for Updates is in the lower-right
+corner. The old 200-pixel sidebar and 40-pixel top bar are hidden on the home screen
+and remain in place on interior screens. Menu actions, shortcuts, sound, help,
+minimize, close, and the in-app updater still work.
+
+For an **exact pixel match** to the approved screenshot, put the supplied
+1672 x 941 reference PNG at this relative path in the selected skin:
+
+    Skins/Obsidian/Graphics/Title_Menu_Exact.png
+
+The complete screenshot will then be drawn at the client size while live click
+regions keep the buttons functional. This separate UI image does not replace or
+modify Backgrounds/Title_Screen.jpg. If the composite is missing, the game draws
+the new chrome natively over the existing title-screen crowd-and-logo art.
+
+This screen's design is independent of the controls used by the other game pages.
+The screenshot PNG is a user-provided asset; it must be installed separately
+unless included in a local skin pack or a release containing that asset.
+
+## Database Selector and Load Game popups (v0.5.7)
+
+Database Selector and Load Game are now centered modal utility dialogs, not full
+pages. Each uses the same reusable shell with a PWR header, two-column layout
+(selection on the left, information on the right) and action footer, styled in
+dark navy, cyan and red. These tools leave the underlying page intact.
+
+Database Selector lists the discovered MDB universes, shows verifiable local
+file information, and activates the selected database. Import MDB and Open
+Folder are available. The selected universe is refreshed when the selector
+is called from New Game. The information panel does not fabricate author or
+description fields that have not yet been stored in PWR.
+
+Load Game lists real saved careers and their file and backup information.
+Rename and Copy are implemented as folder operations. Recovery restores
+Backups/initial.mdb after storing the previous active save in Backups.
+Delete archives the whole career folder to System/DeletedSaves rather than
+destroying it. Check Save inspects the MDB header and table accessibility
+without claiming a full database repair. Open Folder works directly. The
+Load action is disabled until gameplay save restoration is integrated; the
+dialog does not falsely suggest that the simulation can already resume.
+
+No TEW copyrighted skin artwork is used. Existing databases, saved careers,
+skins, and custom title-screen graphics are not modified by the release installer.
+
+## Database editor workspace (v0.5.6)
+
+The Database Editor main page is a browsing hub, NOT the detailed editor for an
+individual worker or company. It uses the PWR dark navy, cyan and red styling,
+without the large "Editing Database" banner. The **active database name is
+the heading directly above the record list**. There is no redundant database
+dropdown in the left actions column; Change Database is in the bottom toolbar.
+
+The left column has the actual MDB table categories and the action buttons.
+The **Mass Edit** field dropdown is immediately underneath the Mass Edit button,
+not embedded in the button or placed elsewhere. The centre lists actual record
+names with search and sort, and the right column has Notes and Database Summary
+tabs. Double-click a record for a full read-only field inspection, with the
+option to open the MDB in Access.
+
+Working tools include database switching, MDB import, details, basic schema
+accessibility check, External Editing, and text-field Mass Edit. Mass Edit
+requires an Access table with exactly one declared primary key, asks for
+confirmation, creates a backup under the database's Backups folder, and applies
+the update in a transaction. Unsupported tables are rejected rather than
+updated by guessed row positions. Add, Copy, Delete, and Import Items remain
+disabled until their category-specific editing workflows are implemented.
+
+For large tables, the browser loads the first 10,000 rows and displays the
+actual total. The interface uses Microsoft ACE OLE DB; a 64-bit compatible
+Microsoft Access Database Engine is required for reading and updating MDBs.
+
 ## Minimal Edition title screen
 
 The logical client area is 1366 x 768, with the same Windows display scaling configuration as v0.4.
