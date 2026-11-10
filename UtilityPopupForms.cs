@@ -866,6 +866,21 @@ internal sealed class LoadGameDialog : UtilityPopupForm
         RefreshSaves();
     }
 
+    /// <summary>
+    /// Show the approved Option A Load Game layout as an independent,
+    /// game-sized window. This covers rather than floats over the title screen.
+    /// </summary>
+    internal void FillLauncherWindow(Form launcher)
+    {
+        StartPosition = FormStartPosition.Manual;
+        MinimumSize = Size.Empty;
+        MaximumSize = Size.Empty;
+        ClientSize = launcher.ClientSize;
+        Location = launcher.PointToScreen(Point.Empty);
+        MinimumSize = Size;
+        MaximumSize = Size;
+    }
+
     private sealed record SaveItem(CareerEntry Career)
     {
         public string DisplayName => Career.Name + "   (" + Career.UniverseName + ")";

@@ -255,9 +255,11 @@ public sealed partial class LauncherForm : Form
 
     private void ShowLoadGame()
     {
-        // The save manager does not claim to resume gameplay. Loading becomes
-        // available only once the simulation engine is connected.
+        // Independent full-window Load Game screen: cover the title artwork
+        // completely, while Close/Escape restores the existing launcher state.
+        // Gameplay loading remains unavailable until the engine is connected.
         using var dialog = new LoadGameDialog(_paths, _skin);
+        dialog.FillLauncherWindow(this);
         dialog.ShowDialog(this);
     }
 

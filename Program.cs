@@ -208,8 +208,8 @@ internal static class Program
             try { paths.CreateCareer(world, "../bad"); }
             catch (ArgumentException) { unsafeRejected = true; }
             if (!unsafeRejected) throw new Exception("Unsafe path was allowed.");
-            // Reusable popup shell and both modal flows must be real controls,
-            // not full-screen replacements of the title/game pages.
+            // Both save selection flows retain working modal controls. Database
+            // selection is compact; Load Game fills the launcher as its own screen.
             using (var selector = new DatabaseSelectorDialog(paths, skin))
             using (var saves = new LoadGameDialog(paths, skin))
             {
@@ -228,6 +228,17 @@ internal static class Program
                 var load = saves.Controls.Find("ActionLoad", true).SingleOrDefault() as Button;
                 if (load is null || load.Enabled)
                     throw new Exception("Unimplemented gameplay loading must stay disabled.");
+                using var launcherBounds = new Form
+                {
+                    ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight)
+                };
+                saves.FillLauncherWindow(launcherBounds);
+                if (saves.ClientSize != launcherBounds.ClientSize ||
+                    saves.StartPosition != FormStartPosition.Manual ||
+                    saves.MinimumSize != saves.Size ||
+                    saves.MaximumSize != saves.Size)
+                    throw new Exception(
+                        "Load Game must occupy the whole launcher, not a floating popup.");
             }
 
             // Exercise safe save operations using a file-management fixture.
