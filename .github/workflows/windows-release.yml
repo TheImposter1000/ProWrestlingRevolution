@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.7 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.8 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Version 0.5.7 portable game ZIP
+      - name: Assemble the Version 0.5.8 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.7 game ZIP
+      - name: Upload complete Version 0.5.8 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,8 +76,8 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.7
-          name: Pro Wrestling Revolution 0.5.7 - Utility Popups
+          tag_name: v0.5.8
+          name: Pro Wrestling Revolution 0.5.8 - Database Editor Refresh
           target_commitish: main
           prerelease: false
           make_latest: true
@@ -91,7 +91,7 @@ jobs:
             an executable backup in .pwr-updates before replacing anything.
             Database universes, saved careers, skins, pictures, settings and
             custom title art are not touched.
-            This release adds PWR styled Database Selector and Load Game modal windows, with a reusable popup shell. It supports selecting and importing universes plus rename, copy, recovery, archive, and save checks. Loading the actual gameplay simulation remains disabled until that engine exists. The existing editor, title art, skins, and updater remain unchanged.
+            Version 0.5.8 refreshes the Database Editor interface: the active database name appears in red above Current Section, record search and sorting move above the records list, and the Notes and Database Summary tabs remain intact. The bottom action bar fits without horizontal scrolling. The launcher also uses a single shared Check for Updates button. All existing database operations, title artwork, skins, and popup tools remain available. Gameplay simulation remains under development.
             IMPORTANT: For existing v0.5.3 installs, extract this release once
             to add the in-app updater. Future stable releases update in place.
             The updater replaces only the executable, not assets or data folders.
