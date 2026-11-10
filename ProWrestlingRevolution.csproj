@@ -11,11 +11,13 @@
     <Nullable>enable</Nullable>
     <AssemblyName>ProWrestlingRevolution</AssemblyName>
     <ApplicationTitle>Pro Wrestling Revolution</ApplicationTitle>
-	  <Version>0.5.3</Version>
-	  <ApplicationIcon>F:\Games\Pro Wrestling Revolution\System\ProWrestlingRevolution-Final-AppIcon.ico</ApplicationIcon> 
-    <Version>0.5.4</Version>
-    <AssemblyVersion>0.5.4.0</AssemblyVersion>
-    <FileVersion>0.5.4.0</FileVersion>
+    <!-- Prefer a portable project-relative icon. Retain the existing local
+         custom icon when building from its original installation directory. -->
+    <ApplicationIcon Condition="Exists('System/ProWrestlingRevolution-Final-AppIcon.ico')">System/ProWrestlingRevolution-Final-AppIcon.ico</ApplicationIcon>
+    <ApplicationIcon Condition="'$(ApplicationIcon)' == '' and Exists('F:\Games\Pro Wrestling Revolution\System\ProWrestlingRevolution-Final-AppIcon.ico')">F:\Games\Pro Wrestling Revolution\System\ProWrestlingRevolution-Final-AppIcon.ico</ApplicationIcon>
+    <Version>0.5.5</Version>
+    <AssemblyVersion>0.5.5.0</AssemblyVersion>
+    <FileVersion>0.5.5.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Data.OleDb" Version="10.0.0" />

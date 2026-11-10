@@ -6,6 +6,29 @@ An original Windows desktop wrestling management project. Version 0.5.4 (In-App 
 
 Download the portable ZIP from https://github.com/TheImposter1000/ProWrestlingRevolution/releases. Extract it to a writable directory and run ProWrestlingRevolution.exe. No Python or separate .NET installation is required.
 
+## Approved full-width title screen
+
+The home screen now uses the approved reference composition: a compact upper-left
+identity panel, a four-icon utility cluster at upper right, and seven functional
+menu tiles in two rows along the bottom. Check for Updates is in the lower-right
+corner. The old 200-pixel sidebar and 40-pixel top bar are hidden on the home screen
+and remain in place on interior screens. Menu actions, shortcuts, sound, help,
+minimize, close, and the in-app updater still work.
+
+For an **exact pixel match** to the approved screenshot, put the supplied
+1672 x 941 reference PNG at this relative path in the selected skin:
+
+    Skins/Obsidian/Graphics/Title_Menu_Exact.png
+
+The complete screenshot will then be drawn at the client size while live click
+regions keep the buttons functional. This separate UI image does not replace or
+modify Backgrounds/Title_Screen.jpg. If the composite is missing, the game draws
+the new chrome natively over the existing title-screen crowd-and-logo art.
+
+This screen's design is independent of the controls used by the other game pages.
+The screenshot PNG is a user-provided asset; it must be installed separately
+unless included in a local skin pack or a release containing that asset.
+
 ## Minimal Edition title screen
 
 The logical client area is 1366 x 768, with the same Windows display scaling configuration as v0.4.

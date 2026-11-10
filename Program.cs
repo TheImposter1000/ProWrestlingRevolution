@@ -93,10 +93,16 @@ internal static class Program
                         launcher.ClientSize.Width + " x " + launcher.ClientSize.Height + ".");
                 if (launcher.FormBorderStyle != FormBorderStyle.None)
                     throw new Exception("Launcher must not use a resizable standard border.");
+                var titleCanvas = launcher.Controls.OfType<Panel>()
+                    .SingleOrDefault(panel => panel.Dock == DockStyle.Fill);
+                var titleScreen = titleCanvas?.Controls.OfType<TitleScreenView>().SingleOrDefault();
+                if (titleScreen is null || titleScreen.Dock != DockStyle.Fill ||
+                    titleScreen.Artwork is null)
+                    throw new Exception("Full-bleed, functional bottom-menu title screen is missing.");
                 var sidebar = launcher.Controls.OfType<Panel>()
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
                 if (sidebar is null || sidebar.Width != 200)
-                    throw new Exception("Unified navigation width must be 240.");
+                    throw new Exception("Interior navigation width must be 200.");
                 var updateButton = sidebar.Controls.OfType<Button>()
                     .SingleOrDefault(button => button.Name == "CheckUpdatesButton");
                 if (updateButton is null || updateButton.Dock != DockStyle.Bottom ||
