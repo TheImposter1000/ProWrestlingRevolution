@@ -1,22 +1,24 @@
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace ProWrestlingRevolution;
 
 /// <summary>
-/// Simple database directory. This screen locates records and offers category-wide
-/// operations; it is deliberately NOT the per-worker/per-company editing form.
-/// All displayed records and section names come from the selected MDB.
+/// Database directory: visual interface and category-wide tools.
+/// All names and records are sourced from the selected MDB. The controls below
+/// do not alter browsing, sorting, selection, mass editing, or import behavior.
 /// </summary>
 internal sealed class DatabaseEditorWorkspace : UserControl
 {
-    private static readonly Color Ink = Color.FromArgb(7, 18, 30);
-    private static readonly Color PanelInk = Color.FromArgb(12, 28, 43);
-    private static readonly Color ButtonInk = Color.FromArgb(19, 39, 54);
-    private static readonly Color Cyan = Color.FromArgb(100, 208, 238);
-    private static readonly Color Red = Color.FromArgb(248, 45, 78);
-    private static readonly Color Soft = Color.FromArgb(175, 197, 214);
+    private static readonly Color Ink = Color.FromArgb(9, 15, 24);
+    private static readonly Color PanelInk = Color.FromArgb(17, 29, 40);
+    private static readonly Color ButtonInk = Color.FromArgb(29, 47, 61);
+    private static readonly Color CardBorder = Color.FromArgb(59, 84, 99);
+    private static readonly Color Cyan = Color.FromArgb(91, 212, 232);
+    private static readonly Color Red = Color.FromArgb(242, 48, 75);
+    private static readonly Color Soft = Color.FromArgb(170, 191, 207);
 
     private readonly AppPaths _paths;
     private readonly Action _goBack;
@@ -30,9 +32,9 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private readonly Label _count = new();
     private readonly Label _recordStatus = new();
     private readonly Label _hint = new();
-    private readonly Button _massButton = new();
-    private readonly Button _notesTab = new();
-    private readonly Button _summaryTab = new();
+    private readonly EditorActionButton _massButton = new();
+    private readonly EditorActionButton _notesTab = new();
+    private readonly EditorActionButton _summaryTab = new();
 
     private UniverseEntry? _universe;
     private DataTable? _loaded;
@@ -44,6 +46,225 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private sealed record Entry(DataRow Row, string Name)
     {
         public override string ToString() => Name;
+    }
+
+    // Simple vector-based chrome; no image assets or database-dependent UI rendering.
+    private static GraphicsPath Rounded(Rectangle bounds, int radius)
+    {
+        int size = Math.Max(2, Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height)));
+        var path = new GraphicsPath();
+        path.AddArc(bounds.Left, bounds.Top, size, size, 180, 90);
+        path.AddArc(bounds.Right - size, bounds.Top, size, size, 270, 90);
+        path.AddArc(bounds.Right - size, bounds.Bottom - size, size, size, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - size, size, size, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+
+    private sealed class EditorCard : Panel
+    {
+        internal EditorCard()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint, true);
+            BackColor = PanelInk;
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Ink);
+            var rect = new Rectangle(1, 1, Math.Max(2, Width - 3), Math.Max(2, Height - 3));
+            using var path = Rounded(rect, 10);
+            using var fill = new LinearGradientBrush(rect,
+                Color.FromArgb(30, 46, 60), PanelInk, LinearGradientMode.Vertical);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.FillPath(fill, path);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            var rect = new Rectangle(1, 1, Math.Max(2, Width - 3), Math.Max(2, Height - 3));
+            using var path = Rounded(rect, 10);
+            using var outline = new Pen(CardBorder, 1f);
+            using var shine = new Pen(Color.FromArgb(60, 146, 171, 188), 1);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.DrawPath(outline, path);
+            e.Graphics.DrawLine(shine, 13, 2, Math.Max(13, Width - 14), 2);
+        }
+    }
+
+    private sealed class EditorActionButton : Button
+    {
+        private bool _hover;
+        private bool _active;
+        internal string Glyph { get; set; } = "";
+        internal bool Important { get; set; }
+        internal bool Active
+        {
+            get => _active;
+            set { _active = value; Invalidate(); }
+        }
+
+        internal EditorActionButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            ForeColor = Color.White;
+            BackColor = ButtonInk;
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+            Cursor = Cursors.Hand;
+            UseVisualStyleBackColor = false;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hover = false;
+            Invalidate();
+        }
+
+        protected override void OnEnabledChanged(EventArgs e)
+        {
+            base.OnEnabledChanged(e);
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Width < 4 || Height < 4) return;
+
+            var rect = new Rectangle(1, 1, Width - 3, Height - 3);
+            using var outline = Rounded(rect, 5);
+            bool light = Enabled && (_hover || _active || Important);
+            Color top = Enabled
+                ? (light ? Color.FromArgb(36, 82, 103) : Color.FromArgb(41, 59, 71))
+                : Color.FromArgb(30, 43, 53);
+            Color bottom = Enabled
+                ? (light ? Color.FromArgb(14, 43, 59) : Color.FromArgb(22, 37, 49))
+                : Color.FromArgb(24, 35, 44);
+            using (var fill = new LinearGradientBrush(rect, top, bottom, LinearGradientMode.Vertical))
+                g.FillPath(fill, outline);
+            using (var border = new Pen(_active || (Enabled && Important) ? Cyan : CardBorder,
+                       _active ? 1.6f : 1f))
+                g.DrawPath(border, outline);
+            if (Enabled)
+            {
+                using var highlight = new Pen(Color.FromArgb(57, 185, 216, 231), 1f);
+                g.DrawLine(highlight, 8, 2, Width - 9, 2);
+            }
+
+            Color foreground = Enabled ? Color.FromArgb(237, 243, 247) :
+                Color.FromArgb(119, 138, 150);
+            if (Glyph.Length > 0)
+                DrawGlyph(g, Glyph, new Rectangle(15, (Height - 19) / 2, 19, 19),
+                    _active ? Cyan : foreground);
+            Rectangle textArea = Glyph.Length > 0
+                ? new Rectangle(40, 1, Math.Max(5, Width - 49), Height - 2)
+                : new Rectangle(8, 1, Math.Max(5, Width - 16), Height - 2);
+            TextRenderer.DrawText(g, Text, Font, textArea, foreground,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(rect, -5, -4));
+        }
+
+        private static void DrawGlyph(Graphics g, string glyph, Rectangle bounds, Color color)
+        {
+            GraphicsState saved = g.Save();
+            try
+            {
+                g.TranslateTransform(bounds.X, bounds.Y);
+                using var p = new Pen(color, 1.9f) { StartCap = LineCap.Round,
+                    EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+                switch (glyph)
+                {
+                    case "plus":
+                        g.DrawLine(p, 9, 2, 9, 17);
+                        g.DrawLine(p, 2, 9, 17, 9);
+                        break;
+                    case "delete":
+                        g.DrawLine(p, 4, 4, 15, 15);
+                        g.DrawLine(p, 15, 4, 4, 15);
+                        break;
+                    case "copy":
+                        g.DrawRectangle(p, 5, 5, 11, 12);
+                        g.DrawLine(p, 3, 13, 2, 2);
+                        g.DrawLine(p, 2, 2, 12, 2);
+                        break;
+                    case "import":
+                        g.DrawLine(p, 9, 1, 9, 12);
+                        g.DrawLines(p, [new Point(5, 8), new Point(9, 12), new Point(13, 8)]);
+                        g.DrawLines(p, [new Point(2, 13), new Point(2, 17),
+                            new Point(16, 17), new Point(16, 13)]);
+                        break;
+                    case "edit":
+                        g.DrawLine(p, 4, 15, 14, 4);
+                        g.DrawLine(p, 6, 17, 16, 6);
+                        g.DrawLine(p, 4, 15, 3, 18);
+                        break;
+                    case "layers":
+                        g.DrawLines(p, [new Point(2, 6), new Point(9, 2),
+                            new Point(17, 6), new Point(9, 10), new Point(2, 6)]);
+                        g.DrawLines(p, [new Point(2, 10), new Point(9, 14), new Point(17, 10)]);
+                        g.DrawLines(p, [new Point(2, 14), new Point(9, 18), new Point(17, 14)]);
+                        break;
+                    case "all":
+                        g.DrawRectangle(p, 2, 2, 15, 15);
+                        g.DrawLines(p, [new Point(5, 9), new Point(8, 12), new Point(14, 5)]);
+                        break;
+                    case "clear":
+                        g.DrawRectangle(p, 3, 3, 13, 13);
+                        break;
+                    case "invert":
+                        g.DrawLines(p, [new Point(2, 6), new Point(16, 6),
+                            new Point(12, 2)]);
+                        g.DrawLines(p, [new Point(16, 13), new Point(2, 13),
+                            new Point(6, 17)]);
+                        break;
+                    case "database":
+                        g.DrawEllipse(p, 2, 2, 15, 6);
+                        g.DrawArc(p, 2, 9, 15, 7, 0, 180);
+                        g.DrawLine(p, 2, 5, 2, 13);
+                        g.DrawLine(p, 17, 5, 17, 13);
+                        break;
+                    case "info":
+                        g.DrawEllipse(p, 2, 2, 15, 15);
+                        g.DrawLine(p, 9, 8, 9, 14);
+                        g.FillEllipse(new SolidBrush(color), 8, 5, 2, 2);
+                        break;
+                    case "verify":
+                        g.DrawEllipse(p, 2, 2, 15, 15);
+                        g.DrawLines(p, [new Point(5, 9), new Point(8, 12), new Point(14, 6)]);
+                        break;
+                    case "access":
+                        g.DrawLines(p, [new Point(12, 2), new Point(17, 2),
+                            new Point(17, 7)]);
+                        g.DrawLine(p, 17, 2, 8, 11);
+                        g.DrawLines(p, [new Point(15, 11), new Point(15, 16),
+                            new Point(2, 16), new Point(2, 4), new Point(8, 4)]);
+                        break;
+                    case "back":
+                        g.DrawLines(p, [new Point(10, 3), new Point(3, 9),
+                            new Point(10, 15)]);
+                        g.DrawLine(p, 3, 9, 17, 9);
+                        break;
+                }
+            }
+            finally { g.Restore(saved); }
+        }
     }
 
     internal DatabaseEditorWorkspace(AppPaths paths, SkinPalette skin, Action goBack)
@@ -64,35 +285,28 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         return new Label
         {
             Text = text,
-            Dock = DockStyle.Top,
             Height = height,
+            Width = 250,
+            Margin = new Padding(0, 2, 0, 3),
             TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font("Segoe UI", strong ? 11 : 9, strong ? FontStyle.Bold : FontStyle.Regular),
-            ForeColor = strong ? Color.White : Soft,
+            Font = new Font("Segoe UI", strong ? 10 : 9, strong ? FontStyle.Bold : FontStyle.Regular),
+            ForeColor = strong ? Color.FromArgb(235, 242, 248) : Soft,
             BackColor = Color.Transparent
         };
     }
 
-    private static Button Button(string text, bool important = false)
+    private static EditorActionButton Button(string text, bool important = false, string glyph = "")
     {
-        var button = new Button
+        return new EditorActionButton
         {
             Text = text,
-            Height = 34,
-            Width = 238,
-            Margin = new Padding(0, 2, 0, 2),
-            TextAlign = ContentAlignment.MiddleCenter,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = ButtonInk,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 9, important ? FontStyle.Bold : FontStyle.Regular),
-            Cursor = Cursors.Hand,
-            TabStop = true,
-            UseVisualStyleBackColor = false
+            Glyph = glyph,
+            Important = important,
+            Height = 36,
+            Width = 250,
+            Margin = new Padding(0, 2, 0, 3),
+            Font = new Font("Segoe UI", 9.2f, important ? FontStyle.Bold : FontStyle.Regular)
         };
-        button.FlatAppearance.BorderColor = important ? Cyan : Color.FromArgb(63, 105, 126);
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 66, 89);
-        return button;
     }
 
     private static ComboBox DropDown()
@@ -101,30 +315,28 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
-            Height = 33,
-            Width = 238,
+            Height = 34,
+            Width = 250,
             Margin = new Padding(0, 2, 0, 7),
-            BackColor = Color.FromArgb(15, 34, 50),
+            BackColor = Color.FromArgb(15, 29, 41),
             ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10)
+            Font = new Font("Segoe UI", 9.5f)
         };
     }
 
-    private static Panel Pane()
+    private static EditorCard Pane()
     {
-        return new Panel
+        return new EditorCard
         {
             Dock = DockStyle.Fill,
-            BackColor = PanelInk,
             Margin = new Padding(0, 0, 9, 0),
-            Padding = new Padding(9)
+            Padding = new Padding(11)
         };
     }
 
     private static void SetEnabled(Button b, bool enabled, string tooltip)
     {
         b.Enabled = enabled;
-        if (!enabled) b.ForeColor = Color.FromArgb(133, 146, 158);
         new ToolTip().SetToolTip(b, tooltip);
     }
 
@@ -132,38 +344,45 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     {
         var bottom = new Panel
         {
-            Dock = DockStyle.Bottom, Height = 65,
-            BackColor = Color.FromArgb(9, 25, 39),
-            Padding = new Padding(15, 8, 15, 6)
+            Dock = DockStyle.Bottom, Height = 66,
+            BackColor = Color.FromArgb(11, 21, 32),
+            Padding = new Padding(12, 6, 12, 7)
+        };
+        bottom.Paint += (_, e) =>
+        {
+            using var red = new Pen(Color.FromArgb(160, Red));
+            e.Graphics.DrawLine(red, 0, bottom.Height - 2, bottom.Width, bottom.Height - 2);
         };
         Controls.Add(bottom);
-        var footer = new FlowLayoutPanel
+
+        var footer = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            AutoScroll = true,
-            WrapContents = false,
+            ColumnCount = 6, RowCount = 1,
+            Margin = Padding.Empty,
             BackColor = Color.Transparent
         };
+        for (int i = 0; i < 6; i++)
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6f));
         bottom.Controls.Add(footer);
-
-        AddFooter(footer, "Change Database", ChooseUniverse);
-        AddFooter(footer, "Import Database", ImportUniverse);
-        AddFooter(footer, "Database Details", ShowDetails);
-        AddFooter(footer, "Data Check", CheckData);
-        AddFooter(footer, "Open MDB in Access", OpenInAccess);
-        AddFooter(footer, "Back", _goBack);
+        AddFooter(footer, 0, "Change Database", ChooseUniverse, "database");
+        AddFooter(footer, 1, "Import Database", ImportUniverse, "import");
+        AddFooter(footer, 2, "Database Details", ShowDetails, "info");
+        AddFooter(footer, 3, "Data Check", CheckData, "verify");
+        AddFooter(footer, 4, "Open MDB in Access", OpenInAccess, "access");
+        AddFooter(footer, 5, "Back", _goBack, "back");
 
         var content = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(14, 15, 5, 11),
+            Padding = new Padding(12, 12, 4, 9),
             BackColor = Ink,
             ColumnCount = 3, RowCount = 1,
             GrowStyle = TableLayoutPanelGrowStyle.FixedSize
         };
-        content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 285));
-        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43));
-        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 288));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         Controls.Add(content);
 
@@ -184,15 +403,14 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         BuildRight(right);
     }
 
-    private static void AddFooter(FlowLayoutPanel footer, string title, Action callback)
+    private static void AddFooter(TableLayoutPanel footer, int index,
+        string title, Action callback, string glyph)
     {
-        Button b = Button(title);
-        b.AutoSize = true;
-        b.MinimumSize = new Size(title.Length > 16 ? 165 : 131, 39);
-        b.Height = 39;
-        b.Margin = new Padding(0, 1, 9, 0);
-        b.Click += (_, _) => Safe(callback);
-        footer.Controls.Add(b);
+        var button = Button(title, false, glyph);
+        button.Dock = DockStyle.Fill;
+        button.Margin = new Padding(3, 3, 4, 3);
+        button.Click += (_, _) => Safe(callback);
+        footer.Controls.Add(button, index, 0);
     }
 
     private void BuildLeft(Panel host)
@@ -206,67 +424,69 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             BackColor = Color.Transparent
         };
         host.Controls.Add(scroll);
-
         void Add(Control c) => scroll.Controls.Add(c);
-        Add(Label("CURRENT SECTION", 27, true));
 
+        Add(Label("ACTIVE DATABASE", 20, true));
+        _dbName.Name = "ActiveDatabaseName";
+        _dbName.Width = 250;
+        _dbName.Height = 39;
+        _dbName.Margin = new Padding(0, 0, 0, 4);
+        _dbName.Text = "NO DATABASE SELECTED";
+        _dbName.AutoEllipsis = true;
+        _dbName.ForeColor = Red;
+        _dbName.TextAlign = ContentAlignment.MiddleLeft;
+        _dbName.Font = new Font("Segoe UI", 13.5f, FontStyle.Bold);
+        Add(_dbName);
+        var rule = new Panel
+        {
+            Height = 2, Width = 250,
+            Margin = new Padding(0, 0, 0, 9),
+            BackColor = Red
+        };
+        Add(rule);
+
+        Add(Label("CURRENT SECTION", 26, true));
         _section.Name = "EditorCategorySelector";
         ConfigureCombo(_section);
         _section.SelectedIndexChanged += (_, _) => LoadRecords();
         Add(_section);
 
-        var add = Button("＋   Add New Item");
+        var add = Button("Add New Item", false, "plus");
         SetEnabled(add, false, "Category-specific Add screens will be implemented separately.");
         Add(add);
 
-        var delete = Button("×   Delete Item(s)");
+        var delete = Button("Delete Item(s)", false, "delete");
         SetEnabled(delete, false, "Direct record deletion is not enabled; use the MDB editor in Access.");
         Add(delete);
 
-        var copy = Button("▢   Copy Item(s)");
+        var copy = Button("Copy Item(s)", false, "copy");
         SetEnabled(copy, false, "Record duplication requires a category-specific editor.");
         Add(copy);
 
-        var import = Button("⇩   Import Items");
+        var import = Button("Import Items", false, "import");
         SetEnabled(import, false, "Import individual records will be implemented for each category.");
         Add(import);
 
-        var external = Button("↗   External Editing");
+        var external = Button("External Editing", false, "edit");
         external.Click += (_, _) => Safe(OpenInAccess);
         Add(external);
 
         _massButton.Text = "Mass Edit Selected Items";
         _massButton.Name = "MassEditButton";
+        _massButton.Glyph = "layers";
+        _massButton.Important = true;
         StyleButton(_massButton);
         _massButton.Click += (_, _) => Safe(MassEdit);
         Add(_massButton);
 
-        // Intentional layout: mass edit field drop-down immediately BELOW its button.
         _massField.Name = "MassEditFieldSelector";
         ConfigureCombo(_massField);
         _massField.Items.Add("Choose a text field...");
         _massField.SelectedIndex = 0;
         Add(_massField);
 
-        Add(Label("SEARCH RECORDS", 28, true));
-        _search.Name = "RecordSearch";
-        _search.Width = 238;
-        _search.Height = 30;
-        _search.Margin = new Padding(0, 2, 0, 6);
-        _search.PlaceholderText = "Search names...";
-        _search.BackColor = Color.FromArgb(15, 34, 50);
-        _search.ForeColor = Color.White;
-        _search.BorderStyle = BorderStyle.FixedSingle;
-        _search.TextChanged += (_, _) => FilterRecords();
-        Add(_search);
-
-        ConfigureCombo(_sort);
-        _sort.Items.AddRange(["Name (A to Z)", "Name (Z to A)"]);
-        _sort.SelectedIndex = 0;
-        _sort.SelectedIndexChanged += (_, _) => FilterRecords();
-        Add(_sort);
-
-        var selectAll = Button("Select All");
+        Add(Label("RECORD SELECTION", 27, true));
+        var selectAll = Button("Select All", false, "all");
         selectAll.Click += (_, _) =>
         {
             _records.BeginUpdate();
@@ -279,11 +499,11 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         };
         Add(selectAll);
 
-        var clear = Button("Clear Selection");
+        var clear = Button("Clear Selection", false, "clear");
         clear.Click += (_, _) => _records.ClearSelected();
         Add(clear);
 
-        var invert = Button("Invert Selection");
+        var invert = Button("Invert Selection", false, "invert");
         invert.Click += (_, _) =>
         {
             _records.BeginUpdate();
@@ -296,17 +516,19 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         };
         Add(invert);
 
-        _hint.Height = 48;
-        _hint.Width = 238;
+        _hint.Height = 44;
+        _hint.Width = 250;
+        _hint.Margin = new Padding(0, 3, 0, 0);
         _hint.ForeColor = Soft;
         _hint.Font = new Font("Segoe UI", 8);
-        _hint.Text = "Double-click an item to inspect its fields. Individual editing screens will be added by category.";
+        _hint.Text = "Double-click an item to inspect its fields.";
         Add(_hint);
 
         void ResizeChildren()
         {
             if (scroll.IsDisposed) return;
-            int width = Math.Max(180, scroll.ClientSize.Width - (scroll.VerticalScroll.Visible ? 22 : 5));
+            int width = Math.Max(175, scroll.ClientSize.Width -
+                (scroll.VerticalScroll.Visible ? 22 : 6));
             foreach (Control control in scroll.Controls) control.Width = width;
         }
         scroll.SizeChanged += (_, _) => ResizeChildren();
@@ -316,90 +538,135 @@ internal sealed class DatabaseEditorWorkspace : UserControl
 
     private static void ConfigureCombo(ComboBox combo)
     {
-        var sample = DropDown();
-        combo.DropDownStyle = sample.DropDownStyle;
-        combo.FlatStyle = sample.FlatStyle;
-        combo.Height = sample.Height;
-        combo.Width = sample.Width;
-        combo.Margin = sample.Margin;
-        combo.BackColor = sample.BackColor;
-        combo.ForeColor = sample.ForeColor;
-        combo.Font = sample.Font;
-        sample.Dispose();
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.FlatStyle = FlatStyle.Flat;
+        combo.Height = 34;
+        combo.Width = 250;
+        combo.Margin = new Padding(0, 2, 0, 7);
+        combo.BackColor = Color.FromArgb(15, 29, 41);
+        combo.ForeColor = Color.White;
+        combo.Font = new Font("Segoe UI", 9.5f);
     }
 
-    private static void StyleButton(Button button)
+    private static void StyleButton(EditorActionButton button)
     {
-        using var b = Button(button.Text);
-        button.Height = b.Height;
-        button.Width = b.Width;
-        button.Margin = b.Margin;
-        button.FlatStyle = b.FlatStyle;
-        button.BackColor = b.BackColor;
-        button.ForeColor = b.ForeColor;
-        button.Font = b.Font;
-        button.Cursor = Cursors.Hand;
-        button.FlatAppearance.BorderColor = Cyan;
-        button.UseVisualStyleBackColor = false;
+        button.Height = 36;
+        button.Width = 250;
+        button.Margin = new Padding(0, 2, 0, 3);
+        button.Font = new Font("Segoe UI", 9.2f, FontStyle.Regular);
     }
 
     private void BuildCenter(Panel host)
     {
-        var heading = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.FromArgb(15, 36, 51) };
-        host.Controls.Add(heading);
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1, RowCount = 4,
+            Margin = Padding.Empty,
+            BackColor = Color.Transparent
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 41));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
+        host.Controls.Add(layout);
 
-        // The database NAME is the central heading, where "Records" used to be.
-        _dbName.Name = "ActiveDatabaseName";
-        _dbName.Dock = DockStyle.Fill;
-        _dbName.Text = "NO DATABASE SELECTED";
-        _dbName.ForeColor = Color.White;
-        _dbName.TextAlign = ContentAlignment.MiddleLeft;
-        _dbName.Padding = new Padding(13, 0, 0, 0);
-        _dbName.Font = new Font("Segoe UI", 15, FontStyle.Bold);
-        heading.Controls.Add(_dbName);
+        var header = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+        var title = new Label
+        {
+            Text = "RECORDS",
+            Dock = DockStyle.Left, Width = 140,
+            Font = new Font("Segoe UI", 13, FontStyle.Bold),
+            ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft
+        };
+        header.Controls.Add(title);
         _count.Dock = DockStyle.Right;
-        _count.Width = 122;
+        _count.Width = 150;
         _count.ForeColor = Cyan;
+        _count.Font = new Font("Segoe UI", 9.5f);
         _count.TextAlign = ContentAlignment.MiddleRight;
-        _count.Padding = new Padding(0, 0, 8, 0);
-        _count.Font = new Font("Segoe UI", 9);
-        heading.Controls.Add(_count);
-        _count.BringToFront();
+        header.Controls.Add(_count);
+        header.Paint += (_, e) =>
+        {
+            using var red = new SolidBrush(Red);
+            e.Graphics.FillRectangle(red, 0, 11, 5, 19);
+        };
+        title.Padding = new Padding(16, 0, 0, 0);
+        layout.Controls.Add(header, 0, 0);
 
-        _recordStatus.Dock = DockStyle.Bottom;
-        _recordStatus.Height = 28;
-        _recordStatus.ForeColor = Soft;
-        _recordStatus.Text = "Choose a database to begin.";
-        _recordStatus.Font = new Font("Segoe UI", 8);
-        _recordStatus.Padding = new Padding(4, 5, 0, 0);
-        host.Controls.Add(_recordStatus);
+        var searchRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2, RowCount = 1,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty
+        };
+        searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 67));
+        searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+        layout.Controls.Add(searchRow, 0, 1);
+
+        _search.Name = "RecordSearch";
+        _search.Dock = DockStyle.Fill;
+        _search.Margin = new Padding(0, 3, 8, 9);
+        _search.PlaceholderText = "Search names...";
+        _search.BackColor = Color.FromArgb(10, 25, 36);
+        _search.ForeColor = Color.White;
+        _search.BorderStyle = BorderStyle.FixedSingle;
+        _search.Font = new Font("Segoe UI", 10);
+        _search.TextChanged += (_, _) => FilterRecords();
+        searchRow.Controls.Add(_search, 0, 0);
+
+        ConfigureCombo(_sort);
+        _sort.Name = "RecordSort";
+        _sort.Dock = DockStyle.Fill;
+        _sort.Margin = new Padding(0, 3, 0, 9);
+        _sort.Items.AddRange(["Name (A to Z)", "Name (Z to A)"]);
+        _sort.SelectedIndex = 0;
+        _sort.SelectedIndexChanged += (_, _) => FilterRecords();
+        searchRow.Controls.Add(_sort, 1, 0);
 
         _records.Name = "DatabaseRecordList";
         _records.Dock = DockStyle.Fill;
-        _records.BorderStyle = BorderStyle.None;
+        _records.Margin = new Padding(0, 0, 0, 4);
+        _records.BorderStyle = BorderStyle.FixedSingle;
         _records.SelectionMode = SelectionMode.MultiExtended;
         _records.IntegralHeight = false;
-        _records.BackColor = Color.FromArgb(5, 16, 26);
-        _records.ForeColor = Color.White;
-        _records.Font = new Font("Segoe UI", 10.5f, FontStyle.Regular);
+        _records.BackColor = Color.FromArgb(6, 16, 25);
+        _records.ForeColor = Color.FromArgb(235, 241, 246);
+        _records.Font = new Font("Segoe UI", 10.25f);
         _records.ItemHeight = 23;
         _records.SelectedIndexChanged += (_, _) => UpdateNotesAndSummary();
         _records.DoubleClick += (_, _) => OpenRecordDetails();
-        host.Controls.Add(_records);
-        _records.BringToFront();
-        heading.BringToFront();
+        layout.Controls.Add(_records, 0, 2);
+
+        _recordStatus.Dock = DockStyle.Fill;
+        _recordStatus.ForeColor = Soft;
+        _recordStatus.Text = "Choose a database to begin.";
+        _recordStatus.Font = new Font("Segoe UI", 8.5f);
+        _recordStatus.TextAlign = ContentAlignment.MiddleLeft;
+        layout.Controls.Add(_recordStatus, 0, 3);
     }
 
     private void BuildRight(Panel host)
     {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            Margin = Padding.Empty, BackColor = Color.Transparent
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        host.Controls.Add(layout);
+
         var tabs = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 49, ColumnCount = 2,
-            BackColor = Color.Transparent
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            BackColor = Color.Transparent, Margin = Padding.Empty
         };
-        tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
-        tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));
-
+        tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
+        tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
         _notesTab.Text = "NOTES";
         _summaryTab.Text = "DATABASE SUMMARY";
         _notesTab.Name = "NotesTab";
@@ -409,24 +676,31 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             var button = i == 0 ? _notesTab : _summaryTab;
             StyleButton(button);
             button.Dock = DockStyle.Fill;
-            button.Margin = new Padding(0, 0, 7, 8);
+            button.Margin = new Padding(0, 0, i == 0 ? 7 : 0, 7);
             tabs.Controls.Add(button, i, 0);
         }
-
+        layout.Controls.Add(tabs, 0, 0);
         _notesTab.Click += (_, _) => { _showSummary = false; UpdateNotesAndSummary(); };
         _summaryTab.Click += (_, _) => { _showSummary = true; UpdateNotesAndSummary(); };
 
+        var notesFrame = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(6, 16, 25),
+            Padding = new Padding(10, 8, 7, 6),
+            Margin = new Padding(0)
+        };
         _notes.Name = "EditorNotes";
         _notes.Dock = DockStyle.Fill;
         _notes.ReadOnly = true;
-        _notes.BorderStyle = BorderStyle.FixedSingle;
-        _notes.BackColor = Color.FromArgb(5, 16, 26);
+        _notes.BorderStyle = BorderStyle.None;
+        _notes.BackColor = Color.FromArgb(6, 16, 25);
         _notes.ForeColor = Color.FromArgb(224, 234, 241);
         _notes.Font = new Font("Segoe UI", 10);
         _notes.Text = "Choose a database, category and record to view its notes.";
-        host.Controls.Add(_notes);
-        host.Controls.Add(tabs);
-        tabs.BringToFront();
+        notesFrame.Controls.Add(_notes);
+        layout.Controls.Add(notesFrame, 0, 1);
         UpdateNotesAndSummary();
     }
 
@@ -562,10 +836,8 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private void UpdateNotesAndSummary()
     {
         if (_notes.IsDisposed || _notesTab.IsDisposed) return;
-        _notesTab.BackColor = !_showSummary ? Color.FromArgb(26, 73, 97) : ButtonInk;
-        _summaryTab.BackColor = _showSummary ? Color.FromArgb(26, 73, 97) : ButtonInk;
-        _notesTab.FlatAppearance.BorderColor = !_showSummary ? Cyan : Soft;
-        _summaryTab.FlatAppearance.BorderColor = _showSummary ? Cyan : Soft;
+        _notesTab.Active = !_showSummary;
+        _summaryTab.Active = _showSummary;
 
         if (_showSummary)
         {
