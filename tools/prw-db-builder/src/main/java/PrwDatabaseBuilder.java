@@ -102,21 +102,29 @@ public final class PrwDatabaseBuilder {
         }
 
         try (Database reopened = DatabaseBuilder.open(out)) {
-            int workers = reopened.getTable("Worker").getRowCount();
-            int companies = reopened.getTable("Promotion").getRowCount();
-            int contracts = reopened.getTable("WorkerContract").getRowCount();
-            int universe = reopened.getTable("UniverseInfo").getRowCount();
-            if (reopened.getTableNames().size() < 36 ||
-                workers != 2 || companies != 2 || contracts != 2 || universe != 1) {
-                throw new IOException("MDB verification failed: tables=" +
-                    reopened.getTableNames().size() + ", workers=" + workers +
-                    ", companies=" + companies + ", contracts=" + contracts);
+            String[] requiredTables = {
+                "tblWorker","tblWorkerBio","tblWorkerBusiness","tblWorkerOver",
+                "tblWorkerPhysical","tblWorkerSkills","tblContract","tblContractBio",
+                "tblWorkerAttributes","tblAlternative"
+            };
+            if (reopened.getTableNames().size() != 10) {
+                throw new IOException("Expected exactly 10 user tables, found " + reopened.getTableNames());
+            }
+            for (String name : requiredTables) {
+                if (reopened.getTable(name) == null)
+                    throw new IOException("Missing required table: " + name);
+            }
+            if (reopened.getTable("tblWorker").getRowCount() != 1 ||
+                reopened.getTable("tblContract").getRowCount() != 1 ||
+                reopened.getTable("tblWorkerAttributes").getRowCount() != 1 ||
+                reopened.getTable("tblAlternative").getRowCount() != 1) {
+                throw new IOException("Missing test records");
             }
             System.out.println("VERIFIED native Microsoft Access 2000 MDB: " + out);
             System.out.println("Tables created: " + tableCount);
             System.out.println("Relationships created: " + linkedCount + "/" + relationships.size());
-            System.out.println("Workers: " + workers + "; Promotions: " + companies +
-                               "; Contracts: " + contracts);
+            System.out.println("Workers: " + reopened.getTable("tblWorker").getRowCount() +
+                "; Contracts: " + reopened.getTable("tblContract").getRowCount());
             System.out.println("Bytes: " + out.length());
         }
     }
@@ -148,129 +156,63 @@ public final class PrwDatabaseBuilder {
     }
 
     private static void seed(Database db) throws IOException {
-        put(db,"SchemaVersion","VersionID",
-            "VersionNumber","0.1.0","AppliedDate",day(2026,11,10),
-            "Description","Initial native PRW worker-domain test database");
-        put(db,"UniverseInfo","UniverseID",
-            "Name","PRW Default Test Universe",
-            "Description","Native PRW development universe with fictional worker and promotion records.",
-            "StartDate",day(2026,11,10),"SchemaRevision","0.1.0","IsTemplate",true);
-
-        int power = put(db,"Promotion","PromotionID",
-            "Name","POWER Wrestling","Initials","POWER","Active",true,"CompanySize",25);
-        int dna = put(db,"Promotion","PromotionID",
-            "Name","DNA Wrestling","Initials","DNA","Active",true,"CompanySize",12);
-        int midAtlantic = put(db,"Region","RegionID",
-            "Name","Mid Atlantic","RegionTypeCode","TEWStyleRegion","CountryCode","US");
-        int triState = put(db,"Region","RegionID",
-            "Name","Tri State","RegionTypeCode","TEWStyleRegion","CountryCode","US");
-
-        int jayden = put(db,"Worker","WorkerID",
+        int jayden = put(db, "tblWorker", "UID",
             "Name","Jayden Cole","ShortName","Cole",
-            "BirthDate",day(1995,8,20),"DebutDate",day(2013,1,1),
-            "HeightInches",74,"WeightPounds",225,
-            "NationalityCode","US","BodyTypeCode","Athletic",
-            "BusinessStatusCode","Active","InRingStatusCode","Active",
-            "BasedInRegionID",midAtlantic,"UserCharacterEligible",true);
-        int taylor = put(db,"Worker","WorkerID",
-            "Name","Taylor Vale","ShortName","Vale",
-            "BirthDate",day(1987,4,11),"DebutDate",day(2006,7,1),
-            "HeightInches",70,"WeightPounds",178,
-            "NationalityCode","US","BodyTypeCode","Average",
-            "BusinessStatusCode","Active","InRingStatusCode","Retired",
-            "BasedInRegionID",triState,"UserCharacterEligible",true);
+            "BiographyType","Organic",
+            "Born",day(1995,8,20),"SetToDebut",day(2013,1,1),
+            "GenderID","Cisgender Male","Pronouns","He-Him","Sexuality","Heterosexual",
+            "Race","White","Nationality","American","BasedIn","Mid Atlantic",
+            "GameStatus","Active","InRingStatus","Active","Celebrity",false,
+            "Style","Brawler","BodyType","Athletic","HeightInches",74,
+            "WeightPounds",225,"MinWeightPounds",210,"MaxWeightPounds",245,
+            "Freelance",false,"UserCharacter",true,"CompetesVs","Men's Division Only",
+            "RoleWrestler",true,"FaceGimmick","Fighting Spirit",
+            "FaceGimmickBasis","Realistic","HeelGimmick","The Vanguard",
+            "HeelGimmickBasis","Swagger","Hair",true,
+            "ActiveUSA",true,"ActiveCanada",true,
+            "LanguageEnglish",3);
 
-        put(db,"WorkerBiography","WorkerID","WorkerID",jayden,
-            "Biography","Fictional PRW worker used for database and simulation tests.");
-        put(db,"WorkerBiography","WorkerID","WorkerID",taylor,
-            "Biography","Fictional PRW manager and booker used for database tests.");
-        put(db,"WorkerPossibleRole","WorkerID","WorkerID",jayden,"RoleCode","Wrestler");
-        put(db,"WorkerPossibleRole","WorkerID","WorkerID",taylor,"RoleCode","Manager");
-        put(db,"WorkerPossibleRole","WorkerID","WorkerID",taylor,"RoleCode","Producer");
-        put(db,"WorkerPhysical","WorkerID",
-            "WorkerID",jayden,"HeadHealth",100,"BodyHealth",100,
-            "LeftArmHealth",100,"RightArmHealth",100,
-            "LeftLegHealth",100,"RightLegHealth",100);
-        put(db,"WorkerPhysical","WorkerID",
-            "WorkerID",taylor,"HeadHealth",100,"BodyHealth",100,
-            "LeftArmHealth",100,"RightArmHealth",100,
-            "LeftLegHealth",100,"RightLegHealth",100);
-        put(db,"WorkerSkill","WorkerID",
-            "WorkerID",jayden,"Brawling",60,"Psychology",68,"Charisma",72,
-            "Microphone",70,"Basics",65,"Selling",67,"Safety",75);
-        put(db,"WorkerSkill","WorkerID",
-            "WorkerID",taylor,"Brawling",60,"Psychology",73,"Charisma",66,
-            "Microphone",62,"Basics",63,"Selling",68,"Safety",78);
-        put(db,"WorkerBusinessSkill","WorkerID",
-            "WorkerID",taylor,"OwnerSkill",58,"BookingSkill",84,
-            "BusinessReputation",69);
-        put(db,"WorkerPopularity","WorkerPopularityID",
-            "WorkerID",jayden,"RegionID",midAtlantic,"PopularityValue",55);
-        put(db,"WorkerPopularity","WorkerPopularityID",
-            "WorkerID",jayden,"RegionID",triState,"PopularityValue",32);
-        put(db,"WorkerPopularity","WorkerPopularityID",
-            "WorkerID",taylor,"RegionID",midAtlantic,"PopularityValue",25);
-
-        int professional = put(db,"AttributeDefinition","AttributeDefinitionID",
-            "Name","Professional","CategoryCode","Personality","IsActive",true);
-        put(db,"WorkerAttribute","WorkerAttributeID",
-            "WorkerID",jayden,"AttributeDefinitionID",professional,
-            "Hidden",false,"Permanent",false);
-        put(db,"ExternalCodeMap","ExternalCodeMapID",
-            "SourceSystem","TEW IX","SourceVersion","9",
-            "SourceField","tblAttribute.Attribute","ExternalCode","1",
-            "TargetEntityType","AttributeDefinition","TargetCodeOrID","Professional",
-            "Verified",true,"VerificationNote","Verified in TEW Universe code label catalog.");
-
-        int ego = put(db,"WorkerAlterEgo","AlterEgoID",
-            "WorkerID",jayden,"Name","The Vanguard","UsageWeight",100);
-        put(db,"AlterEgoEligibility","EligibilityID",
-            "AlterEgoID",ego,"ScopeCode","SpecificPromotion","PromotionID",dna);
-
-        int contractPower = put(db,"WorkerContract","ContractID",
-            "WorkerID",jayden,"PromotionID",power,"ContractTypeCode","Written",
-            "Exclusive",false,"Touring",false,"PayBasisCode","Monthly",
-            "StartDate",day(2026,1,1),"AlignmentCode","Babyface",
-            "CompetesInCode","MensDivision");
-        int contractDna = put(db,"WorkerContract","ContractID",
-            "WorkerID",jayden,"PromotionID",dna,"ContractTypeCode","Handshake",
-            "Exclusive",false,"Touring",false,"PayBasisCode","PerShow",
-            "StartDate",day(2026,9,1),"AlignmentCode","Heel",
-            "CompetesInCode","MensDivision");
-        put(db,"ContractRole","ContractID","ContractID",contractPower,"RoleCode","Wrestler");
-        put(db,"ContractRole","ContractID","ContractID",contractDna,"RoleCode","Wrestler");
-        put(db,"WorkerCompanyPresentation","ContractID",
-            "ContractID",contractPower,"ActiveRingName","Jayden Cole",
-            "GimmickTypeCode","Realistic","GimmickName","Jayden Cole","MaskRespect",0);
-        put(db,"WorkerCompanyPresentation","ContractID",
-            "ContractID",contractDna,"ActiveRingName","The Vanguard",
-            "AlterEgoID",ego,"GimmickTypeCode","Swagger","GimmickName","The Vanguard");
-        put(db,"WorkerCompanyStanding","StandingID",
-            "WorkerID",jayden,"PromotionID",power,
-            "CompanyPushCode","MajorStar","MomentumValue",65);
-        put(db,"WorkerCompanyStanding","StandingID",
-            "WorkerID",jayden,"PromotionID",dna,
-            "CompanyPushCode","Recognizable","MomentumValue",34);
-        put(db,"WorkerManagerAssignment","AssignmentID",
-            "PromotionID",power,"WrestlerWorkerID",jayden,
-            "ManagerWorkerID",taylor,"StartDate",day(2026,1,1));
-
-        put(db,"WorkerJobHistory","JobHistoryID",
-            "WorkerID",jayden,"PromotionID",power,"EmployerInitials","POWER",
-            "RecordName","POWER 2020 onward","StartDate",day(2020,1,1));
-        put(db,"WorkerJobHistory","JobHistoryID",
-            "WorkerID",jayden,"PromotionID",dna,"EmployerInitials","DNA",
-            "RecordName","DNA 2018-2019","StartDate",day(2018,5,1),
-            "EndDate",day(2019,7,1));
-        put(db,"WorkerBusinessHistory","BusinessHistoryID",
-            "WorkerID",taylor,"PromotionID",power,
-            "EmployerInitials","POWER","PositionCode","HeadBooker",
-            "StartDate",day(2024,2,1));
-
-        int legacy = put(db,"WorkerLegacy","LegacyID",
-            "LegacyName","Masked Aurora","NextGenerationNumber",2,
-            "BloodRelativePolicyCode","DoesNotMatter","MaskRequired",true);
-        put(db,"WorkerLegacyMembership","MembershipID",
-            "LegacyID",legacy,"WorkerID",taylor,"GenerationNumber",1);
+        put(db,"tblWorkerBio","WorkerUID",
+            "WorkerUID",jayden,
+            "Biography","Fictional PRW development worker for testing the native MDB schema.");
+        put(db,"tblWorkerBusiness","WorkerUID",
+            "WorkerUID",jayden,"BusinessReputation",10,
+            "BookingReputation",20,"BookingSkill",35,
+            "MinimumOwnerAge",40,"MinimumBookerAge",35);
+        put(db,"tblWorkerPhysical","WorkerUID",
+            "WorkerUID",jayden,"HeadCondition",100,"BodyCondition",100,
+            "ArmsCondition",100,"LegsCondition",100);
+        put(db,"tblWorkerOver","WorkerUID",
+            "WorkerUID",jayden,"RegionCode","Mid Atlantic","Popularity",55);
+        put(db,"tblWorkerOver","WorkerUID",
+            "WorkerUID",jayden,"RegionCode","Tri State","Popularity",32);
+        put(db,"tblWorkerSkills","WorkerUID",
+            "WorkerUID",jayden,"Brawling",60,"Puroresu",40,
+            "Technical",55,"Psychology",68,"Charisma",72,"Microphone",70,
+            "Basics",65,"Selling",67,"Safety",75,"Stamina",77,
+            "PotentialPrimary",70,"PotentialMental",72,
+            "PotentialPerformance",80,"PotentialFundamentals",76,
+            "PotentialPhysical",75);
+        int contract = put(db,"tblContract","UID",
+            "WorkerUID",jayden,"EmployerInitials","DNA",
+            "Name","Jayden Cole","ShortName","Cole",
+            "ContractType","Handshake","Exclusive",false,"Touring",false,
+            "PayBasis","Per Show","StartDate",day(2026,1,1),
+            "Alignment","Babyface","CompetesIn","Men's Division",
+            "RoleWrestler",true,"CompanyPush","Major Star",
+            "Momentum",60,"GimmickName","Fighting Spirit",
+            "GimmickBasis","Realistic","MaskRespect",0);
+        put(db,"tblContractBio","ContractUID",
+            "ContractUID",contract,
+            "Biography","Company-specific biography can be stored here without overwriting the worker's main biography.");
+        put(db,"tblWorkerAttributes","UID",
+            "WorkerUID",jayden,"AttributeName","Professional",
+            "SourceTEWCode",1,"Hidden",false,"Permanent",false);
+        put(db,"tblAlternative","UID",
+            "WorkerUID",jayden,"RecordName","Jayden Cole (DNA)",
+            "CompanyScope","In","CompanyInitials","DNA",
+            "Usage",100,"Name","The Vanguard","ShortName","Vanguard",
+            "Gimmick","The Vanguard","GimmickBasis","Swagger",
+            "MinAge",18,"MaxAge",100);
     }
 }
