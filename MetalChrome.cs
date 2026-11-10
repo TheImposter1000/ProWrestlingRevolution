@@ -20,13 +20,42 @@ internal static class MetalColors
     }
 
     internal static Color SidebarLeft(SkinPalette palette) =>
-        Mix(palette.Sidebar, Color.FromArgb(5, 13, 25), 0.72);
+        Mix(palette.Sidebar, Color.FromArgb(5, 12, 23), 0.72);
 
     internal static Color SidebarRight(SkinPalette palette) =>
-        Mix(palette.Sidebar, Color.FromArgb(12, 33, 57), 0.62);
+        Mix(palette.Sidebar, Color.FromArgb(8, 19, 33), 0.78);
 
     internal static Color TopRight(SkinPalette palette) =>
-        Mix(palette.Surface, Color.FromArgb(7, 19, 35), 0.78);
+        Mix(palette.Surface, Color.FromArgb(8, 24, 40), 0.82);
+}
+
+/// <summary>
+/// Optional skin art for the application's actual chrome, separate from the
+/// Backgrounds/Title_Screen.jpg artwork. These assets contain background
+/// treatments only: real buttons, labels and hit targets remain native controls.
+/// The vector reference design is used when a skin omits an asset.
+/// </summary>
+internal static class SkinChromeArt
+{
+    internal static bool Draw(Graphics graphics, SkinPalette palette,
+        string relativePath, Rectangle bounds)
+    {
+        var path = palette.Asset(relativePath);
+        if (!File.Exists(path)) return false;
+        try
+        {
+            using var art = Image.FromFile(path);
+            graphics.DrawImage(art, bounds);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool Exists(SkinPalette palette, string relativePath) =>
+        File.Exists(palette.Asset(relativePath));
 }
 
 internal sealed class MetalTopBar : Panel
@@ -51,18 +80,21 @@ internal sealed class MetalTopBar : Panel
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         if (Width < 1 || Height < 1) return;
+        if (SkinChromeArt.Draw(e.Graphics, _palette,
+            Path.Combine("TopBars", "Title_Chrome.png"), ClientRectangle)) return;
+
         using var metal = new LinearGradientBrush(ClientRectangle,
-            MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 18, 34), 0.75),
+            MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 16, 27), 0.82),
             MetalColors.TopRight(_palette), LinearGradientMode.Horizontal);
         metal.InterpolationColors = new ColorBlend
         {
             Colors =
             [
-                MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 16, 29), 0.80),
-                MetalColors.Mix(_palette.Surface, Color.FromArgb(12, 38, 63), 0.77),
-                MetalColors.TopRight(_palette)
+                MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 14, 24), 0.84),
+                MetalColors.Mix(_palette.Surface, Color.FromArgb(10, 27, 45), 0.80),
+                MetalColors.Mix(_palette.Surface, Color.FromArgb(7, 22, 37), 0.83)
             ],
-            Positions = [0f, 0.49f, 1f]
+            Positions = [0f, 0.43f, 1f]
         };
         e.Graphics.FillRectangle(metal, ClientRectangle);
     }
@@ -73,8 +105,8 @@ internal sealed class MetalTopBar : Panel
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        using var upperReflection = new Pen(Color.FromArgb(90, 172, 199, 225), 1);
-        using var accentLine = new Pen(Color.FromArgb(145, _palette.AccentSecondary), 1);
+        using var upperReflection = new Pen(Color.FromArgb(55, 153, 187, 218), 1);
+        using var accentLine = new Pen(Color.FromArgb(115, _palette.AccentSecondary), 1);
         g.DrawLine(upperReflection, 0, 0, Width - 1, 0);
         g.DrawLine(accentLine, 0, Height - 1, Width - 1, Height - 1);
 
@@ -89,7 +121,7 @@ internal sealed class MetalTopBar : Panel
         g.DrawLine(gleam, 34, 12, 43, 12);
 
         using var divider = new Pen(Color.FromArgb(165, 173, 196, 217), 1);
-        g.DrawLine(divider, 310, 11, 310, 29);
+        g.DrawLine(divider, 307, 11, 307, 29);
     }
 }
 
@@ -115,6 +147,9 @@ internal sealed class MetalSidebar : Panel
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         if (Width <= 0 || Height <= 0) return;
+        if (SkinChromeArt.Draw(e.Graphics, _palette,
+            Path.Combine("SideBars", "Title_Chrome.png"), ClientRectangle)) return;
+
         using var brushed = new LinearGradientBrush(ClientRectangle,
             MetalColors.SidebarLeft(_palette),
             MetalColors.SidebarRight(_palette),
@@ -128,16 +163,21 @@ internal sealed class MetalSidebar : Panel
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        // Geometric, translucent steel facet below the seven menu entries.
-        using var facet = new SolidBrush(Color.FromArgb(44, 30, 66, 105));
-        g.FillPolygon(facet,
-        [
-            new Point(0, Height - 1),
-            new Point(Width - 1, Height - 182),
-            new Point(Width - 1, Height - 1)
-        ]);
-        using var facetEdge = new Pen(Color.FromArgb(44, 111, 150, 190), 1);
-        g.DrawLine(facetEdge, 0, Height - 1, Width - 1, Height - 182);
+        // Lower-left diagonal metal facet from the supplied reference image.
+        // Do not paint over optional skin-supplied sidebar chrome.
+        if (!SkinChromeArt.Exists(_palette, Path.Combine("SideBars", "Title_Chrome.png")))
+        {
+            using var facet = new SolidBrush(Color.FromArgb(32, 26, 54, 86));
+            g.FillPolygon(facet,
+            [
+                new Point(0, Height - 68),
+                new Point(Width - 1, Height - 261),
+                new Point(Width - 1, Height - 1),
+                new Point(0, Height - 1)
+            ]);
+            using var facetEdge = new Pen(Color.FromArgb(44, 94, 139, 178), 1);
+            g.DrawLine(facetEdge, 0, Height - 68, Width - 1, Height - 261);
+        }
 
         using var border = new Pen(Color.FromArgb(100, _palette.Border), 1);
         using var coolEdge = new Pen(Color.FromArgb(35, _palette.AccentSecondary), 1);
@@ -217,10 +257,8 @@ internal sealed class TopUtilityButton : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        using (var back = new LinearGradientBrush(ClientRectangle,
-            MetalColors.TopRight(_palette),
-            MetalColors.Mix(MetalColors.TopRight(_palette), Color.Black, 0.14),
-            LinearGradientMode.Vertical))
+        // Match the surrounding top bar instead of showing four boxed tiles.
+        using (var back = new SolidBrush(MetalColors.TopRight(_palette)))
             g.FillRectangle(back, ClientRectangle);
 
         if (_hovered)
@@ -229,8 +267,8 @@ internal sealed class TopUtilityButton : Control
             g.FillRectangle(hover, ClientRectangle);
         }
 
-        using var divider = new Pen(Color.FromArgb(75, 159, 179, 198));
-        using var bottom = new Pen(Color.FromArgb(145, _palette.AccentSecondary));
+        using var divider = new Pen(Color.FromArgb(78, 137, 160, 181));
+        using var bottom = new Pen(Color.FromArgb(115, _palette.AccentSecondary));
         g.DrawLine(divider, 0, 7, 0, Height - 7);
         g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
 
@@ -265,12 +303,17 @@ internal sealed class TopUtilityButton : Control
                 break;
 
             case "help":
-                g.DrawEllipse(pen, 13, 8, 19, 19);
-                using (var font = new Font("Segoe UI", 11, FontStyle.Bold))
-                    TextRenderer.DrawText(g, "?", font,
-                        new Rectangle(15, 8, 16, 20), color,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-                        TextFormatFlags.NoPadding);
+                // A vector question mark stays precisely within its vector circle,
+                // independent of font rendering, Windows DPI and font metrics.
+                g.DrawEllipse(pen, 13, 8, 20, 20);
+                g.DrawBezier(pen,
+                    new Point(18, 15), new Point(16, 8),
+                    new Point(30, 8), new Point(29, 16));
+                g.DrawBezier(pen,
+                    new Point(29, 16), new Point(29, 19),
+                    new Point(23, 19), new Point(23, 22));
+                using (var dot = new SolidBrush(color))
+                    g.FillEllipse(dot, 22, 24, 3, 3);
                 break;
 
             case "minimize":
