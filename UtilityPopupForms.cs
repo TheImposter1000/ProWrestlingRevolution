@@ -810,14 +810,15 @@ internal sealed class DatabaseSelectorDialog : UtilityPopupForm
     internal DatabaseSelectorDialog(AppPaths paths, SkinPalette palette)
         : base(paths, palette, "Database Selector", "Available Databases",
             "Database Information",
-            "Choose an installed universe on the left, review its file details, " +
-            "then select Use This Database. Import MDB copies a new universe into " +
-            "the game without modifying the original file.",
+            "Create Database starts from the installed PRWDefault.mdb template. " +
+            "Import MDB copies an existing universe into the game. Both store " +
+            "independent data in this installation folder.",
             910, 525)
     {
         Name = "DatabaseSelectorDialog";
         _use = AddAction("Use This Database", SelectDatabase, true, width: 191);
         AcceptButton = _use;
+        AddAction("Create Database", CreateDatabase, width: 155);
         AddAction("Import MDB", ImportDatabase, width: 125);
         AddAction("Open Folder", () => OpenFolder(Paths.Databases), width: 133);
         AddAction("Cancel", () => { DialogResult = DialogResult.Cancel; Close(); }, width: 110);
@@ -854,7 +855,7 @@ internal sealed class DatabaseSelectorDialog : UtilityPopupForm
         _use.Enabled = chosen is not null;
         if (chosen is null)
         {
-            Information.Text = "No databases have been installed.\n\nUse Import MDB to add a universe.";
+            Information.Text = "No databases have been created.\n\nUse Create Database to start from the built-in PRWDefault database, or Import MDB to add an existing universe.";
             return;
         }
         var file = new FileInfo(chosen.MdbPath);
@@ -881,6 +882,16 @@ internal sealed class DatabaseSelectorDialog : UtilityPopupForm
         SelectedDatabaseName = item.Name;
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    private void CreateDatabase()
+    {
+        string? name = AskForName("Name for new database", "New Universe");
+        if (name is null) return;
+        UniverseEntry result = Paths.CreateUniverse(name);
+        RefreshDatabases(result.Name);
+        Explain("Created an independent database from System/PRWDefault.mdb at:\n" +
+            result.MdbPath + "\n\nSelect Use This Database to activate it.");
     }
 
     private void ImportDatabase()

@@ -27,27 +27,29 @@ jobs:
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
           if ($LASTEXITCODE -ne 0) { throw "Version 0.5.12 smoke test failed: $LASTEXITCODE" }
 
-      - name: Generate original raster image packs at their exact reference sizes
-        shell: pwsh
-        run: |
-          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --generate-assets
-          if ($LASTEXITCODE -ne 0) { throw "Skin asset generation failed" }
-          foreach ($skin in @("Obsidian", "Steel")) {
-            foreach ($category in @("Backgrounds","Buttons","Graphics","Loading_NoProfile","Loading_Profile","LowerBars","SideBars","TopBars")) {
-              if (-not (Test-Path ("Skins/" + $skin + "/" + $category))) { throw "Missing skin category: $skin/$category" }
-            }
-            foreach ($file in @("Backgrounds/Title_Screen.jpg", "SideBars/Title_Screen.jpg",
-                                "SideBars/Title_Screen_Alt.jpg", "TopBars/Title_Screen_On.jpg",
-                                "TopBars/Title_Screen_Off.jpg", "LowerBars/Title_Screen.jpg")) {
-              if (-not (Test-Path ("Skins/" + $skin + "/" + $file))) { throw "Missing image: $skin/$file" }
-            }
-          }
-
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
         run: |
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
+
+      - name: Generate assets in the published application directory
+        shell: pwsh
+        run: |
+          # WinExe launches asynchronously under PowerShell; explicitly wait.
+          $initialized = Start-Process -FilePath (Resolve-Path "publish/ProWrestlingRevolution.exe") -ArgumentList "--generate-assets" -Wait -PassThru
+          if ($initialized.ExitCode -ne 0) { throw "Runtime asset generation failed: $($initialized.ExitCode)" }
+          foreach ($skin in @("Obsidian", "Steel")) {
+            foreach ($category in @("Backgrounds","Buttons","Graphics","Loading_NoProfile","Loading_Profile","LowerBars","SideBars","TopBars")) {
+              if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $category))) { throw "Missing published skin category: $skin/$category" }
+            }
+            foreach ($file in @("Backgrounds/Title_Screen.jpg", "SideBars/Title_Screen.jpg",
+                                "SideBars/Title_Screen_Alt.jpg", "TopBars/Title_Screen_On.jpg",
+                                "TopBars/Title_Screen_Off.jpg", "LowerBars/Title_Screen.jpg")) {
+              if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $file))) { throw "Missing published skin: $skin/$file" }
+            }
+          }
+          if (-not (Test-Path "publish/System/PRWDefault.mdb")) { throw "Local default template was not installed" }
 
       - name: Assemble the Version 0.5.12 portable game ZIP
         shell: pwsh

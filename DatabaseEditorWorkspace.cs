@@ -640,7 +640,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         _records.Font = new Font("Segoe UI", 10.25f);
         _records.ItemHeight = 23;
         _records.SelectedIndexChanged += (_, _) => UpdateNotesAndSummary();
-        _records.DoubleClick += (_, _) => OpenRecordDetails();
+        _records.DoubleClick += (_, _) => Safe(OpenRecordDetails);
         layout.Controls.Add(_records, 0, 2);
 
         _recordStatus.Dock = DockStyle.Fill;
@@ -748,7 +748,8 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             if (_section.Items.Count > 0)
             {
                 string initial = _section.Items.Cast<string>()
-                    .FirstOrDefault(s => s.Equals("Workers", StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(s => s.Equals(PrwSchema.WorkerTable, StringComparison.OrdinalIgnoreCase))
+                    ?? _section.Items.Cast<string>().FirstOrDefault(s => s.Equals("Workers", StringComparison.OrdinalIgnoreCase))
                     ?? (string)_section.Items[0]!;
                 _section.SelectedItem = initial;
             }
@@ -916,10 +917,42 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             },
             EnableHeadersVisualStyles = false
         };
+        details.Columns.Add("section", "Section");
         details.Columns.Add("field", "Field");
         details.Columns.Add("value", "Value");
-        foreach (DataColumn col in entry.Row.Table.Columns)
-            details.Rows.Add(col.ColumnName, Convert.ToString(entry.Row[col]) ?? "");
+        details.Columns[0].FillWeight = 28;
+        details.Columns[1].FillWeight = 38;
+        details.Columns[2].FillWeight = 60;
+
+        // Native PRW worker records include the linked biography, skills,
+        // physical condition, popularity, contracts, and alternate identities.
+        if (_universe is not null &&
+            string.Equals(_section.SelectedItem?.ToString(), PrwSchema.WorkerTable,
+                StringComparison.OrdinalIgnoreCase) &&
+            entry.Row.Table.Columns.Contains("UID"))
+        {
+            var profile = PrwWorkerRepository.Load(
+                _universe.MdbPath, entry.Row["UID"], _password);
+            foreach (var section in profile.Sections)
+            {
+                int index = 0;
+                foreach (DataRow row in section.Records.Rows)
+                {
+                    index++;
+                    string group = section.Records.Rows.Count == 1
+                        ? section.Table : section.Table + " #" + index;
+                    foreach (DataColumn col in section.Records.Columns)
+                        details.Rows.Add(group, col.ColumnName,
+                            Convert.ToString(row[col]) ?? "");
+                }
+            }
+        }
+        else
+        {
+            foreach (DataColumn col in entry.Row.Table.Columns)
+                details.Rows.Add(_section.SelectedItem?.ToString() ?? "",
+                    col.ColumnName, Convert.ToString(entry.Row[col]) ?? "");
+        }
         dialog.Controls.Add(details);
 
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 57 };
@@ -1068,6 +1101,18 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     {
         if (_universe is null) { Alert("No database selected."); return; }
         var tables = AccessDatabase.TableNames(_universe.MdbPath, _password);
+        if (tables.Contains(PrwSchema.WorkerTable, StringComparer.OrdinalIgnoreCase))
+        {
+            var report = PrwSchema.Inspect(_universe.MdbPath, _password);
+            Alert(report.IsValid
+                ? "Native PRW database schema verified.\n\nAll " +
+                  PrwSchema.Tables.Count + " expected tables and their columns are accessible." +
+                  "\n\nThis does not check record-level foreign keys or gameplay rules."
+                : "Native PRW database schema has problems:\n\n" +
+                  string.Join("\n", report.Problems.Take(20)) +
+                  (report.Problems.Count > 20 ? "\nMore problems omitted." : ""));
+            return;
+        }
         Alert("MDB header verified.\n\n" + tables.Count +
             " user tables are accessible.\n\nThis is an accessibility check, not a full relational integrity audit.");
     }

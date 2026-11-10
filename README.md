@@ -29,6 +29,39 @@ This screen's design is independent of the controls used by the other game pages
 The screenshot PNG is a user-provided asset; it must be installed separately
 unless included in a local skin pack or a release containing that asset.
 
+## Local database creation and runtime paths
+
+The default database is the user's original PRWDefault.mdb, embedded losslessly
+in the executable. On first launch, the game extracts it into
+`System/PRWDefault.mdb` **beside the running executable**, verifies its SHA-256
+before installing it, and preserves any already-installed template instead of
+overwriting it. The installation remains portable and requires no repository
+checkout, network request, or current-working-directory dependency.
+
+Database Selector > **Create Database** asks for a name and copies the installed
+local base into `Databases/<Name>/PWR.mdb`. This creates an independent universe,
+with its own SaveGames folder. Creating a career copies the selected universe to
+`Databases/<Name>/SaveGames/<Career>/PWRSave.mdb` and makes an initial backup.
+Imports from existing MDBs are still available.
+
+All user data is discovered relative to `AppContext.BaseDirectory`, the
+directory containing the executable. The previous special-case upward scan for
+a parent folder named `Repos` has been removed. Database files, careers, skins,
+pictures, settings and the installed template remain in the application folder;
+editing and reading a universe use the local `PWR.mdb` copy.
+
+`PrwSchema.cs` maps the ten original worker-related tables and their declared
+relationships. `PrwWorkerRepository.cs` supports worker identity listings
+and full linked record reads, including skills, popularity, physical condition,
+biographies, attributes, alternative identities and contracts. The editor
+defaults to `tblWorker` and displays linked records on double-click.
+
+This release still does not implement the full gameplay simulation, write/edit
+workflows for every category, or row-level referential integrity verification.
+The Windows 64-bit Microsoft ACE OLE DB provider is required for accessing MDB
+records, but simply copying the built-in template into a new universe does not
+require Access to be installed.
+
 ## Database Selector and Load Game popups (v0.5.7)
 
 Database Selector and Load Game are now centered modal utility dialogs, not full
@@ -36,9 +69,9 @@ pages. Each uses the same reusable shell with a PWR header, two-column layout
 (selection on the left, information on the right) and action footer, styled in
 dark navy, cyan and red. These tools leave the underlying page intact.
 
-Database Selector lists the discovered MDB universes, shows verifiable local
-file information, and activates the selected database. Import MDB and Open
-Folder are available. The selected universe is refreshed when the selector
+Database Selector lists locally created or imported MDB universes, shows verifiable
+file information, and activates the selected database. Create Database, Import
+MDB, and Open Folder are available. The selected universe is refreshed when the selector
 is called from New Game. The information panel does not fabricate author or
 description fields that have not yet been stored in PWR.
 

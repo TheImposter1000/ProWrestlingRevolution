@@ -16,7 +16,7 @@ public static class AccessDatabase
         return Encoding.ASCII.GetString(bytes, 0, n).Contains("Standard Jet DB", StringComparison.Ordinal);
     }
 
-    private static OleDbConnection Open(string file, string? password)
+    internal static OleDbConnection Open(string file, string? password)
     {
         if (!LooksLikeMdb(file)) throw new InvalidDataException("Not a Microsoft Access MDB database.");
         Exception? last = null;

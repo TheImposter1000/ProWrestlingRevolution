@@ -16,7 +16,7 @@ internal static class Program
 
             if (args.Contains("--generate-assets", StringComparer.OrdinalIgnoreCase))
             {
-                var workingDirectory = new AppPaths(Directory.GetCurrentDirectory());
+                var workingDirectory = new AppPaths(FindGameRoot());
                 workingDirectory.EnsureLayout();
                 return 0;
             }
@@ -42,38 +42,40 @@ internal static class Program
         }
     }
 
-    private static string FindGameRoot()
-    {
-        DirectoryInfo? folder =
-            new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (folder != null)
-        {
-            if (folder.Name.Equals(
-                    "Repos",
-                    StringComparison.OrdinalIgnoreCase)
-                && folder.Parent is DirectoryInfo gameFolder
-                && Directory.Exists(
-                    Path.Combine(gameFolder.FullName, "Skins"))
-                && Directory.Exists(
-                    Path.Combine(gameFolder.FullName, "Databases")))
-            {
-                return gameFolder.FullName;
-            }
-
-            folder = folder.Parent;
-        }
-
-        return AppContext.BaseDirectory;
-    }
+    // All installed assets and data are resolved from the executable's folder.
+    // Never infer a data directory from a parent called Repos.
+    private static string FindGameRoot() => Path.GetFullPath(AppContext.BaseDirectory);
 
     private static void SmokeTest()
     {
+        PrwSchema.AssertDefinitionIntegrity();
         var root = Path.Combine(Path.GetTempPath(), "PWR-phase1-" + Guid.NewGuid().ToString("N"));
         try
         {
             var paths = new AppPaths(root);
             paths.EnsureLayout();
+            if (!FindGameRoot().Equals(Path.GetFullPath(AppContext.BaseDirectory),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Runtime root must be the executable directory.");
+            if (!File.Exists(paths.DefaultDatabase) ||
+                !AccessDatabase.LooksLikeMdb(paths.DefaultDatabase) ||
+                new FileInfo(paths.DefaultDatabase).Length != 335872)
+                throw new Exception("The bundled base MDB was not installed locally.");
+            var first = paths.CreateUniverse("From Base");
+            var second = paths.CreateUniverse("Another Base");
+            if (first.MdbPath == second.MdbPath ||
+                !File.ReadAllBytes(first.MdbPath).SequenceEqual(
+                    File.ReadAllBytes(paths.DefaultDatabase)))
+                throw new Exception("Universe creation must copy the exact base database.");
+            if (!File.Exists(second.MdbPath) ||
+                !Directory.Exists(Path.Combine(first.DirectoryPath, "SaveGames")))
+                throw new Exception("New universe folder structure was not created.");
+            bool duplicateRejected = false;
+            try { paths.CreateUniverse("From Base"); }
+            catch (IOException) { duplicateRejected = true; }
+            if (!duplicateRejected) throw new Exception("Creating a duplicate universe was allowed.");
+            Directory.Delete(first.DirectoryPath, recursive: true);
+            Directory.Delete(second.DirectoryPath, recursive: true);
             if (paths.Skins().Count < 2) throw new Exception("Built-in skins missing.");
             var skin = paths.LoadSkin("Obsidian");
             if (skin.Accent.IsEmpty) throw new Exception("Skin palette could not load.");
@@ -231,6 +233,8 @@ internal static class Program
                 }
                 if (selector.Controls.Find("ActionUseThisDatabase", true).Length != 1)
                     throw new Exception("Database selection action is missing.");
+                if (selector.Controls.Find("ActionCreateDatabase", true).Length != 1)
+                    throw new Exception("Database creation action is missing.");
                 var load = saves.Controls.Find("ActionLoad", true).SingleOrDefault() as Button;
                 if (load is null || load.Enabled)
                     throw new Exception("Unimplemented gameplay loading must stay disabled.");
