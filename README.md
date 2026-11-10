@@ -29,6 +29,31 @@ This screen's design is independent of the controls used by the other game pages
 The screenshot PNG is a user-provided asset; it must be installed separately
 unless included in a local skin pack or a release containing that asset.
 
+## Database Selector and Load Game popups (v0.5.7)
+
+Database Selector and Load Game are now centered modal utility dialogs, not full
+pages. Each uses the same reusable shell with a PWR header, two-column layout
+(selection on the left, information on the right) and action footer, styled in
+dark navy, cyan and red. These tools leave the underlying page intact.
+
+Database Selector lists the discovered MDB universes, shows verifiable local
+file information, and activates the selected database. Import MDB and Open
+Folder are available. The selected universe is refreshed when the selector
+is called from New Game. The information panel does not fabricate author or
+description fields that have not yet been stored in PWR.
+
+Load Game lists real saved careers and their file and backup information.
+Rename and Copy are implemented as folder operations. Recovery restores
+Backups/initial.mdb after storing the previous active save in Backups.
+Delete archives the whole career folder to System/DeletedSaves rather than
+destroying it. Check Save inspects the MDB header and table accessibility
+without claiming a full database repair. Open Folder works directly. The
+Load action is disabled until gameplay save restoration is integrated; the
+dialog does not falsely suggest that the simulation can already resume.
+
+No TEW copyrighted skin artwork is used. Existing databases, saved careers,
+skins, and custom title-screen graphics are not modified by the release installer.
+
 ## Database editor workspace (v0.5.6)
 
 The Database Editor main page is a browsing hub, NOT the detailed editor for an
