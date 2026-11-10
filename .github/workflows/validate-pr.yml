@@ -25,8 +25,9 @@ jobs:
         run: |
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Publish failed" }
-          & "./publish/ProWrestlingRevolution.exe" --generate-assets
-          if ($LASTEXITCODE -ne 0) { throw "Runtime initialization failed" }
+          # WinExe launches asynchronously under PowerShell; explicitly wait.
+          $initialized = Start-Process -FilePath (Resolve-Path "publish/ProWrestlingRevolution.exe") -ArgumentList "--generate-assets" -Wait -PassThru
+          if ($initialized.ExitCode -ne 0) { throw "Runtime initialization failed: $($initialized.ExitCode)" }
           foreach ($item in @("publish/System/PRWDefault.mdb",
                               "publish/Skins/Obsidian/Backgrounds/Title_Screen.jpg",
                               "publish/Skins/Steel/Backgrounds/Title_Screen.jpg")) {
