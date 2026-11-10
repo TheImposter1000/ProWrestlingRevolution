@@ -77,7 +77,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v0.5.7
-          name: Pro Wrestling Revolution 0.5.5 - Reference Title Screen
+          name: Pro Wrestling Revolution 0.5.7 - Utility Popups
           target_commitish: main
           prerelease: false
           make_latest: true
