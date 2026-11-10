@@ -140,8 +140,35 @@ internal static class Program
                 throw new Exception("Standalone games must not use a repository folder.");
             if (!File.Exists(paths.DefaultDatabase) ||
                 !AccessDatabase.LooksLikeMdb(paths.DefaultDatabase) ||
-                new FileInfo(paths.DefaultDatabase).Length != 335872)
+                new FileInfo(paths.DefaultDatabase).Length != PrwDefaultTemplate.ExpectedLength)
                 throw new Exception("The bundled base MDB was not installed locally.");
+            byte[] pristineDefault = File.ReadAllBytes(paths.DefaultDatabase);
+            // Simulate a previous install, then verify migration retains a
+            // byte-for-byte backup and installs the replacement template.
+            byte[] oldDefault = new byte[2048];
+            Encoding.ASCII.GetBytes("Standard Jet DB").CopyTo(oldDefault, 4);
+            File.WriteAllBytes(paths.DefaultDatabase, oldDefault);
+            File.Delete(Path.Combine(paths.SystemRoot,
+                "PRWDefault.template-sha256.txt"));
+            PrwDefaultTemplate.EnsureInstalled(paths.SystemRoot);
+            if (!new FileInfo(paths.DefaultDatabase).Length.Equals(
+                    (long)PrwDefaultTemplate.ExpectedLength) ||
+                !Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    File.ReadAllBytes(paths.DefaultDatabase)))
+                    .Equals(PrwDefaultTemplate.ExpectedSha256,
+                        StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Replacement base database integrity check failed.");
+            string preservedDefault = Directory.EnumerateFiles(
+                Path.Combine(paths.SystemRoot, "TemplateBackups"), "*.mdb").Single();
+            if (!File.ReadAllBytes(preservedDefault).SequenceEqual(oldDefault))
+                throw new Exception("The previous base MDB was not preserved.");
+
+            // Subsequent local template edits must survive later launches.
+            File.WriteAllBytes(paths.DefaultDatabase, oldDefault);
+            PrwDefaultTemplate.EnsureInstalled(paths.SystemRoot);
+            if (!File.ReadAllBytes(paths.DefaultDatabase).SequenceEqual(oldDefault))
+                throw new Exception("Customized current templates must be preserved.");
+            File.WriteAllBytes(paths.DefaultDatabase, pristineDefault);
             var first = paths.CreateUniverse("From Base");
             var second = paths.CreateUniverse("Another Base");
             if (first.MdbPath == second.MdbPath ||
