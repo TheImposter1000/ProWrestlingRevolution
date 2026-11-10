@@ -30,30 +30,24 @@ public sealed class TitleArtworkView : Control
     {
         base.OnPaint(e);
 
-        if (_artwork is null || Width <= 0 || Height <= 0)
+        if (_artwork == null || Width <= 0 || Height <= 0)
             return;
 
         var g = e.Graphics;
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
 
-        g.Clear(BackColor);
-        g.InterpolationMode =
-            InterpolationMode.HighQualityBicubic;
+        // "Cover" behavior: fill the whole area while preserving aspect ratio
+        float scale = Math.Max((float)Width / _artwork.Width, (float)Height / _artwork.Height);
 
-        double scale = Math.Min(
-            (double)Width / _artwork.Width,
-            (double)Height / _artwork.Height
-        );
+        int drawWidth = (int)Math.Ceiling(_artwork.Width * scale);
+        int drawHeight = (int)Math.Ceiling(_artwork.Height * scale);
 
-        int imageWidth = (int)(_artwork.Width * scale);
-        int imageHeight = (int)(_artwork.Height * scale);
+        int drawX = (Width - drawWidth) / 2;
+        int drawY = (Height - drawHeight) / 2;
 
-        int x = (Width - imageWidth) / 2;
-        int y = (Height - imageHeight) / 2;
+        g.DrawImage(_artwork, new Rectangle(drawX, drawY, drawWidth, drawHeight));
 
-        g.DrawImage(
-            _artwork,
-            new Rectangle(x, y, imageWidth, imageHeight)
-        );
     }
-
 }

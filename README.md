@@ -47,7 +47,6 @@ IMPORTANT: If you install this release in a fresh folder, copy your own skin and
         MyWorld/
             PWR.mdb
             SaveGames/
-                MyCareer/
                     PWRSave.mdb
                     Backups/
                         initial.mdb
