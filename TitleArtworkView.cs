@@ -11,7 +11,7 @@ namespace ProWrestlingRevolution;
 public sealed class TitleArtworkView : Control
 {
     private Image? _artwork;
-    public Image? Artwork
+    internal Image? Artwork
     {
         get => _artwork;
         set { _artwork = value; Invalidate(); }
