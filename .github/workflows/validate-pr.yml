@@ -34,3 +34,7 @@ jobs:
             if (-not (Test-Path $item)) { throw "Missing installed application data: $item" }
           }
           if (Test-Path "System/PRWDefault.mdb") { throw "Template was incorrectly installed in source repository" }
+          if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 434176) { throw "Replacement template length is incorrect" }
+          if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
+            throw "Published replacement template is not the uploaded MDB"
+          }
