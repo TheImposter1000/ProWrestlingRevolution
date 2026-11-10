@@ -7,6 +7,9 @@ on:
     paths:
       - ".github/workflows/build-prw-default-mdb.yml"
       - "tools/prw-db-builder/**"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -35,6 +38,7 @@ jobs:
           java -cp "target/classes:target/dependency/*" PrwDatabaseBuilder ../../Database/Default/PRW_Default.mdb
           file ../../Database/Default/PRW_Default.mdb
       - name: Save verified MDB to branch
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
