@@ -39,7 +39,6 @@ ImportRecordMap|ImportRecordMapID|ImportRecordMapID:L:A,ImportSourceID:L,SourceT
 ImportIssue|ImportIssueID|ImportIssueID:L:A,ImportSourceID:L,SourceTable:T:100,SourceRecordKey:T:120,SourceField:T:100,SourceValue:T:240,SeverityCode:T:20,IssueMessage:M,Resolved:Y
 FK|UniverseInfo|GameInfo|UniverseID|UniverseID
 FK|Region|Worker|RegionID|BasedInRegionID
-FK|Region|Region|RegionID|ParentRegionID
 FK|Worker|WorkerBiography|WorkerID|WorkerID
 FK|Worker|WorkerPossibleRole|WorkerID|WorkerID
 FK|Worker|WorkerPhysical|WorkerID|WorkerID
