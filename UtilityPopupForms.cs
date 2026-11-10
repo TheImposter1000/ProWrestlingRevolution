@@ -69,7 +69,6 @@ internal abstract class UtilityPopupForm : Form
     }
 
     // A compact, permanent rail of main-menu ICON buttons, not a second
-    // full-width sidebar. Save-specific actions remain inside their screens.
     internal void AttachMainNavigation(string activeSection)
     {
         if (Controls.Find("PopupMainNavigation", false).Length != 0) return;
@@ -170,7 +169,7 @@ internal abstract class UtilityPopupForm : Form
             ColumnCount = 1,
             RowCount = 4,
             Margin = new Padding(0),
-            Padding = new Padding(1),
+            Padding = new Padding(SkinArt.SidebarWidth + 3, 3, 3, 3),
             BackColor = Color.FromArgb(7, 19, 31)
         };
         frame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -323,7 +322,7 @@ internal abstract class UtilityPopupForm : Form
             Name = "LoadGameFrame",
             Dock = DockStyle.Fill,
             ColumnCount = 1, RowCount = 4,
-            Padding = new Padding(3),
+            Padding = new Padding(SkinArt.SidebarWidth + 3, 3, 3, 3),
             Margin = Padding.Empty,
             BackColor = Color.FromArgb(7, 16, 27)
         };
