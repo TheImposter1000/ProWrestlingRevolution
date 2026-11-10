@@ -24,3 +24,22 @@ jobs:
         run: dotnet build ProWrestlingRevolution.csproj -c Release
       - name: Validate reference layout and skin fallback
         run: dotnet run --project ProWrestlingRevolution.csproj -c Release --no-build -- --smoke
+      - name: Generate built-in fallback skin art
+        run: dotnet run --project ProWrestlingRevolution.csproj -c Release --no-build -- --generate-assets
+      - name: Publish an isolated Windows x64 preview
+        shell: pwsh
+        run: |
+          dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o preview
+          if ($LASTEXITCODE -ne 0) { throw "Preview publish failed" }
+          foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
+            if (-not (Test-Path ("preview/" + $folder))) {
+              Copy-Item $folder ("preview/" + $folder) -Recurse -Force
+            }
+          }
+          Compress-Archive -Path "preview/*" -DestinationPath "ProWrestlingRevolution-ReferencePreview.zip" -Force
+      - name: Upload preview build (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProWrestlingRevolution-ReferencePreview
+          path: ProWrestlingRevolution-ReferencePreview.zip
+          retention-days: 30
