@@ -26,6 +26,22 @@ public sealed partial class LauncherForm
         Controls.Add(_sidebar);
         Controls.Add(_topbar);
 
+        // Keep the native interior-screen updater; the title screen has its
+        // own painted button that invokes this same update action.
+        _updateButton.Name = "CheckUpdatesButton";
+        _updateButton.Text = "Check for Updates";
+        _updateButton.Dock = DockStyle.Bottom;
+        _updateButton.Height = 46;
+        _updateButton.FlatStyle = FlatStyle.Flat;
+        _updateButton.BackColor = _skin.Button;
+        _updateButton.ForeColor = _skin.Foreground;
+        _updateButton.FlatAppearance.BorderColor = _skin.Border;
+        _updateButton.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        _updateButton.Cursor = Cursors.Hand;
+        _updateButton.Click += async (_, _) =>
+            await GameUpdate.CheckAndInstallAsync(this, _updateButton);
+        _sidebar.Controls.Add(_updateButton);
+
         // One unified row per menu option: vector icon, text and click target.
         // The previous 57px TEW-style image strip is deliberately not added.
         _menuHeader.Text = "M A I N   M E N U";
@@ -200,15 +216,85 @@ public sealed partial class LauncherForm
         _currentPage = "HOME";
         _hoverIcon = null;
         RenderSidebar();
+
+        // Only the title screen uses the approved full-bleed, bottom-menu layout.
+        // Interior screens retain their existing functional navigation chrome.
+        SuspendLayout();
+        _sidebar.Visible = false;
+        _topbar.Visible = false;
         _page.Controls.Clear();
-        _page.Controls.Add(new TitleArtworkView
+
+        var title = new TitleScreenView
         {
             Dock = DockStyle.Fill,
-            BackColor = _skin.Background,
             Artwork = LoadArt(Path.Combine("Backgrounds", "Title_Screen.jpg"),
-                Path.Combine("Backgrounds", "Title_Screen.jpg"))
-        });
-        // No LowerBars image, duplicate logo, added CTA or version footer.
+                Path.Combine("Backgrounds", "Title_Screen.jpg")),
+            VersionText = "v" + GameUpdate.DisplayVersion,
+            UpdateText = _updateButton.Text,
+            UpdateEnabled = _updateButton.Enabled,
+            SoundEnabled = _soundEnabled
+        };
+
+        title.CommandInvoked += command =>
+        {
+            switch (command)
+            {
+                case "sound":
+                    _soundEnabled = !_soundEnabled;
+                    title.SoundEnabled = _soundEnabled;
+                    title.Invalidate();
+                    foreach (var button in _topbar.Controls.OfType<TopUtilityButton>())
+                        button.SetSoundEnabled(_soundEnabled);
+                    break;
+                case "help":
+                    MessageBox.Show(this,
+                        "Select a menu item to begin.\n\n" +
+                        "New Game creates a new MDB career.\n" +
+                        "Database allows you to import an MDB universe.\n" +
+                        "Use the arrow keys and Enter, or Alt+letter shortcuts, to navigate.",
+                        "Main Menu Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    break;
+                case "minimize":
+                    WindowState = FormWindowState.Minimized;
+                    break;
+                case "close":
+                    Close();
+                    break;
+                case "updates":
+                    _updateButton.PerformClick();
+                    break;
+                default:
+                    RunSafe(() => Navigate(command));
+                    break;
+            }
+        };
+
+        EventHandler refreshUpdate = (_, _) =>
+        {
+            if (title.IsDisposed) return;
+            title.UpdateText = _updateButton.Text;
+            title.UpdateEnabled = _updateButton.Enabled;
+            title.Invalidate();
+        };
+        _updateButton.TextChanged += refreshUpdate;
+        _updateButton.EnabledChanged += refreshUpdate;
+        title.Disposed += (_, _) =>
+        {
+            _updateButton.TextChanged -= refreshUpdate;
+            _updateButton.EnabledChanged -= refreshUpdate;
+        };
+
+        // Drag only from the title plaque, not from the menu hit targets.
+        title.MouseDown += (sender, args) =>
+        {
+            if (args.Button == MouseButtons.Left &&
+                args.X < title.Width * (390f / 1672f) &&
+                args.Y < title.Height * (158f / 941f))
+                DragWindow(sender, args);
+        };
+
+        _page.Controls.Add(title);
+        ResumeLayout(true);
     }
 
     private void ApplySkin()
