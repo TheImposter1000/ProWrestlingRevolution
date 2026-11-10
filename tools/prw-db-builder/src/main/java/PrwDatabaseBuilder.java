@@ -105,10 +105,11 @@ public final class PrwDatabaseBuilder {
             String[] requiredTables = {
                 "tblFed","tblWorker","tblWorkerBio","tblWorkerBusiness","tblWorkerOver",
                 "tblWorkerPhysical","tblWorkerSkills","tblContract","tblContractBio",
-                "tblWorkerAttributes","tblAlternative"
+                "tblWorkerAttributes","tblAlternative",
+                "tblMatch","tblMatchRingSetup","tblMatchFinishes"
             };
-            if (reopened.getTableNames().size() != 11) {
-                throw new IOException( "Expected exactly 11 user tables, found " + reopened.getTableNames());
+            if (reopened.getTableNames().size() != 14) {
+                throw new IOException( "Expected exactly 14 user tables, found " + reopened.getTableNames());
             }
             for (String name : requiredTables) {
                 if (reopened.getTable(name) == null)
@@ -118,7 +119,10 @@ public final class PrwDatabaseBuilder {
                 reopened.getTable("tblWorker").getRowCount() != 1 ||
                 reopened.getTable("tblContract").getRowCount() != 1 ||
                 reopened.getTable("tblWorkerAttributes").getRowCount() != 1 ||
-                reopened.getTable("tblAlternative").getRowCount() != 1) {
+                reopened.getTable("tblAlternative").getRowCount() != 1 ||
+                reopened.getTable("tblMatch").getRowCount() != 1 ||
+                reopened.getTable("tblMatchRingSetup").getRowCount() != 1 ||
+                reopened.getTable("tblMatchFinishes").getRowCount() != 1) {
                 throw new IOException("Missing test records");
             }
             System.out.println("VERIFIED native Microsoft Access 2000 MDB: " + out);
@@ -221,5 +225,17 @@ public final class PrwDatabaseBuilder {
             "Usage",100,"Name","The Vanguard","ShortName","Vanguard",
             "Gimmick","The Vanguard","GimmickBasis","Swagger",
             "MinAge",18,"MaxAge",100);
+
+        int match = put(db,"tblMatch","UID",
+            "RecordName","1 vs. 1 (PRW Test)",
+            "Name","1 vs. 1",
+            "Description","Standard singles match to test the PRW match type library.",
+            "NonWrestling_Time",2,"MinimumMatch_Time",5,"MaximumMatch_Time",60,
+            "Default",true,"Basic",true,"Special",false);
+        put(db,"tblMatchRingSetup","MatchUID",
+            "MatchUID",match,"RingSetup1",false,"RingSetup2",false,"RingSetup3",false,"RingSetup4",false,"RingSetup5",false,"RingSetup6",false,"RingSetup7",false,"RingSetup8",false,"RingSetup9",false,"RingSetup10",false,"RingSetup11",false,"RingSetup12",false,"RingSetup13",false,"RingSetup14",false,"RingSetup15",false,"RingSetup16",false,"RingSetup17",false,"RingSetup18",false,"RingSetup19",false,"RingSetup20",false);
+        put(db,"tblMatchFinishes","MatchUID",
+            "MatchUID",match,"Finish1",true,"Finish2",true,"Finish3",true,"Finish4",true,"Finish5",false,"Finish6",false,"Finish7",false,"Finish8",false,"Finish9",false,"Finish10",false,"Finish11",false,"Finish12",false,"Finish13",false,"Finish14",false,"Finish15",false,"Finish16",false,"Finish17",false,"Finish18",false,"Finish19",false);
+
     }
 }
