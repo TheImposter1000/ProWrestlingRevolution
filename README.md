@@ -71,9 +71,17 @@ The Windows smoke test checks that the sidebar is 200 pixels wide, contains all 
 
 The seven main-menu entries now form a continuous, evenly spaced navigation group; the former blank gap before Achievements has been removed. The MAIN MENU heading and thin line, New Game's blue blade shape, icons, label positions and top bar align more closely with the reference. No title-screen JPG, logo, tagline or crowd artwork has been edited. Because the original user artwork is intentionally preserved, its embedded logo can still have a different size or composition from the reference mockup. All file paths, Access data handling and skin selection remain unchanged.
 
+## Reference-matched title-screen chrome
+
+The main-menu chrome follows the supplied 1366 x 768 reference layout: 40-pixel top bar, 200-pixel sidebar, menu rows beginning at sidebar-local y=95 with 55-pixel height and a 56-pixel pitch. The home screen has no update button or footer. The diagonal selected row uses a dark-to-blue metallic fill, cyan slanted edge, and live vector icons and labels. The help icon's question mark is drawn as a vector inside its circle.
+
+The selected skin may optionally provide image-based chrome without replacing the original background artwork. These optional transparent or opaque assets can be added to an existing skin folder: `TopBars/Title_Chrome.png` at 1366 x 40, `SideBars/Title_Chrome.png` at 200 x 728, `Buttons/Title_Idle.png`, `Buttons/Title_Selected.png`, and `Buttons/Title_Hover.png` each at 200 x 55. Button assets should contain only backgrounds, not text or icons. Missing files use the native reference-matched vector rendering. The skin's `Backgrounds/Title_Screen.jpg` is never modified.
+
+The title artwork inside the content area still comes directly from the installed skin. Exact logo size and positioning depend on that user-supplied JPG; these chrome improvements do not remake it.
+
 ## In-app updates (version 0.5.4 and later)
 
-Click **Check for Updates** at the bottom of the sidebar. The game uses GitHub's
+Open any secondary page and click **Check for Updates** at the bottom of the sidebar. The game uses GitHub's
 **latest stable release** and checks it against the version embedded in the
 Windows executable. If newer, it asks for your approval, downloads the official
 portable ZIP from this repository, verifies the release asset SHA-256 digest,
