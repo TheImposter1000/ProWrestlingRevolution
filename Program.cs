@@ -146,6 +146,31 @@ internal static class Program
                 if (controls.OrderBy(button => button.Left).First().Left !=
                     SkinArt.WindowWidth - 200)
                     throw new Exception("Top controls are incorrectly aligned.");
+                
+                // The editor is a full-width directory. The name of the MDB is the
+                // central heading, and the mass-edit dropdown sits beneath its button.
+                typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
+                var workspace = titleCanvas!.Controls
+                    .OfType<DatabaseEditorWorkspace>().SingleOrDefault();
+                if (workspace is null || sidebar.Visible)
+                    throw new Exception("Database editor workspace must replace the interior sidebar.");
+                static IEnumerable<Control> Descendants(Control parent) =>
+                    parent.Controls.Cast<Control>().SelectMany(child =>
+                        new[] { child }.Concat(Descendants(child)));
+                var descendants = Descendants(workspace).ToArray();
+                var databaseName = descendants.SingleOrDefault(c => c.Name == "ActiveDatabaseName");
+                var massButton = descendants.SingleOrDefault(c => c.Name == "MassEditButton");
+                var massField = descendants.SingleOrDefault(c => c.Name == "MassEditFieldSelector");
+                var categories = descendants.SingleOrDefault(c => c.Name == "EditorCategorySelector");
+                var notes = descendants.SingleOrDefault(c => c.Name == "EditorNotes");
+                if (databaseName is null || categories is null || notes is null)
+                    throw new Exception("Editor directory sections are missing.");
+                if (massButton is null || massField is null ||
+                    massField.Top <= massButton.Top)
+                    throw new Exception("Mass edit dropdown must be under the mass edit button.");
+
             }
 
             // Updates may carry game data files in the ZIP, but the installer
