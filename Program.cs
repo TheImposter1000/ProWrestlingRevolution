@@ -64,6 +64,17 @@ internal static class Program
                         launcher.ClientSize.Width + " x " + launcher.ClientSize.Height + ".");
                 if (launcher.FormBorderStyle != FormBorderStyle.None)
                     throw new Exception("Launcher must not use a resizable standard border.");
+                var sidebar = launcher.Controls.OfType<Panel>()
+                    .SingleOrDefault(control => control.Dock == DockStyle.Left);
+                if (sidebar is null || sidebar.Width != 240)
+                    throw new Exception("Unified navigation width must be 240.");
+                if (sidebar.Controls.OfType<PictureBox>().Any())
+                    throw new Exception("Old graphical icon strip was still added to sidebar.");
+                var rows = sidebar.Controls.OfType<SidebarMenuRow>().ToList();
+                if (rows.Count != SkinArt.MenuIcons.Length)
+                    throw new Exception("Sidebar must contain eight unified navigation rows.");
+                if (rows.Any(row => row.AccessibleRole != AccessibleRole.PushButton))
+                    throw new Exception("Navigation row is not accessible as a button.");
             }
 
             var fixture = Path.Combine(root, "sample.mdb");

@@ -76,21 +76,21 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.0
-          name: Pro Wrestling Revolution 0.5.0 - Minimal Main Menu
+          tag_name: v0.5.1
+          name: Pro Wrestling Revolution 0.5.1 - Unified Sidebar
           target_commitish: main
           prerelease: true
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Minimal Edition title-screen update. Your skin's Backgrounds/Title_Screen.jpg is
-            preserved, with no duplicated logos, taglines or lower information bar.
-            A clean utility title bar displays the version once, while readable navigation labels
-            sit beside the existing per-skin image icons.
-            Eight-category skin folders remain supported and incomplete folders are selectable;
-            missing assets fall back to Obsidian instead of failing.
-            MDB universe import, database editor, career copies and backups are unchanged.
+            A single unified navigation row now contains both an original vector icon and label.
+            The old TEW-style left icon strip is removed entirely.
+            Full-row blue hover/selection styling, accessible click targets and keyboard navigation.
+            The custom Backgrounds/Title_Screen.jpg is still supported, with no secondary logo or footer.
+            The former stretched/repeated image bottom is replaced with a subtle theme-color fade.
+            Eight-folder custom skin support, incomplete-skin fallback, MDB import, editor,
+            career copies and backups remain in place.
             Download the ZIP, extract into a writable folder and launch ProWrestlingRevolution.exe.
             Includes no third-party databases or images. Your own MDB is imported from Database Selector.
             Access table preview requires a matching Microsoft ACE OLE DB driver; direct file import/copy does not.

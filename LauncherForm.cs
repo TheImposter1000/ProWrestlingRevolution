@@ -13,12 +13,10 @@ public sealed partial class LauncherForm : Form
     private readonly AppPaths _paths;
     private SkinPalette _skin;
     private readonly Panel _page = new() { Dock = DockStyle.Fill };
-    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 215 };
+    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 240 };
     private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 38 };
-    private readonly PictureBox _sidebarImage = new() { Dock = DockStyle.Left, Width = SkinArt.SidebarWidth, SizeMode = PictureBoxSizeMode.Normal };
     private readonly PictureBox _topImage = new() { Dock = DockStyle.Right, Width = 180, SizeMode = PictureBoxSizeMode.Normal };
     private readonly Dictionary<string, Image> _assetCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ToolTip _iconTips = new();
     private string? _hoverIcon;
     private bool _soundEnabled = true;
     private readonly List<Button> _navigation = [];
@@ -86,14 +84,6 @@ public sealed partial class LauncherForm : Form
             case "achievements": ShowAchievements(); break;
             case "credits": ShowCredits(); break;
         }
-    }
-
-    private string? IconAt(int y)
-    {
-        foreach (var (key, _, cy) in SkinArt.MenuIcons)
-            if (Math.Abs(y - cy) <= 24 && !(key == "back" && _currentPage == "HOME"))
-                return key;
-        return null;
     }
 
     private void DragWindow(object? sender, MouseEventArgs args)

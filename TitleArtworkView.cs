@@ -44,13 +44,14 @@ public sealed class TitleArtworkView : Control
             return;
         }
 
+        // Show the complete artwork without stretching or repeating its lettering.
+        // Any remaining space uses the theme background with a subtle fade.
         g.DrawImage(_artwork, new Rectangle(0, 0, Width, fittedHeight));
-        // Use only the dark bottom edge to fill any extra height. This isn't a
-        // new information bar and contains no repeated logo or version text.
-        int stripHeight = Math.Min(48, _artwork.Height);
-        g.DrawImage(_artwork,
-            new Rectangle(0, fittedHeight - 1, Width, Height - fittedHeight + 1),
-            new Rectangle(0, _artwork.Height - stripHeight, _artwork.Width, stripHeight),
-            GraphicsUnit.Pixel);
+        int fadeHeight = Math.Min(48, fittedHeight);
+        var fadeBounds = new Rectangle(0, fittedHeight - fadeHeight, Width,
+            Height - fittedHeight + fadeHeight);
+        using var fade = new LinearGradientBrush(fadeBounds,
+            Color.FromArgb(0, BackColor), BackColor, LinearGradientMode.Vertical);
+        g.FillRectangle(fade, fadeBounds);
     }
 }

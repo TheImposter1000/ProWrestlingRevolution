@@ -9,7 +9,8 @@ namespace ProWrestlingRevolution;
 /// </summary>
 public sealed partial class LauncherForm
 {
-    private readonly Dictionary<string, Label> _menuLabels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SidebarMenuRow> _menuRows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
     private readonly Label _versionText = new();
     private readonly Font _navFont = new("Segoe UI", 9.5f, FontStyle.Regular);
@@ -25,40 +26,38 @@ public sealed partial class LauncherForm
         Controls.Add(_sidebar);
         Controls.Add(_topbar);
 
-        // A custom skin's graphical icon strip is still used; the nearby text
-        // is a cleaner clickable navigation layer, not a replacement image.
-        _sidebar.Controls.Add(_sidebarImage);
+        // One unified row per menu option: vector icon, text and click target.
+        // The previous 57px TEW-style image strip is deliberately not added.
+        _menuHeader.Text = "M A I N   M E N U";
+        _menuHeader.Location = new Point(24, 75);
+        _menuHeader.Size = new Size(198, 28);
+        _menuHeader.TextAlign = ContentAlignment.MiddleLeft;
+        _menuHeader.BackColor = _skin.Sidebar;
+        _menuHeader.ForeColor = _skin.Muted;
+        _menuHeader.Font = new Font("Segoe UI", 9, FontStyle.Regular);
+        _sidebar.Controls.Add(_menuHeader);
+
         foreach (var (key, label, y) in SkinArt.MenuIcons)
         {
-            var nav = new Label
+            var text = key switch
             {
-                Name = "Nav_" + key,
-                Text = label.ToUpperInvariant(),
-                Location = new Point(62, y - 23),
-                Size = new Size(149, 46),
-                TextAlign = ContentAlignment.MiddleLeft,
-                BackColor = _skin.Sidebar,
-                ForeColor = _skin.Foreground,
-                Font = _navFont,
-                Cursor = Cursors.Hand
+                "back" => "Home",
+                "database" => "Database Selector",
+                "editor" => "Database Editor",
+                _ => label
             };
-            nav.MouseEnter += (_, _) => SetHoverIcon(key);
-            nav.MouseLeave += (_, _) => SetHoverIcon(null);
-            nav.Click += (_, _) => RunSafe(() => Navigate(key));
-            _menuLabels[key] = nav;
-            _sidebar.Controls.Add(nav);
+            var item = new SidebarMenuRow(key, text, _skin, _navFont, _navFontActive)
+            {
+                Name = "Menu_" + key,
+                Location = new Point(6, y - 27),
+                Width = _sidebar.Width - 12
+            };
+            item.MouseEnter += (_, _) => SetHoverIcon(key);
+            item.MouseLeave += (_, _) => SetHoverIcon(null);
+            item.Click += (_, _) => RunSafe(() => Navigate(key));
+            _menuRows.Add(key, item);
+            _sidebar.Controls.Add(item);
         }
-        _sidebarImage.MouseMove += (_, e) =>
-        {
-            SetHoverIcon(IconAt(e.Y));
-            _sidebarImage.Cursor = IconAt(e.Y) is null ? Cursors.Default : Cursors.Hand;
-        };
-        _sidebarImage.MouseLeave += (_, _) => SetHoverIcon(null);
-        _sidebarImage.MouseClick += (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left && IconAt(e.Y) is string key)
-                RunSafe(() => Navigate(key));
-        };
 
         _titleText.Text = "PRO WRESTLING REVOLUTION";
         _titleText.Location = new Point(20, 0);
@@ -133,27 +132,29 @@ public sealed partial class LauncherForm
 
     private void UpdateNavigation()
     {
-        foreach (var (key, nav) in _menuLabels)
+        bool isHome = _currentPage == "HOME";
+        _menuHeader.Visible = isHome;
+        _menuHeader.BackColor = _skin.Sidebar;
+        _menuHeader.ForeColor = _skin.Muted;
+
+        string? active = _currentPage switch
         {
-            bool home = _currentPage == "HOME";
-            if (key == "back")
-            {
-                nav.Text = home ? "MAIN MENU" : "HOME";
-                nav.Enabled = !home;
-                nav.Cursor = home ? Cursors.Default : Cursors.Hand;
-            }
-            else
-                nav.Text = key switch
-                {
-                    "database" => "DATABASE SELECTOR",
-                    "editor" => "DATABASE EDITOR",
-                    _ => SkinArt.MenuIcons.First(x => x.Key == key).Label.ToUpperInvariant()
-                };
-            bool hover = _hoverIcon == key && !(key == "back" && home);
-            nav.ForeColor = hover ? _skin.AccentSecondary : key == "back" && home
-                ? _skin.Muted : _skin.Foreground;
-            nav.BackColor = hover ? _skin.Button : _skin.Sidebar;
-            nav.Font = hover ? _navFontActive : _navFont;
+            "NEW GAME" => "new",
+            "LOAD GAME" => "load",
+            "DATABASE SELECTOR" => "database",
+            "DATABASE EDITOR" => "editor",
+            "SKINS" => "skins",
+            "ACHIEVEMENTS" => "achievements",
+            "CREDITS" => "credits",
+            _ => null
+        };
+
+        foreach (var (key, item) in _menuRows)
+        {
+            item.Visible = key != "back" || !isHome;
+            item.UpdateAppearance(_skin,
+                _hoverIcon == key && item.Visible,
+                active == key);
         }
     }
 
@@ -181,12 +182,6 @@ public sealed partial class LauncherForm
 
     private void RenderSidebar()
     {
-        bool home = _currentPage == "HOME";
-        string baseFile = home ? "Title_Screen_Alt.jpg" : "Title_Screen.jpg";
-        string hover = _hoverIcon is null ? baseFile
-            : (home ? "Title_Screen_Alt_Hover_" : "Title_Screen_Hover_") + _hoverIcon + ".jpg";
-        _sidebarImage.Image = LoadArt(Path.Combine("SideBars", hover),
-            Path.Combine("SideBars", baseFile));
         UpdateNavigation();
     }
 
@@ -200,7 +195,6 @@ public sealed partial class LauncherForm
 
     private void ClearAssetCache()
     {
-        _sidebarImage.Image = null;
         _topImage.Image = null;
         _topArt = null;
         foreach (var item in _assetCache.Values) item.Dispose();
@@ -227,6 +221,7 @@ public sealed partial class LauncherForm
     {
         ClearAssetCache();
         _sidebar.BackColor = _skin.Sidebar;
+        _menuHeader.BackColor = _skin.Sidebar;
         _topbar.BackColor = _skin.Surface;
         _page.BackColor = _skin.Background;
         _titleText.BackColor = _skin.Surface;
