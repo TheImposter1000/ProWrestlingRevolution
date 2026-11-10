@@ -92,7 +92,7 @@ public static class PrwWorkerRepository
 
     private static void EnsureSchema(OleDbConnection connection)
     {
-        var inspection = PrwSchema.Inspect(connection);
+        var inspection = PrwSchema.Inspect(connection, requireExpandedTables: false);
         if (!inspection.IsValid)
             throw new InvalidDataException(
                 "This database is not compatible with the native PRW worker reader.\n" +
