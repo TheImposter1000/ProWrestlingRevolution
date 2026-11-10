@@ -103,18 +103,19 @@ public final class PrwDatabaseBuilder {
 
         try (Database reopened = DatabaseBuilder.open(out)) {
             String[] requiredTables = {
-                "tblWorker","tblWorkerBio","tblWorkerBusiness","tblWorkerOver",
+                "tblFed","tblWorker","tblWorkerBio","tblWorkerBusiness","tblWorkerOver",
                 "tblWorkerPhysical","tblWorkerSkills","tblContract","tblContractBio",
                 "tblWorkerAttributes","tblAlternative"
             };
-            if (reopened.getTableNames().size() != 10) {
-                throw new IOException("Expected exactly 10 user tables, found " + reopened.getTableNames());
+            if (reopened.getTableNames().size() != 11) {
+                throw new IOException( "Expected exactly 11 user tables, found " + reopened.getTableNames());
             }
             for (String name : requiredTables) {
                 if (reopened.getTable(name) == null)
                     throw new IOException("Missing required table: " + name);
             }
-            if (reopened.getTable("tblWorker").getRowCount() != 1 ||
+            if (reopened.getTable("tblFed").getRowCount() != 1 ||
+                reopened.getTable("tblWorker").getRowCount() != 1 ||
                 reopened.getTable("tblContract").getRowCount() != 1 ||
                 reopened.getTable("tblWorkerAttributes").getRowCount() != 1 ||
                 reopened.getTable("tblAlternative").getRowCount() != 1) {
@@ -156,6 +157,12 @@ public final class PrwDatabaseBuilder {
     }
 
     private static void seed(Database db) throws IOException {
+        int dna = put(db, "tblFed", "UID",
+            "Name","Dynamic National Alliance","Initials","DNA",
+            "Profile","Fictional PRW company record for development testing.",
+            "HomeRegion","Ontario","Prestige",50,"Momentum",60,
+            "FanLoyalty",50,"EmployerReputation",50,
+            "MaxSize","No Limit","ScheduleStrategy","Fixed");
         int jayden = put(db, "tblWorker", "UID",
             "Name","Jayden Cole","ShortName","Cole",
             "BiographyType","Organic",
@@ -194,7 +201,7 @@ public final class PrwDatabaseBuilder {
             "PotentialPerformance",80,"PotentialFundamentals",76,
             "PotentialPhysical",75);
         int contract = put(db,"tblContract","UID",
-            "WorkerUID",jayden,"EmployerInitials","DNA",
+            "WorkerUID",jayden,"FedUID",dna,"EmployerInitials","DNA",
             "Name","Jayden Cole","ShortName","Cole",
             "ContractType","Handshake","Exclusive",false,"Touring",false,
             "PayBasis","Per Show","StartDate",day(2026,1,1),
