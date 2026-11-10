@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.14 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.15 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -55,7 +55,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.14 portable game ZIP
+      - name: Assemble the Version 0.5.15 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -72,7 +72,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.14 game ZIP
+      - name: Upload complete Version 0.5.15 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -82,30 +82,15 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.14
-          name: Pro Wrestling Revolution 0.5.14 - MDB Settings Migration
+          tag_name: v0.5.15
+          name: Pro Wrestling Revolution 0.5.15 - Quality of Life
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Automatic in-app Windows updater. Use Check for Updates at the bottom of
-            the sidebar to find future stable releases, verify their SHA-256 digest,
-            download the portable ZIP, install the new executable and restart.
-            The temporary updater waits for the current game to close and saves
-            an executable backup in .pwr-updates before replacing anything.
-            Database universes, saved careers, skins, pictures, settings and
-            custom title art are not touched.
-            Version 0.5.14 adds Create Database using the built-in PRWDefault.mdb
-            template. The game installs the base MDB in its own System folder,
-            creates independent universe copies in Databases, and reads database
-            files, saves, skins, pictures, and settings relative to the installed
-            executable rather than a repository folder. Worker records can be
-            browsed with linked skills, biographies, contracts, and popularity.
-            Existing database universes, saves, skins, and settings are preserved.
-            Gameplay simulation and full category editing are still in development.
-            IMPORTANT: For existing v0.5.3 installs, extract this release once
-            to add the in-app updater. Future stable releases update in place.
-            The updater replaces only the executable, not assets or data folders.
+           made a quality of life update, readding the icon
+           updated the sidebars so that the loading and database
+           editors can work properly
           files: ProWrestlingRevolution-Windows-x64.zip
