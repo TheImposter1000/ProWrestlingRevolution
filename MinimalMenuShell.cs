@@ -245,6 +245,18 @@ public sealed partial class LauncherForm
             SoundEnabled = _soundEnabled
         };
 
+        // An exact 1672x941 approved composite takes precedence over procedural
+        // chrome if present. This keeps every pixel of the user's chosen design.
+        // The custom skin's original Backgrounds/Title_Screen.jpg is not modified.
+        string exactImagePath = _skin.Asset(Path.Combine("Graphics", "Title_Menu_Exact.png"));
+        if (File.Exists(exactImagePath))
+        {
+            using var stream = File.OpenRead(exactImagePath);
+            using var image = Image.FromStream(stream);
+            title.ExactLayout = new Bitmap(image);
+            title.Disposed += (_, _) => title.ExactLayout?.Dispose();
+        }
+
         title.CommandInvoked += command =>
         {
             switch (command)
