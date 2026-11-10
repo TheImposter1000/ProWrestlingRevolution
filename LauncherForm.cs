@@ -164,6 +164,9 @@ public sealed partial class LauncherForm : Form
     {
         _currentPage = pageName;
         _hoverIcon = null;
+        // Interior pages need the regular navigation; the title hides it.
+        _sidebar.Visible = true;
+        _topbar.Visible = true;
         RenderSidebar();
         _page.Controls.Clear();
         _page.BackColor = _skin.Background;
