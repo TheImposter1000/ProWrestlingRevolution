@@ -22,6 +22,7 @@ public sealed partial class LauncherForm
     {
         _page.BackColor = _skin.Background;
         _sidebar.BackColor = _skin.Sidebar;
+        _sidebar.Width = SkinArt.SidebarWidth;
         _topbar.BackColor = _skin.Surface;
         Controls.Add(_page);
         Controls.Add(_sidebar);
@@ -43,39 +44,27 @@ public sealed partial class LauncherForm
             await GameUpdate.CheckAndInstallAsync(this, _updateButton);
         _sidebar.Controls.Add(_updateButton);
 
-        // One unified row per menu option: vector icon, text and click target.
-        // The previous 57px TEW-style image strip is deliberately not added.
-        _menuHeader.Text = "M A I N   M E N U";
-        _menuHeader.Location = new Point(28, 51);
-        _menuHeader.Size = new Size(_sidebar.Width - 36, 28);
-        _menuHeader.TextAlign = ContentAlignment.MiddleLeft;
-        _menuHeader.BackColor = Color.Transparent;
-        _menuHeader.ForeColor = _skin.Muted;
-        _menuHeader.Font = new Font("Segoe UI", 9, FontStyle.Regular);
-        _menuHeader.Paint += (_, e) =>
+        // Consistent slim icon rail on every interior page. The same keys
+        // and icon art are used on full-window utility screens.
+        var navTooltips = new ToolTip { InitialDelay = 350, ReshowDelay = 80 };
+        _sidebar.Disposed += (_, _) => navTooltips.Dispose();
+        foreach (var (key, label, y) in SkinArt.MenuIcons)
         {
-            using var rule = new Pen(Color.FromArgb(100, _skin.AccentSecondary), 1);
-            e.Graphics.DrawLine(rule, 111, 14, _menuHeader.Width - 4, 14);
-        };
-        _sidebar.Controls.Add(_menuHeader);
-
-        int menuIndex = 0;
-        foreach (var (key, label, _) in SkinArt.MenuIcons)
-        {
-            var text = key switch
+            var caption = key switch
             {
                 "back" => "Home",
                 "database" => "Database",
                 "editor" => "Editor",
                 _ => label
             };
-            int center = key == "back" ? 63 : 124 + (menuIndex++ * 56);
-            var item = new SidebarMenuRow(key, text, _skin, _navFont, _navFontActive)
+            var item = new SidebarMenuRow(key, caption, _skin, _navFont, _navFontActive)
             {
                 Name = "Menu_" + key,
-                Location = new Point(0, center - 27),
+                IconOnly = true,
+                Location = new Point(0, y - 27),
                 Width = _sidebar.Width
             };
+            navTooltips.SetToolTip(item, label);
             item.MouseEnter += (_, _) => SetHoverIcon(key);
             item.MouseLeave += (_, _) => SetHoverIcon(null);
             item.Click += (_, _) => RunSafe(() => Navigate(key));
@@ -86,9 +75,10 @@ public sealed partial class LauncherForm
         // The shared update button is also used by the title screen updater.
         // Do not add a second button with the same Name: the smoke test and
         // accessibility tree require exactly one update action in the sidebar.
-        _updateButton.Text = "↻  Check for Updates";
-        _updateButton.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        _updateButton.Text = "↻";
+        _updateButton.Font = new Font("Segoe UI", 18, FontStyle.Bold);
         _updateButton.AccessibleName = "Check for Updates";
+        navTooltips.SetToolTip(_updateButton, "Check for Updates");
         _updateButton.BringToFront();
 
         // Brushed-metal chrome replaces the separate raster button strip.
@@ -171,9 +161,7 @@ public sealed partial class LauncherForm
     private void UpdateNavigation()
     {
         bool isHome = _currentPage == "HOME";
-        _menuHeader.Visible = isHome;
-        _menuHeader.BackColor = Color.Transparent;
-        _menuHeader.ForeColor = _skin.Muted;
+        _menuHeader.Visible = false; // No label header in the compact rail.
 
         string? active = _currentPage switch
         {

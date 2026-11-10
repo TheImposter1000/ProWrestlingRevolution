@@ -68,29 +68,27 @@ internal abstract class UtilityPopupForm : Form
         BuildChrome();
     }
 
-    // Main-menu navigation is a permanent part of the utility screen chrome.
-    // Reuse the exact icon-and-text buttons from the launcher.
+    // A compact, permanent rail of main-menu ICON buttons, not a second
+    // full-width sidebar. Save-specific actions remain inside their screens.
     internal void AttachMainNavigation(string activeSection)
     {
-        if (Controls.Find("PopupMainNavigation", false).Length > 0) return;
+        if (Controls.Find("PopupMainNavigation", false).Length != 0) return;
         var sidebar = new MetalSidebar(Palette)
         {
             Name = "PopupMainNavigation",
             Dock = DockStyle.Left,
-            Width = 200
+            Width = SkinArt.SidebarWidth
         };
         var normal = new Font("Segoe UI", 10.5f);
         var selectedFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
-        Disposed += (_, _) => { normal.Dispose(); selectedFont.Dispose(); };
-        sidebar.Controls.Add(new Label
+        var navTooltips = new ToolTip { InitialDelay = 350, ReshowDelay = 80 };
+        Disposed += (_, _) =>
         {
-            Text = "M A I N   M E N U", Location = new Point(28, 8),
-            Size = new Size(168, 24), ForeColor = Palette.Muted,
-            BackColor = Color.Transparent,
-            Font = new Font("Segoe UI", 9f)
-        });
-        int index = 0;
-        foreach (var (key, label, _) in SkinArt.MenuIcons)
+            normal.Dispose();
+            selectedFont.Dispose();
+            navTooltips.Dispose();
+        };
+        foreach (var (key, label, y) in SkinArt.MenuIcons)
         {
             string caption = key switch
             {
@@ -99,30 +97,34 @@ internal abstract class UtilityPopupForm : Form
                 "editor" => "Editor",
                 _ => label
             };
-            int center = key == "back" ? 63 : 124 + index++ * 56;
-            var row = new SidebarMenuRow(key, caption, Palette, normal, selectedFont)
+            var item = new SidebarMenuRow(key, caption, Palette, normal, selectedFont)
             {
                 Name = "Menu_" + key,
-                Location = new Point(0, center - 27),
+                IconOnly = true,
+                Location = new Point(0, y - 27),
                 Width = sidebar.Width
             };
-            row.UpdateAppearance(Palette, false, activeSection == key);
-            row.Click += (_, _) => RequestMainNavigation(key);
-            sidebar.Controls.Add(row);
+            item.UpdateAppearance(Palette, false, key == activeSection);
+            item.MouseEnter += (_, _) => item.UpdateAppearance(Palette, true, key == activeSection);
+            item.MouseLeave += (_, _) => item.UpdateAppearance(Palette, false, key == activeSection);
+            item.Click += (_, _) => RequestMainNavigation(key);
+            navTooltips.SetToolTip(item, label);
+            sidebar.Controls.Add(item);
         }
-        var updates = new Button
+        var updater = new Button
         {
-            Name = "CheckUpdatesButton", Text = "↻  Check for Updates",
+            Name = "CheckUpdatesButton", Text = "↻",
             Dock = DockStyle.Bottom, Height = 46,
             FlatStyle = FlatStyle.Flat, BackColor = Palette.Button,
             ForeColor = Palette.Foreground,
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Font = new Font("Segoe UI", 18, FontStyle.Bold),
+            AccessibleName = "Check for Updates", Cursor = Cursors.Hand
         };
-        updates.FlatAppearance.BorderColor = Palette.Border;
-        updates.Click += (_, _) => RequestMainNavigation("updates");
-        sidebar.Controls.Add(updates);
-        updates.BringToFront();
+        updater.FlatAppearance.BorderColor = Palette.Border;
+        updater.Click += (_, _) => RequestMainNavigation("updates");
+        navTooltips.SetToolTip(updater, "Check for Updates");
+        sidebar.Controls.Add(updater);
+        updater.BringToFront();
         Controls.Add(sidebar);
         sidebar.BringToFront();
     }

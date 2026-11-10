@@ -19,6 +19,10 @@ internal sealed class SidebarMenuRow : Control
     private bool _hovered;
     private bool _selected;
 
+    [System.ComponentModel.DesignerSerializationVisibility(
+        System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal bool IconOnly { get; set; }
+
     internal SidebarMenuRow(string key, string caption, SkinPalette palette,
         Font normalFont, Font activeFont)
     {
@@ -114,18 +118,23 @@ internal sealed class SidebarMenuRow : Control
             g.DrawLine(innerSheen, Width - 6, 3, Width - 23, Height - 4);
         }
 
-        // Reflected silver remains readable above the bright blue blade.
+        // Center the original vector icons in the 57px rail; titles remain
+        // accessible through tooltips and AccessibilityName.
         var foreground = _palette.Foreground;
-        g.TranslateTransform(27, (Height - 26) / 2f);
+        g.TranslateTransform(IconOnly ? (Width - 26) / 2f : 27f,
+            (Height - 26) / 2f);
         DrawIcon(g, _key, foreground);
         g.ResetTransform();
 
-        var textRect = new Rectangle(75, 0, Width - 80, Height);
-        TextRenderer.DrawText(g, _caption,
-            highlighted ? _activeFont : _normalFont,
-            textRect, foreground,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
-            TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        if (!IconOnly)
+        {
+            var textRect = new Rectangle(75, 0, Width - 80, Height);
+            TextRenderer.DrawText(g, _caption,
+                highlighted ? _activeFont : _normalFont,
+                textRect, foreground,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        }
 
         if (Focused)
         {
@@ -133,7 +142,9 @@ internal sealed class SidebarMenuRow : Control
             {
                 DashStyle = DashStyle.Dot
             };
-            g.DrawRectangle(focus, 4, 4, Width - 26, Height - 9);
+            g.DrawRectangle(focus, IconOnly
+                ? new Rectangle(4, 4, Width - 8, Height - 9)
+                : new Rectangle(4, 4, Width - 26, Height - 9));
         }
     }
 

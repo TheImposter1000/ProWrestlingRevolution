@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.11 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.12 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Version 0.5.11 portable game ZIP
+      - name: Assemble the Version 0.5.12 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.11 game ZIP
+      - name: Upload complete Version 0.5.12 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,8 +76,8 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.11
-          name: Pro Wrestling Revolution 0.5.11 - Persistent Main Menu Navigation
+          tag_name: v0.5.12
+          name: Pro Wrestling Revolution 0.5.12 - Compact Main Menu Icon Rail
           target_commitish: main
           prerelease: false
           make_latest: true
@@ -91,7 +91,7 @@ jobs:
             an executable backup in .pwr-updates before replacing anything.
             Database universes, saved careers, skins, pictures, settings and
             custom title art are not touched.
-            Version 0.5.11 retains the main menu sidebar on Load Game, Database Selector and the Database Editor while preserving each screen's existing action buttons and data. The full-window Load Game design remains Option A. Gameplay simulation remains under development.
+            Version 0.5.12 replaces the duplicated full-width sidebar with a compact icon-only main-menu rail on the left of the editor and utility screens. It keeps the approved Option A Load Game interface, all save management functions, and the existing application navigation. The executable's version has also been corrected so automatic updates can detect this release.
             IMPORTANT: For existing v0.5.3 installs, extract this release once
             to add the in-app updater. Future stable releases update in place.
             The updater replaces only the executable, not assets or data folders.

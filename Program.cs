@@ -101,8 +101,8 @@ internal static class Program
                     throw new Exception("Full-bleed, functional bottom-menu title screen is missing.");
                 var sidebar = launcher.Controls.OfType<Panel>()
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
-                if (sidebar is null || sidebar.Width != 200)
-                    throw new Exception("Interior navigation width must be 200.");
+                if (sidebar is null || sidebar.Width != SkinArt.SidebarWidth)
+                    throw new Exception("Interior navigation must use the slim icon rail.");
                 var updateButton = sidebar.Controls.OfType<Button>()
                     .SingleOrDefault(button => button.Name == "CheckUpdatesButton");
                 if (updateButton is null || updateButton.Dock != DockStyle.Bottom ||
@@ -113,8 +113,9 @@ internal static class Program
                 var rows = sidebar.Controls.OfType<SidebarMenuRow>().ToList();
                 if (rows.Count != SkinArt.MenuIcons.Length)
                     throw new Exception("Sidebar must contain eight unified navigation rows.");
-                if (rows.Any(row => row.AccessibleRole != AccessibleRole.PushButton))
-                    throw new Exception("Navigation row is not accessible as a button.");
+                if (rows.Any(row => row.AccessibleRole != AccessibleRole.PushButton ||
+                    !row.IconOnly || row.Width != SkinArt.SidebarWidth))
+                    throw new Exception("Navigation buttons must be accessible, compact and icon-only.");
                 var topbar = launcher.Controls.OfType<MetalTopBar>().SingleOrDefault();
                 if (topbar is null || topbar.Height != 40)
                     throw new Exception("The metallic utility bar must be 36 pixels high.");
@@ -125,21 +126,12 @@ internal static class Program
                 if (topbar.Controls.OfType<PictureBox>().Any())
                     throw new Exception("The old raster top utility strip must not be displayed.");
 
-                var newRow = rows.Single(row => row.Name == "Menu_new");
-                var creditsRow = rows.Single(row => row.Name == "Menu_credits");
-                if (newRow.Left != 0 || newRow.Top != 97 ||
-                    newRow.Width != sidebar.Width ||
-                    creditsRow.Top != 433 || creditsRow.Left != 0)
-                    throw new Exception("Menu rows must be flush and evenly spaced.");
-                foreach (var key in new[]
+                foreach (var (key, _, y) in SkinArt.MenuIcons)
                 {
-                    "new", "load", "database", "editor", "skins",
-                    "achievements", "credits"
-                }.Select((key, i) => (key, i)))
-                {
-                    var row = rows.Single(r => r.Name == "Menu_" + key.key);
-                    if (row.Top != 97 + key.i * 56 || row.Height != 54)
-                        throw new Exception("Incorrect spacing for " + key.key);
+                    var icon = rows.Single(row => row.Name == "Menu_" + key);
+                    if (icon.Left != 0 || icon.Top != y - 27 ||
+                        icon.Width != SkinArt.SidebarWidth || icon.Height != 54)
+                        throw new Exception("Incorrect compact icon position for " + key);
                 }
                 if (controls.Any(button => button.Width != 50 || button.Height != 40))
                     throw new Exception("Top utility controls must match the 50 x 40 reference.");
@@ -222,8 +214,9 @@ internal static class Program
                     popup.AttachMainNavigation(popup == saves ? "load" : "database");
                     var nav = popup.Controls.Find("PopupMainNavigation", false)
                         .SingleOrDefault() as MetalSidebar;
-                    if (nav is null || nav.Width != 200 ||
+                    if (nav is null || nav.Width != SkinArt.SidebarWidth ||
                         nav.Controls.OfType<SidebarMenuRow>().Count() != SkinArt.MenuIcons.Length ||
+                        nav.Controls.OfType<SidebarMenuRow>().Any(x => !x.IconOnly) ||
                         nav.Controls.Find("Menu_back", false).Length != 1 ||
                         nav.Controls.Find("Menu_load", false).Length != 1 ||
                         nav.Controls.Find("Menu_database", false).Length != 1)
