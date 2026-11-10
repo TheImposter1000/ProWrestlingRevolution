@@ -230,6 +230,8 @@ internal static class Program
                     throw new Exception("Unimplemented gameplay loading must stay disabled.");
                 using var launcherBounds = new Form
                 {
+                    FormBorderStyle = FormBorderStyle.None,
+                    AutoScaleMode = AutoScaleMode.None,
                     ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight)
                 };
                 saves.FillLauncherWindow(launcherBounds);
@@ -238,7 +240,10 @@ internal static class Program
                     saves.MinimumSize != saves.Size ||
                     saves.MaximumSize != saves.Size)
                     throw new Exception(
-                        "Load Game must occupy the whole launcher, not a floating popup.");
+                        "Load Game must occupy the whole launcher, not a floating popup. " +
+                        $"Load client={saves.ClientSize}; Launcher client={launcherBounds.ClientSize}; " +
+                        $"Load window={saves.Size}; Min={saves.MinimumSize}; Max={saves.MaximumSize}; " +
+                        $"Start={saves.StartPosition}.");
             }
 
             // Exercise safe save operations using a file-management fixture.
