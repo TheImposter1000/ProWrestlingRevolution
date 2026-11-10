@@ -36,8 +36,9 @@ jobs:
       - name: Generate assets in the published application directory
         shell: pwsh
         run: |
-          & "./publish/ProWrestlingRevolution.exe" --generate-assets
-          if ($LASTEXITCODE -ne 0) { throw "Runtime asset generation failed: $LASTEXITCODE" }
+          # WinExe launches asynchronously under PowerShell; explicitly wait.
+          $initialized = Start-Process -FilePath (Resolve-Path "publish/ProWrestlingRevolution.exe") -ArgumentList "--generate-assets" -Wait -PassThru
+          if ($initialized.ExitCode -ne 0) { throw "Runtime asset generation failed: $($initialized.ExitCode)" }
           foreach ($skin in @("Obsidian", "Steel")) {
             foreach ($category in @("Backgrounds","Buttons","Graphics","Loading_NoProfile","Loading_Profile","LowerBars","SideBars","TopBars")) {
               if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $category))) { throw "Missing published skin category: $skin/$category" }
