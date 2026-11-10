@@ -54,6 +54,15 @@ internal abstract class UtilityPopupForm : Form
         Font = new Font("Segoe UI", 10);
         DoubleBuffered = true;
         KeyPreview = true;
+        KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                DialogResult = DialogResult.Cancel;
+                Close();
+                e.Handled = true;
+            }
+        };
         BuildChrome();
     }
 
@@ -370,6 +379,7 @@ internal sealed class DatabaseSelectorDialog : UtilityPopupForm
     {
         Name = "DatabaseSelectorDialog";
         _use = AddAction("Use This Database", SelectDatabase, true, width: 191);
+        AcceptButton = _use;
         AddAction("Import MDB", ImportDatabase, width: 125);
         AddAction("Open Folder", () => OpenFolder(Paths.Databases), width: 133);
         AddAction("Cancel", () => { DialogResult = DialogResult.Cancel; Close(); }, width: 110);
