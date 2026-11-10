@@ -306,12 +306,13 @@ internal static class GameUpdate
 
             try
             {
-                Process.Start(new ProcessStartInfo
+                if (Process.Start(new ProcessStartInfo
                 {
                     FileName = target,
                     WorkingDirectory = directory,
                     UseShellExecute = true
-                }) ?? throw new IOException("The new game could not be launched.");
+                }) is null)
+                    throw new IOException("The new game could not be launched.");
                 return 0;
             }
             catch
