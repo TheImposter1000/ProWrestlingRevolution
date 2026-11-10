@@ -15,7 +15,6 @@ public sealed partial class LauncherForm
     private readonly Label _versionText = new();
     private readonly Font _navFont = new("Segoe UI", 9.5f, FontStyle.Regular);
     private readonly Font _navFontActive = new("Segoe UI", 9.5f, FontStyle.Bold);
-    private Image? _topArt;
 
     private void BuildChrome()
     {
@@ -30,9 +29,9 @@ public sealed partial class LauncherForm
         // The previous 57px TEW-style image strip is deliberately not added.
         _menuHeader.Text = "M A I N   M E N U";
         _menuHeader.Location = new Point(24, 75);
-        _menuHeader.Size = new Size(198, 28);
+        _menuHeader.Size = new Size(_sidebar.Width - 38, 28);
         _menuHeader.TextAlign = ContentAlignment.MiddleLeft;
-        _menuHeader.BackColor = _skin.Sidebar;
+        _menuHeader.BackColor = Color.Transparent;
         _menuHeader.ForeColor = _skin.Muted;
         _menuHeader.Font = new Font("Segoe UI", 9, FontStyle.Regular);
         _sidebar.Controls.Add(_menuHeader);
@@ -59,104 +58,64 @@ public sealed partial class LauncherForm
             _sidebar.Controls.Add(item);
         }
 
+        // Brushed-metal chrome replaces the separate raster button strip.
+        // Every utility button is clickable, keyboard-accessible and has a tooltip name.
         _titleText.Text = "PRO WRESTLING REVOLUTION";
-        _titleText.Location = new Point(20, 0);
-        _titleText.Size = new Size(291, 38);
+        _titleText.Location = new Point(30, 0);
+        _titleText.Size = new Size(301, _topbar.Height - 1);
         _titleText.TextAlign = ContentAlignment.MiddleLeft;
-        _titleText.BackColor = _skin.Surface;
+        _titleText.BackColor = Color.Transparent;
         _titleText.ForeColor = _skin.Foreground;
         _titleText.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
 
-        _versionText.Text = "v0.5.0";
-        _versionText.Location = new Point(313, 0);
-        _versionText.Size = new Size(74, 38);
+        _versionText.Text = "v0.5.2";
+        _versionText.Location = new Point(357, 0);
+        _versionText.Size = new Size(75, _topbar.Height - 1);
         _versionText.TextAlign = ContentAlignment.MiddleLeft;
-        _versionText.BackColor = _skin.Surface;
+        _versionText.BackColor = Color.Transparent;
         _versionText.ForeColor = _skin.Muted;
         _versionText.Font = new Font("Segoe UI", 9.5f);
 
-
-        var brandAccent = new Panel
-        {
-            Location = new Point(10, 12),
-            Size = new Size(9, 15),
-            BackColor = _skin.Surface
-        };
-
-        brandAccent.Paint += (_, e) =>
-        {
-            using var brush = new SolidBrush(
-                Color.FromArgb(239, 36, 65));
-
-            e.Graphics.FillPolygon(brush, new[]
-            {
-        new Point(5, 0),
-        new Point(9, 0),
-        new Point(4, 15),
-        new Point(0, 15)
-    });
-        };
-
-        _topbar.Controls.Add(brandAccent);
-        brandAccent.BringToFront();
-
         _topbar.Controls.Add(_titleText);
         _topbar.Controls.Add(_versionText);
-        _topbar.Controls.Add(_topImage);
-        _topImage.BringToFront();
-
-
-        var topAccent = new Panel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 1,
-            BackColor = _skin.AccentSecondary
-        };
-
-        _topbar.Controls.Add(topAccent);
-        topAccent.BringToFront();
-
-
-        _topImage.Paint += (_, e) =>
-        {
-            if (_topArt is null) return;
-            int sourceX = Math.Max(0, _topArt.Width - _topImage.Width);
-            e.Graphics.DrawImage(_topArt,
-                new Rectangle(0, 0, _topImage.Width, _topImage.Height),
-                new Rectangle(sourceX, 0, Math.Min(_topImage.Width, _topArt.Width),
-                    Math.Min(SkinArt.TopHeight, _topArt.Height)), GraphicsUnit.Pixel);
-        };
         _topbar.MouseDown += DragWindow;
         _titleText.MouseDown += DragWindow;
         _versionText.MouseDown += DragWindow;
-        _topImage.MouseClick += (_, e) =>
+
+        var sound = new TopUtilityButton("sound", _skin);
+        var help = new TopUtilityButton("help", _skin);
+        var minimize = new TopUtilityButton("minimize", _skin);
+        var close = new TopUtilityButton("close", _skin);
+        var utility = new[] { sound, help, minimize, close };
+
+        for (int i = 0; i < utility.Length; i++)
         {
-            if (e.Button != MouseButtons.Left) return;
-            int x = e.X + SkinArt.WindowWidth - _topImage.Width;
-            if (x is >= 1201 and < 1238)
-            {
-                _soundEnabled = !_soundEnabled;
-                RenderTop();
-            }
-            else if (x is >= 1238 and < 1278)
-                MessageBox.Show(this,
-                    "Use the navigation at left to choose an option.\n\n" +
-                    "New Game creates an independent MDB career.\n" +
-                    "Database Selector imports your Access MDB.\n" +
-                    "Skins lets you change the game's graphic assets.",
-                    "Main Menu Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            else if (x is >= 1278 and < 1318)
-                WindowState = FormWindowState.Minimized;
-            else if (x >= 1318)
-                Close();
+            utility[i].Location = new Point(
+                SkinArt.WindowWidth - (utility.Length - i) * 44, 0);
+            _topbar.Controls.Add(utility[i]);
+        }
+
+        sound.SetSoundEnabled(_soundEnabled);
+        sound.Click += (_, _) =>
+        {
+            _soundEnabled = !_soundEnabled;
+            sound.SetSoundEnabled(_soundEnabled);
         };
+        help.Click += (_, _) => MessageBox.Show(this,
+            "Use the navigation at left to choose an option.\n\n" +
+            "New Game creates an independent MDB career.\n" +
+            "Database Selector imports your Access MDB.\n" +
+            "Skins lets you change the game's graphic assets.",
+            "Main Menu Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        minimize.Click += (_, _) => WindowState = FormWindowState.Minimized;
+        close.Click += (_, _) => Close();
+
         FormClosed += (_, _) =>
         {
             _navFont.Dispose();
             _navFontActive.Dispose();
         };
         RenderSidebar();
-        RenderTop();
     }
 
     private void SetHoverIcon(string? key)
@@ -222,18 +181,8 @@ public sealed partial class LauncherForm
         UpdateNavigation();
     }
 
-    private void RenderTop()
-    {
-        _topArt = LoadArt(Path.Combine("TopBars",
-                _soundEnabled ? "Title_Screen_On.jpg" : "Title_Screen_Off.jpg"),
-            Path.Combine("TopBars", "Title_Screen_On.jpg"));
-        _topImage.Invalidate();
-    }
-
     private void ClearAssetCache()
     {
-        _topImage.Image = null;
-        _topArt = null;
         foreach (var item in _assetCache.Values) item.Dispose();
         _assetCache.Clear();
     }
@@ -258,14 +207,15 @@ public sealed partial class LauncherForm
     {
         ClearAssetCache();
         _sidebar.BackColor = _skin.Sidebar;
-        _menuHeader.BackColor = _skin.Sidebar;
+        _sidebar.UpdatePalette(_skin);
+        _menuHeader.ForeColor = _skin.Muted;
         _topbar.BackColor = _skin.Surface;
+        _topbar.UpdatePalette(_skin);
+        foreach (var button in _topbar.Controls.OfType<TopUtilityButton>())
+            button.UpdatePalette(_skin);
         _page.BackColor = _skin.Background;
-        _titleText.BackColor = _skin.Surface;
         _titleText.ForeColor = _skin.Foreground;
-        _versionText.BackColor = _skin.Surface;
         _versionText.ForeColor = _skin.Muted;
         RenderSidebar();
-        RenderTop();
     }
 }

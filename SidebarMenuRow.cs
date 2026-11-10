@@ -64,7 +64,12 @@ internal sealed class SidebarMenuRow : Control
         base.OnPaint(e);
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(_palette.Sidebar);
+        // Align the idle row with the sidebar's subtle metallic finish.
+        using (var baseMetal = new LinearGradientBrush(ClientRectangle,
+            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(39, 51, 70), 0.30),
+            MetalColors.Mix(_palette.Sidebar, Color.FromArgb(2, 7, 15), 0.26),
+            LinearGradientMode.Horizontal))
+            g.FillRectangle(baseMetal, ClientRectangle);
         bool highlighted = _hovered || _selected;
 
         if (highlighted)
@@ -98,13 +103,15 @@ internal sealed class SidebarMenuRow : Control
             );
 
             g.DrawLine(accent, 1, 4, 1, Height - 5);
+            using var reflectedEdge = new Pen(Color.FromArgb(100, _palette.AccentSecondary), 1);
+            g.DrawLine(reflectedEdge, Width - 2, 3, Width - 2, Height - 4);
         }
 
         var foreground = highlighted ? _palette.AccentSecondary : _palette.Foreground;
-        g.TranslateTransform(17, (Height - 26) / 2f);
+        g.TranslateTransform(12, (Height - 26) / 2f);
         DrawIcon(g, _key, foreground);
         g.ResetTransform();
-        var textRect = new Rectangle(61, 0, Width - 65, Height);
+        var textRect = new Rectangle(49, 0, Width - 53, Height);
         TextRenderer.DrawText(g, _caption, highlighted ? _activeFont : _normalFont,
             textRect, foreground,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter |

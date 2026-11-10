@@ -91,7 +91,7 @@ internal static class Program
                     throw new Exception("Launcher must not use a resizable standard border.");
                 var sidebar = launcher.Controls.OfType<Panel>()
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
-                if (sidebar is null || sidebar.Width != 240)
+                if (sidebar is null || sidebar.Width != 200)
                     throw new Exception("Unified navigation width must be 240.");
                 if (sidebar.Controls.OfType<PictureBox>().Any())
                     throw new Exception("Old graphical icon strip was still added to sidebar.");
@@ -100,6 +100,15 @@ internal static class Program
                     throw new Exception("Sidebar must contain eight unified navigation rows.");
                 if (rows.Any(row => row.AccessibleRole != AccessibleRole.PushButton))
                     throw new Exception("Navigation row is not accessible as a button.");
+                var topbar = launcher.Controls.OfType<MetalTopBar>().SingleOrDefault();
+                if (topbar is null || topbar.Height != 36)
+                    throw new Exception("The metallic utility bar must be 36 pixels high.");
+                var controls = topbar.Controls.OfType<TopUtilityButton>().ToList();
+                if (controls.Count != 4 ||
+                    controls.Any(button => button.AccessibleRole != AccessibleRole.PushButton))
+                    throw new Exception("Four accessible top utility buttons are required.");
+                if (topbar.Controls.OfType<PictureBox>().Any())
+                    throw new Exception("The old raster top utility strip must not be displayed.");
             }
 
             var fixture = Path.Combine(root, "sample.mdb");

@@ -13,9 +13,8 @@ public sealed partial class LauncherForm : Form
     private readonly AppPaths _paths;
     private SkinPalette _skin;
     private readonly Panel _page = new() { Dock = DockStyle.Fill };
-    private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 200 };
-    private readonly Panel _topbar = new() { Dock = DockStyle.Top, Height = 36 };
-    private readonly PictureBox _topImage = new() { Dock = DockStyle.Right, Width = 240, SizeMode = PictureBoxSizeMode.Normal };
+    private readonly MetalSidebar _sidebar;
+    private readonly MetalTopBar _topbar;
     private readonly Dictionary<string, Image> _assetCache = new(StringComparer.OrdinalIgnoreCase);
     private string? _hoverIcon;
     private bool _soundEnabled = true;
@@ -27,6 +26,8 @@ public sealed partial class LauncherForm : Form
     {
         _paths = paths;
         _skin = paths.LoadSkin(paths.ReadSetting("Skin", "Obsidian"));
+        _sidebar = new MetalSidebar(_skin);
+        _topbar = new MetalTopBar(_skin);
         Text = "Pro Wrestling Revolution";
         AutoScaleMode = AutoScaleMode.None;
         FormBorderStyle = FormBorderStyle.None;

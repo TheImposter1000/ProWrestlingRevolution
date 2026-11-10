@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.2 smoke test failed: $LASTEXITCODE" }
 
       - name: Generate original raster image packs at their exact reference sizes
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
           dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
           if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
-      - name: Assemble the Version 0.5 portable game ZIP
+      - name: Assemble the Version 0.5.2 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -66,7 +66,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5 game ZIP
+      - name: Upload complete Version 0.5.2 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -76,21 +76,21 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.1
-          name: Pro Wrestling Revolution 0.5.1 - Unified Sidebar
+          tag_name: v0.5.2
+          name: Pro Wrestling Revolution 0.5.2 - Metallic Chrome
           target_commitish: main
           prerelease: true
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            A single unified navigation row now contains both an original vector icon and label.
-            The old TEW-style left icon strip is removed entirely.
-            Full-row blue hover/selection styling, accessible click targets and keyboard navigation.
-            The custom Backgrounds/Title_Screen.jpg is still supported, with no secondary logo or footer.
-            The former stretched/repeated image bottom is replaced with a subtle theme-color fade.
-            Eight-folder custom skin support, incomplete-skin fallback, MDB import, editor,
-            career copies and backups remain in place.
+            Metallic gunmetal top bar and sidebar, with etched silver lines and cyan skin accents.
+            Original red brand slash, four accessible vector utility buttons, and 200px sidebar.
+            Brushed-metal selected menu row preserves the current New Game highlight.
+            The original custom Backgrounds/Title_Screen.jpg remains untouched.
+            No tagline, second logo, footer or additional art is imposed on custom skins.
+            Skin browsing, MDB import, database editor, career copies and backups are unchanged.
+            Updated Windows smoke checks cover the revised 200px sidebar and 36px top bar.
             Download the ZIP, extract into a writable folder and launch ProWrestlingRevolution.exe.
             Includes no third-party databases or images. Your own MDB is imported from Database Selector.
             Access table preview requires a matching Microsoft ACE OLE DB driver; direct file import/copy does not.
