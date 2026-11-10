@@ -154,7 +154,11 @@ internal static class Program
                     System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
                 var workspace = titleCanvas!.Controls
                     .OfType<DatabaseEditorWorkspace>().SingleOrDefault();
-                if (workspace is null || !sidebar.Visible)
+                // The smoke test intentionally never shows the launcher.
+                // Control.Visible is false while its parent Form is hidden,
+                // even if the sidebar is explicitly enabled on the editor.
+                if (workspace is null || sidebar.Dock != DockStyle.Left ||
+                    sidebar.Controls.OfType<SidebarMenuRow>().Count() != SkinArt.MenuIcons.Length)
                     throw new Exception("Database editor must retain the main menu sidebar.");
                 static IEnumerable<Control> Descendants(Control parent) =>
                     parent.Controls.Cast<Control>().SelectMany(child =>
