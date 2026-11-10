@@ -146,6 +146,124 @@ public sealed class AppPaths
         }
     }
 
+    /// <summary>
+    /// Save operations are restricted to careers currently discovered under
+    /// Databases/{Universe}/SaveGames. These routines never write to a universe MDB.
+    /// </summary>
+    private string LocateCareerDirectory(CareerEntry career)
+    {
+        var existing = Careers().FirstOrDefault(x =>
+            string.Equals(x.MdbPath, career.MdbPath, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(x.UniverseName, career.UniverseName, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+            throw new FileNotFoundException("This saved career is no longer available.");
+        var directory = Path.GetDirectoryName(existing.MdbPath)
+            ?? throw new InvalidDataException("The save's folder is missing.");
+        return directory;
+    }
+
+    public CareerEntry RenameCareer(CareerEntry career, string newName)
+    {
+        string name = SafeName(newName);
+        string source = LocateCareerDirectory(career);
+        if (name.Equals(career.Name, StringComparison.OrdinalIgnoreCase))
+            return career;
+        string destination = Path.Combine(Path.GetDirectoryName(source)!, name);
+        if (Directory.Exists(destination))
+            throw new IOException("A saved career with that name already exists.");
+        Directory.Move(source, destination);
+        return new CareerEntry(name, career.UniverseName,
+            Path.Combine(destination, "PWRSave.mdb"));
+    }
+
+    public CareerEntry CopyCareer(CareerEntry career, string copyName)
+    {
+        string name = SafeName(copyName);
+        string source = LocateCareerDirectory(career);
+        string destination = Path.Combine(Path.GetDirectoryName(source)!, name);
+        if (Directory.Exists(destination))
+            throw new IOException("A saved career with that name already exists.");
+        Directory.CreateDirectory(destination);
+        try
+        {
+            // Retain the entire save directory, including recovery data and any
+            // future career metadata, but reject filesystem links.
+            CopyCareerFiles(source, destination);
+            if (!File.Exists(Path.Combine(destination, "PWRSave.mdb")))
+                throw new IOException("The copied career has no PWRSave.mdb.");
+            return new CareerEntry(name, career.UniverseName,
+                Path.Combine(destination, "PWRSave.mdb"));
+        }
+        catch
+        {
+            Directory.Delete(destination, true);
+            throw;
+        }
+    }
+
+    private static void CopyCareerFiles(string source, string target)
+    {
+        foreach (string file in Directory.EnumerateFiles(source))
+        {
+            if (File.GetAttributes(file).HasFlag(FileAttributes.ReparsePoint))
+                throw new IOException("Linked files cannot be copied as career data.");
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        }
+        foreach (string folder in Directory.EnumerateDirectories(source))
+        {
+            if (File.GetAttributes(folder).HasFlag(FileAttributes.ReparsePoint))
+                throw new IOException("Linked folders cannot be copied as career data.");
+            string subfolder = Path.Combine(target, Path.GetFileName(folder));
+            Directory.CreateDirectory(subfolder);
+            CopyCareerFiles(folder, subfolder);
+        }
+    }
+
+    public string RestoreCareerInitialBackup(CareerEntry career)
+    {
+        string directory = LocateCareerDirectory(career);
+        string active = Path.Combine(directory, "PWRSave.mdb");
+        string backupFolder = Path.Combine(directory, "Backups");
+        string initial = Path.Combine(backupFolder, "initial.mdb");
+        if (!File.Exists(initial) || !AccessDatabase.LooksLikeMdb(initial))
+            throw new FileNotFoundException(
+                "The initial recovery MDB is missing or unrecognized.", initial);
+
+        Directory.CreateDirectory(backupFolder);
+        string oldCopy = Path.Combine(backupFolder,
+            "before-recovery-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") +
+            "-" + Guid.NewGuid().ToString("N")[..8] + ".mdb");
+        File.Copy(active, oldCopy);
+
+        // Prepare the new file alongside the original, then replace it only
+        // when the copy succeeds. Never change the parent universe MDB.
+        string temporary = Path.Combine(directory, ".restore-" +
+            Guid.NewGuid().ToString("N") + ".mdb");
+        try
+        {
+            File.Copy(initial, temporary);
+            File.Move(temporary, active, true);
+            return oldCopy;
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
+    }
+
+    public string ArchiveCareer(CareerEntry career)
+    {
+        string directory = LocateCareerDirectory(career);
+        string archiveRoot = Path.Combine(SystemRoot, "DeletedSaves");
+        Directory.CreateDirectory(archiveRoot);
+        string folder = Path.Combine(archiveRoot,
+            SafeName(career.UniverseName) + "_" + SafeName(career.Name) + "_" +
+            DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "_" +
+            Guid.NewGuid().ToString("N")[..8]);
+        Directory.Move(directory, folder);
+        return folder;
+    }
+
     public static string SafeName(string value)
     {
         var name = value.Trim();
