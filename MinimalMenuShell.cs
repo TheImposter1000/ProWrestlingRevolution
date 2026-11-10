@@ -14,8 +14,8 @@ public sealed partial class LauncherForm
     private readonly Label _titleText = new();
     private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
-    private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
-    private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
+    private readonly Font _navFont = new("Segoe UI", 11f, FontStyle.Regular);
+    private readonly Font _navFontActive = new("Segoe UI", 11f, FontStyle.Bold);
 
     private void BuildChrome()
     {
@@ -38,7 +38,7 @@ public sealed partial class LauncherForm
         _menuHeader.Paint += (_, e) =>
         {
             using var rule = new Pen(Color.FromArgb(100, _skin.AccentSecondary), 1);
-            e.Graphics.DrawLine(rule, 111, 14, _menuHeader.Width - 4, 14);
+            e.Graphics.DrawLine(rule, 92, 14, 144, 14);
         };
         _sidebar.Controls.Add(_menuHeader);
 
@@ -52,7 +52,7 @@ public sealed partial class LauncherForm
                 "editor" => "Editor",
                 _ => label
             };
-            int center = key == "back" ? 63 : 124 + (menuIndex++ * 56);
+            int center = key == "back" ? 63 : 122 + (menuIndex++ * 56);
             var item = new SidebarMenuRow(key, text, _skin, _navFont, _navFontActive)
             {
                 Name = "Menu_" + key,
@@ -98,7 +98,7 @@ public sealed partial class LauncherForm
         _titleText.Font = new Font("Segoe UI", 11.5f, FontStyle.Bold);
 
         _versionText.Text = "v" + GameUpdate.DisplayVersion;
-        _versionText.Location = new Point(326, 0);
+        _versionText.Location = new Point(323, 0);
         _versionText.Size = new Size(75, _topbar.Height - 1);
         _versionText.TextAlign = ContentAlignment.MiddleLeft;
         _versionText.BackColor = Color.Transparent;
@@ -157,6 +157,10 @@ public sealed partial class LauncherForm
     private void UpdateNavigation()
     {
         bool isHome = _currentPage == "HOME";
+        // The reference's home screen ends cleanly at the bottom of the sidebar.
+        // Keep updates available on every secondary page without adding a
+        // visually unrelated button to the title-screen composition.
+        _updateButton.Visible = !isHome;
         _menuHeader.Visible = isHome;
         _menuHeader.BackColor = Color.Transparent;
         _menuHeader.ForeColor = _skin.Muted;
