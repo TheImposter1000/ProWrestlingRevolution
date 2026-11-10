@@ -96,7 +96,7 @@ internal static class Program
                 var sidebar = launcher.Controls.OfType<Panel>()
                     .SingleOrDefault(control => control.Dock == DockStyle.Left);
                 if (sidebar is null || sidebar.Width != 200)
-                    throw new Exception("Unified navigation width must be 240.");
+                    throw new Exception("Unified navigation width must be 200.");
                 var updateButton = sidebar.Controls.OfType<Button>()
                     .SingleOrDefault(button => button.Name == "CheckUpdatesButton");
                 if (updateButton is null || updateButton.Dock != DockStyle.Bottom ||
@@ -111,7 +111,7 @@ internal static class Program
                     throw new Exception("Navigation row is not accessible as a button.");
                 var topbar = launcher.Controls.OfType<MetalTopBar>().SingleOrDefault();
                 if (topbar is null || topbar.Height != 40)
-                    throw new Exception("The metallic utility bar must be 36 pixels high.");
+                    throw new Exception("The metallic utility bar must be 40 pixels high.");
                 var controls = topbar.Controls.OfType<TopUtilityButton>().ToList();
                 if (controls.Count != 4 ||
                     controls.Any(button => button.AccessibleRole != AccessibleRole.PushButton))
@@ -121,9 +121,9 @@ internal static class Program
 
                 var newRow = rows.Single(row => row.Name == "Menu_new");
                 var creditsRow = rows.Single(row => row.Name == "Menu_credits");
-                if (newRow.Left != 0 || newRow.Top != 97 ||
+                if (newRow.Left != 0 || newRow.Top != 95 ||
                     newRow.Width != sidebar.Width ||
-                    creditsRow.Top != 433 || creditsRow.Left != 0)
+                    creditsRow.Top != 431 || creditsRow.Left != 0)
                     throw new Exception("Menu rows must be flush and evenly spaced.");
                 foreach (var key in new[]
                 {
@@ -132,7 +132,7 @@ internal static class Program
                 }.Select((key, i) => (key, i)))
                 {
                     var row = rows.Single(r => r.Name == "Menu_" + key.key);
-                    if (row.Top != 97 + key.i * 56 || row.Height != 54)
+                    if (row.Top != 95 + key.i * 56 || row.Height != 55)
                         throw new Exception("Incorrect spacing for " + key.key);
                 }
                 if (controls.Any(button => button.Width != 50 || button.Height != 40))
