@@ -1,6 +1,25 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.14 migrates skin and selected-database preferences into a genuine Access MDB, retaining the native universe database workflow.
+An original Windows desktop wrestling management project. Version 0.5.16 replaces the built-in base database with PRW_Default(2).mdb, expanding the universe schema while preserving the existing settings and interface.
+
+## Version 0.5.16: expanded PRW default database
+
+The uploaded `PRW_Default(2).mdb` replaces the built-in base for new
+universes. It has 14 tables and 12 declared relationships. The four added
+tables are `tblFed`, `tblMatch`, `tblMatchRingSetup`, and
+`tblMatchFinishes`, with their original fields preserved. The ten existing
+worker and contract tables remain supported.
+
+An existing `System/PRWDefault.mdb` is copied to
+`System/TemplateBackups` before the replacement is installed. A local
+version marker records the upgrade; later user edits to that current
+template are preserved. Existing universes, careers, settings, skins,
+pictures, and save files are not modified. New universes copy the
+replacement template into their own `Databases` folder.
+
+Worker record browsing remains compatible with older ten-table native
+universes. The full data check validates all 14 tables for new universes.
+Federation and match-specific gameplay and editing are not yet implemented.
 
 ## Version 0.5.14: native MDB settings
 
@@ -39,9 +58,9 @@ unless included in a local skin pack or a release containing that asset.
 
 The default database is the user's original PRWDefault.mdb, embedded losslessly
 in the executable. On first launch, the game extracts it into
-`System/PRWDefault.mdb` **beside the running executable**, verifies its SHA-256
-before installing it, and preserves any already-installed template instead of
-overwriting it. The installation remains portable and requires no repository
+`System/PRWDefault.mdb` **beside the running executable**, verifies its SHA-256 before installing it. When the bundled template version
+changes, the previous local template is backed up before being replaced.
+Later custom changes to the current template remain untouched. The installation remains portable and requires no repository
 checkout, network request, or current-working-directory dependency.
 
 Database Selector > **Create Database** asks for a name and copies the installed
@@ -56,7 +75,7 @@ a parent folder named `Repos` has been removed. Database files, careers, skins,
 pictures, settings and the installed template remain in the application folder;
 editing and reading a universe use the local `PWR.mdb` copy.
 
-`PrwSchema.cs` maps the ten original worker-related tables and their declared
+`PrwSchema.cs` maps all fourteen native tables and their declared
 relationships. `PrwWorkerRepository.cs` supports worker identity listings
 and full linked record reads, including skills, popularity, physical condition,
 biographies, attributes, alternative identities and contracts. The editor

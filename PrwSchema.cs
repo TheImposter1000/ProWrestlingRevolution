@@ -94,7 +94,34 @@ public static class PrwSchema
             "CompanyInitials", "RegionCode", "Usage", "Name", "ShortName",
             "Picture", "Biography", "MoveSet", "Gimmick", "GimmickBasis",
             "Mask", "MinAge", "MaxAge"
-        ])
+        ]),
+        new("tblFed", ["UID"],
+        [
+            "UID", "Name", "Initials", "Profile", "Logo", "Backdrop",
+            "Website", "HomeRegion", "SetToOpen", "ClosedOn", "Money",
+            "Prestige", "Momentum", "FanLoyalty", "EmployerReputation",
+            "MaxSize", "ScheduleStrategy"
+        ]),
+        new("tblMatch", ["UID"],
+        [
+            "UID", "RecordName", "Name", "Description", "MatchType",
+            "MatchContent_Risk", "MatchInjury_Risk", "MatchPrestige",
+            "MinFedSize", "Location", "Rules", "Entrance",
+            "NonWrestling_Time", "MinimumMatch_Time", "MaximumMatch_Time",
+            "Special", "Default", "Basic"
+        ]),
+        new("tblMatchRingSetup", ["MatchUID"],
+            ["MatchUID", "RingSetup1", "RingSetup2", "RingSetup3",
+             "RingSetup4", "RingSetup5", "RingSetup6", "RingSetup7",
+             "RingSetup8", "RingSetup9", "RingSetup10", "RingSetup11",
+             "RingSetup12", "RingSetup13", "RingSetup14", "RingSetup15",
+             "RingSetup16", "RingSetup17", "RingSetup18", "RingSetup19",
+             "RingSetup20"]),
+        new("tblMatchFinishes", ["MatchUID"],
+            ["MatchUID", "Finish1", "Finish2", "Finish3", "Finish4",
+             "Finish5", "Finish6", "Finish7", "Finish8", "Finish9",
+             "Finish10", "Finish11", "Finish12", "Finish13", "Finish14",
+             "Finish15", "Finish16", "Finish17", "Finish18", "Finish19"])
     ];
 
     // Relationships explicitly present in the uploaded MDB. Not every UID-like
@@ -109,7 +136,10 @@ public static class PrwSchema
         new("tblWorker", "UID", "tblWorkerAttributes", "WorkerUID"),
         new("tblWorker", "UID", "tblAlternative", "WorkerUID"),
         new("tblWorker", "UID", "tblContract", "WorkerUID"),
-        new("tblContract", "UID", "tblContractBio", "ContractUID")
+        new("tblContract", "UID", "tblContractBio", "ContractUID"),
+        new("tblFed", "UID", "tblContract", "FedUID"),
+        new("tblMatch", "UID", "tblMatchRingSetup", "MatchUID"),
+        new("tblMatch", "UID", "tblMatchFinishes", "MatchUID")
     ];
 
     public static Inspection Inspect(string file, string? password)
@@ -118,7 +148,7 @@ public static class PrwSchema
         return Inspect(connection);
     }
 
-    internal static Inspection Inspect(OleDbConnection connection)
+    internal static Inspection Inspect(OleDbConnection connection, bool requireExpandedTables = true)
     {
         var tableNames = connection.GetSchema("Tables").Rows.Cast<DataRow>()
             .Where(row => string.Equals(Convert.ToString(row["TABLE_TYPE"]),
@@ -130,7 +160,10 @@ public static class PrwSchema
             return new(false, ["The native tblWorker table is missing."]);
 
         var problems = new List<string>();
-        foreach (var table in Tables)
+        // Preserve worker browsing in older 10-table universes.
+        IEnumerable<Table> expected = requireExpandedTables
+            ? Tables : Tables.Take(10);
+        foreach (var table in expected)
         {
             if (!tableNames.Contains(table.Name))
             {
@@ -166,6 +199,9 @@ public static class PrwSchema
     /// </summary>
     public static void AssertDefinitionIntegrity()
     {
+        if (Tables.Count != 14 || Relationships.Count != 12)
+            throw new InvalidDataException(
+                "The replacement PRW database requires 14 tables and 12 relationships.");
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var table in Tables)
         {

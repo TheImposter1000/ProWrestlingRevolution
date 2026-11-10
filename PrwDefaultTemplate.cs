@@ -4,30 +4,48 @@ using System.Security.Cryptography;
 namespace ProWrestlingRevolution;
 
 /// <summary>
-/// Ships the original, unmodified PRWDefault.mdb as a compact embedded resource.
-/// The running game only reads its installed copy under its own System folder.
-/// No working-directory, source-tree or GitHub repository lookup is performed.
+/// Installs the replacement PRW_Default(2).mdb into the application's own
+/// System directory. Existing templates are backed up before upgrade; edits
+/// made after upgrading to this version are not overwritten.
 /// </summary>
 internal static class PrwDefaultTemplate
 {
     internal const string Filename = "PRWDefault.mdb";
-    private const string OriginalSha256 =
-        "b4f728d091aa4113d3ce03bbfc51de230df7845a4df69646177d857ae6054130";
+    internal const int ExpectedLength = 434176;
+    internal const string ExpectedSha256 =
+        "e59c723d3919da1a9bb6927fea27d712feaa17815735ae29faa23b5087267a38";
+    private const string VersionMarker = "PRWDefault.template-sha256.txt";
 
     internal static string EnsureInstalled(string systemDirectory)
     {
-        string destination = Path.Combine(Path.GetFullPath(systemDirectory), Filename);
-        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        string root = Path.GetFullPath(systemDirectory);
+        Directory.CreateDirectory(root);
+        string destination = Path.Combine(root, Filename);
+        string marker = Path.Combine(root, VersionMarker);
+
         if (File.Exists(destination))
         {
-            if (!AccessDatabase.LooksLikeMdb(destination))
-                throw new InvalidDataException(
-                    "The installed System/PRWDefault.mdb is not an Access database. " +
-                    "Correct or move that file; the game will not overwrite it.");
-            return destination;
+            if (Checksum(destination).Equals(ExpectedSha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(marker, ExpectedSha256);
+                return destination;
+            }
+
+            // A local user edit to the current version is intentional.
+            if (File.Exists(marker) &&
+                File.ReadAllText(marker).Trim().Equals(ExpectedSha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (!AccessDatabase.LooksLikeMdb(destination))
+                    throw new InvalidDataException(
+                        "The customized System/PRWDefault.mdb is not an Access " +
+                        "database. The game will not overwrite it.");
+                return destination;
+            }
         }
 
-        string temporary = Path.Combine(Path.GetDirectoryName(destination)!,
+        string temporary = Path.Combine(root,
             ".prw-template-" + Guid.NewGuid().ToString("N") + ".mdb");
         try
         {
@@ -38,20 +56,39 @@ internal static class PrwDefaultTemplate
                        FileAccess.Write, FileShare.None))
                 decompressor.CopyTo(output);
 
-            if (!AccessDatabase.LooksLikeMdb(temporary) ||
-                !Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(temporary)))
-                    .Equals(OriginalSha256, StringComparison.OrdinalIgnoreCase))
+            if (new FileInfo(temporary).Length != ExpectedLength ||
+                !AccessDatabase.LooksLikeMdb(temporary) ||
+                !Checksum(temporary).Equals(ExpectedSha256,
+                    StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException(
-                    "The bundled default database did not pass its integrity check.");
+                    "The replacement default database failed its integrity check.");
 
-            // Never replace a modified or already-installed user template.
-            if (!File.Exists(destination))
-                File.Move(temporary, destination);
+            if (File.Exists(destination))
+            {
+                // Preserve the previous original or user-modified template.
+                // Nothing inside Databases, SaveGames, Skins or Pictures is touched.
+                string backups = Path.Combine(root, "TemplateBackups");
+                Directory.CreateDirectory(backups);
+                string previous = Path.Combine(backups,
+                    "PRWDefault-before-replacement-" +
+                    DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" +
+                    Guid.NewGuid().ToString("N")[..8] + ".mdb");
+                File.Copy(destination, previous);
+            }
+
+            File.Move(temporary, destination, overwrite: true);
+            File.WriteAllText(marker, ExpectedSha256);
             return destination;
         }
         finally
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    private static string Checksum(string file)
+    {
+        using var input = File.OpenRead(file);
+        return Convert.ToHexString(SHA256.HashData(input));
     }
 }

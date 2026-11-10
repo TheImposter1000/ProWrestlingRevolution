@@ -28,8 +28,8 @@ public sealed class AppPaths
         foreach (var dir in new[] { Databases, Pictures, SkinsRoot, SystemRoot })
             Directory.CreateDirectory(dir);
 
-        // The bundled base MDB is installed locally once. Never read from a
-        // repository checkout or overwrite a user-maintained template.
+        // Install or upgrade the local bundled base MDB. Older versions are
+        // backed up first; subsequent user edits to this version are preserved.
         PrwDefaultTemplate.EnsureInstalled(SystemRoot);
 
         // Build missing, original raster skin assets; existing user artwork is never overwritten.
