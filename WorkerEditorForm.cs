@@ -11,7 +11,7 @@ namespace ProWrestlingRevolution;
 /// replace the central content rather than repeating data on General.
 /// Database writes remain the responsibility of the separate editing layer.
 /// </summary>
-internal sealed class WorkerEditorForm : Form
+internal sealed class WorkerEditorForm : UserControl
 {
     private static readonly Color Ink = Color.FromArgb(9, 18, 31);
     private static readonly Color Surface = Color.FromArgb(17, 34, 53);
@@ -26,16 +26,25 @@ internal sealed class WorkerEditorForm : Form
     private readonly SkinPalette _palette;
     private readonly PrwWorkerProfile _profile;
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Panel _content = new() { Name = "WorkerSectionContent", Dock = DockStyle.Fill };
-    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill };
-    private readonly TableLayoutPanel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+    private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Ink };
+    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Panel _mainRail = new() { Name = "WorkerMainMenuRail", Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
     private string _active = "General";
-    private Point? _dragStartScreen;
-    private Point _dragStartLocation;
     private int _recordIndex;
+    private readonly Font _railNormal = new("Segoe UI", 10f);
+    private readonly Font _railActive = new("Segoe UI", 10f, FontStyle.Bold);
+    private readonly Dictionary<string, SidebarMenuRow> _mainMenuIcons = new();
+    private readonly Panel _mainArea = new() { Name = "WorkerGeneralCanvas", BackColor = Ink };
+    private readonly Panel _actionArea = new() { Name = "WorkerActionArea", BackColor = Color.Transparent };
+    private TableLayoutPanel? _identityBiography;
 
     internal string? RequestedNavigation { get; private set; }
+    internal event EventHandler? CloseRequested;
+
+    internal void Close() =>
+        CloseRequested?.Invoke(this, EventArgs.Empty);
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette, PrwWorkerProfile profile)
     {
@@ -44,21 +53,16 @@ internal sealed class WorkerEditorForm : Form
         _profile = profile;
 
         Name = "WorkerEditorForm";
-        Text = "Pro Wrestling Revolution";
-        FormBorderStyle = FormBorderStyle.None;
-        ShowInTaskbar = false;
-        StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(1230, 682);
+        Text = "Pro Wrestling Revolution | Worker Editor";
+        ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
         AutoScaleMode = AutoScaleMode.None;
         Font = new Font("Segoe UI", 9f);
         BackColor = Ink;
         ForeColor = TextInk;
         DoubleBuffered = true;
-        KeyPreview = true;
         KeyDown += (_, e) =>
         {
             if (e.KeyCode != Keys.Escape) return;
-            DialogResult = DialogResult.Cancel;
             Close();
             e.Handled = true;
         };
@@ -68,42 +72,36 @@ internal sealed class WorkerEditorForm : Form
         Disposed += (_, _) =>
         {
             _tips.Dispose();
+            _railNormal.Dispose();
+            _railActive.Dispose();
         };
     }
 
-    // A borderless child form hosted inside the database workspace behaves as
-    // an in-game popup. It does not create another top-level application window.
+    /// <summary>
+    /// This is a child control hosted in the running game, never another
+    /// desktop window. The surrounding Database Editor remains intact.
+    /// </summary>
     internal void FitInside(Control host)
     {
-        int width = Math.Min(1230, Math.Max(1, host.ClientSize.Width - 20));
-        int height = Math.Min(682, Math.Max(1, host.ClientSize.Height - 18));
-        Size = new Size(width, height);
-        Location = new Point(
-            Math.Max(0, (host.ClientSize.Width - width) / 2),
-            Math.Max(0, (host.ClientSize.Height - height) / 2));
+        Location = Point.Empty;
+        Size = host.ClientSize;
     }
 
-    private void BeginDrag(object? sender, MouseEventArgs e)
+    private void RequestMainMenu(string key)
     {
-        if (e.Button != MouseButtons.Left) return;
-        _dragStartScreen = MousePosition;
-        _dragStartLocation = Location;
+        RequestedNavigation = key;
+        Close();
     }
 
-    private void DragPopup(object? sender, MouseEventArgs e)
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (_dragStartScreen is not Point start || e.Button != MouseButtons.Left ||
-            Parent is not Control host) return;
-        var current = MousePosition;
-        Location = new Point(
-            Math.Clamp(_dragStartLocation.X + current.X - start.X,
-                0, Math.Max(0, host.ClientSize.Width - Width)),
-            Math.Clamp(_dragStartLocation.Y + current.Y - start.Y,
-                0, Math.Max(0, host.ClientSize.Height - Height)));
+        if (keyData == Keys.Escape)
+        {
+            Close();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
-
-    private void EndDrag(object? sender, MouseEventArgs e) =>
-        _dragStartScreen = null;
 
     private static Panel Card(string title, string name)
     {
@@ -138,19 +136,91 @@ internal sealed class WorkerEditorForm : Form
             using var pen = new Pen(Accent);
             e.Graphics.DrawLine(pen, 0, heading.Height - 1, heading.Width, heading.Height - 1);
         };
+        string symbol = title switch
+        {
+            "Personal Data" => "▤",
+            "Roles" => "♟",
+            "Physical Health" => "♥",
+            "Default & Age-Related Settings" => "⚙",
+            "Active Areas" => "◎",
+            "Languages" => "▣",
+            _ => ""
+        };
         var label = new Label
         {
-            Text = title.ToUpperInvariant(),
+            Text = string.IsNullOrEmpty(symbol) ? title : symbol + "  " + title,
             Dock = DockStyle.Fill,
             Padding = new Padding(11, 0, 0, 0),
             TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.Transparent
         };
         heading.Controls.Add(label);
         card.Controls.Add(heading);
         return card;
+    }
+
+    /// <summary>
+    /// Fixed-height section buttons from the approved mockup. The blue
+    /// selection is painted rather than delegated to OS theme rendering.
+    /// </summary>
+    private sealed class WorkerSectionButton : Button
+    {
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool Active { get; set; }
+
+        private bool _hover;
+
+        internal WorkerSectionButton()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            Cursor = Cursors.Hand;
+            Font = new Font("Segoe UI", 9.3f, FontStyle.Bold);
+            ForeColor = Color.White;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hover = false;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 3 || Height < 3) return;
+            var area = new Rectangle(0, 0, Width, Height);
+            var upper = Active
+                ? Color.FromArgb(35, 155, 217)
+                : _hover ? Color.FromArgb(40, 69, 101)
+                    : Color.FromArgb(34, 52, 73);
+            var lower = Active
+                ? Color.FromArgb(7, 91, 150)
+                : _hover ? Color.FromArgb(18, 47, 76)
+                    : Color.FromArgb(13, 25, 40);
+            using (var brush = new LinearGradientBrush(area, upper, lower,
+                LinearGradientMode.Vertical))
+                e.Graphics.FillRectangle(brush, area);
+            using (var outline = new Pen(Active ? Accent : Edge, Active ? 1.5f : 1f))
+                e.Graphics.DrawRectangle(outline, 1, 1, Width - 3, Height - 3);
+            TextRenderer.DrawText(e.Graphics, Text, Font, area, Color.White,
+                TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        }
     }
 
     private static Label TextLabel(string label) => new()
@@ -165,18 +235,87 @@ internal sealed class WorkerEditorForm : Form
         AutoEllipsis = true
     };
 
-    private static TextBox ValueBox(string value, string name) => new()
+    private sealed class WorkerValue : Control
     {
-        Name = name,
-        Text = value,
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool DropDownIndicator { get; set; }
+
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool CalendarIndicator { get; set; }
+
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool SpinnerIndicator { get; set; }
+
+        internal WorkerValue()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer, true);
+            AccessibleRole = AccessibleRole.StaticText;
+            BackColor = FieldInk;
+            ForeColor = Color.FromArgb(11, 28, 42);
+            Font = new Font("Segoe UI", 9.15f, FontStyle.Bold);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var rect = ClientRectangle;
+            if (rect.Width < 3 || rect.Height < 3) return;
+            using var gradient = new LinearGradientBrush(rect,
+                Color.FromArgb(251, 252, 253), Color.FromArgb(228, 237, 245),
+                LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(gradient, rect);
+            using var border = new Pen(Color.FromArgb(110, 145, 170));
+            e.Graphics.DrawRectangle(border, 0, 0, rect.Width - 1, rect.Height - 1);
+            bool indicator = DropDownIndicator || CalendarIndicator || SpinnerIndicator;
+            var textArea = new Rectangle(5, 0,
+                Math.Max(1, rect.Width - (indicator ? 20 : 8)), rect.Height);
+            TextRenderer.DrawText(e.Graphics, Text, Font, textArea, ForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis |
+                TextFormatFlags.SingleLine);
+            int x = rect.Width - 11, y = rect.Height / 2 + 1;
+            using var arrow = new SolidBrush(Color.FromArgb(15, 35, 53));
+            if (DropDownIndicator)
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y - 3), new Point(x + 4, y - 3),
+                    new Point(x, y + 2)
+                ]);
+            if (SpinnerIndicator)
+            {
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y - 2), new Point(x + 4, y - 2),
+                    new Point(x, y - 6)
+                ]);
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y + 3), new Point(x + 4, y + 3),
+                    new Point(x, y + 7)
+                ]);
+            }
+            if (CalendarIndicator)
+            {
+                using var pen = new Pen(Color.FromArgb(32, 62, 84), 1f);
+                e.Graphics.DrawRectangle(pen, rect.Width - 20, (rect.Height - 14) / 2, 14, 13);
+                e.Graphics.DrawLine(pen, rect.Width - 20, (rect.Height - 14) / 2 + 4,
+                    rect.Width - 6, (rect.Height - 14) / 2 + 4);
+                e.Graphics.DrawLine(pen, rect.Width - 17, (rect.Height - 14) / 2 - 2,
+                    rect.Width - 17, (rect.Height - 14) / 2 + 2);
+            }
+        }
+    }
+
+    private static WorkerValue ValueBox(string value, string name,
+        bool dropDown = true) => new()
+    {
+        Name = name, Text = value, DropDownIndicator = dropDown,
         Dock = DockStyle.Fill,
         Margin = new Padding(2, 1, 5, 1),
-        BorderStyle = BorderStyle.FixedSingle,
-        ReadOnly = true,
-        TabStop = false,
-        ForeColor = Color.FromArgb(22, 37, 49),
-        BackColor = FieldInk,
-        Font = new Font("Segoe UI", 8.6f, FontStyle.Bold)
+        TabStop = false
     };
 
     private static bool IsTrue(object? value)
@@ -205,172 +344,330 @@ internal sealed class WorkerEditorForm : Form
 
     private void BuildFrame()
     {
-        var chrome = new Panel { Dock = DockStyle.Top, Height = 42, Name = "WorkerEditorHeader", BackColor = Surface };
-        chrome.Paint += (_, e) =>
-        {
-            var bounds = new Rectangle(0, 0, Math.Max(1, chrome.Width), Math.Max(1, chrome.Height));
-            using var gradient = new LinearGradientBrush(bounds,
-                Color.FromArgb(13, 30, 48), Color.FromArgb(28, 61, 95), LinearGradientMode.Horizontal);
-            e.Graphics.FillRectangle(gradient, bounds);
-            using var line = new Pen(Accent);
-            e.Graphics.DrawLine(line, 0, chrome.Height - 1, chrome.Width, chrome.Height - 1);
-        };
-        var logo = new Label
-        {
-            Text = "PWR  /  PRO WRESTLING REVOLUTION",
-            Dock = DockStyle.Left, Width = 315,
-            Padding = new Padding(16, 0, 0, 0),
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-            BackColor = Color.Transparent
-        };
-        var heading = new Label
-        {
-            Text = "WORKER EDITOR    /    EDIT WORKER",
-            Dock = DockStyle.Left, Width = 430,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
-            ForeColor = Color.White, BackColor = Color.Transparent
-        };
-        var close = new Button
-        {
-            Name = "WorkerClose",
-            Dock = DockStyle.Right, Width = 46,
-            Text = "×", Font = new Font("Segoe UI", 18, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(25, 42, 65), ForeColor = Color.White
-        };
-        close.FlatAppearance.BorderSize = 0;
-        close.Click += (_, _) => Close();
-        chrome.Controls.Add(heading);
-        chrome.Controls.Add(logo);
-        chrome.Controls.Add(close);
-        // Move only by dragging the worker popup's header; section and save
-        // controls retain their independent click targets.
-        foreach (Control dragTarget in new Control[] { chrome, logo, heading })
-        {
-            dragTarget.MouseDown += BeginDrag;
-            dragTarget.MouseMove += DragPopup;
-            dragTarget.MouseUp += EndDrag;
-        }
-
-        _sectionNavigation.BackColor = Color.FromArgb(11, 23, 38);
-        string[] sections =
-        [
-            "General", "Contracts", "Skills", "Popularity", "Attributes",
-            "Business Skills", "Job History", "Business History", "Legacy", "Alter Ego"
-        ];
-        for (int i = 0; i < sections.Length; i++)
-        {
-            string section = sections[i];
-            var button = new Button
-            {
-                Name = "WorkerSection_" + section.Replace(" ", ""),
-                Text = section,
-                Location = new Point(7, 14 + i * 47),
-                Size = new Size(144, 40),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Surface,
-                ForeColor = TextInk,
-                Font = new Font("Segoe UI", 8.7f, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            button.FlatAppearance.BorderColor = Edge;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(28, 75, 112);
-            button.Click += (_, _) => ShowSection(section);
-            _tabs[section] = button;
-            _sectionNavigation.Controls.Add(button);
-        }
-        _body.BackColor = Ink;
-        _body.Padding = new Padding(4, 8, 7, 5);
-        _body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _body.RowStyles.Add(new RowStyle(SizeType.Absolute, 162));
-        _body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        _body.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
-        // Explicit structural rows and columns avoid all Dock/Z-order overlap.
-        var popupLayout = new TableLayoutPanel
+        // An explicit fixed logical canvas matches the approved 1366x768
+        // screenshot. The game uses DPI-unaware GDI scaling at runtime.
+        var shell = new TableLayoutPanel
         {
             Name = "WorkerPopupLayout",
             Dock = DockStyle.Fill,
-            ColumnCount = 2, RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            RowCount = 2,
+            ColumnCount = 2,
+            BackColor = Ink
+        };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 61));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Controls.Add(shell);
+
+        var title = new Panel
+        {
+            Name = "WorkerEditorHeader", Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(16, 30, 49),
+            Margin = Padding.Empty
+        };
+        title.Paint += (_, e) =>
+        {
+            var rect = new Rectangle(0, 0, Math.Max(1, title.Width), Math.Max(1, title.Height));
+            using var gradient = new LinearGradientBrush(rect,
+                Color.FromArgb(10, 22, 38), Color.FromArgb(32, 63, 97),
+                LinearGradientMode.Horizontal);
+            e.Graphics.FillRectangle(gradient, rect);
+            using var border = new Pen(Accent, 1);
+            e.Graphics.DrawLine(border, 0, title.Height - 1, title.Width, title.Height - 1);
+        };
+        shell.Controls.Add(title, 0, 0);
+        shell.SetColumnSpan(title, 2);
+
+        var logo = new Panel
+        {
+            Name = "WorkerBrand", Dock = DockStyle.Left,
+            Width = 300, BackColor = Color.Transparent
+        };
+        logo.Paint += (_, args) =>
+        {
+            var g = args.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var swoosh = new Pen(Color.FromArgb(31, 155, 225), 2.4f);
+            g.DrawArc(swoosh, new Rectangle(18, 3, 111, 28), 188, 143);
+            using var large = new Font("Segoe UI", 28f, FontStyle.Bold | FontStyle.Italic);
+            using var small = new Font("Segoe UI", 9.3f, FontStyle.Bold | FontStyle.Italic);
+            using var white = new SolidBrush(Color.White);
+            g.DrawString("PWR", large, white, new PointF(19, -7));
+            g.DrawString("PRO WRESTLING", small, white, new PointF(133, 5));
+            g.DrawString("REVOLUTION", small, white, new PointF(133, 20));
+            using var cyan = new Pen(Accent, 1f);
+            g.DrawLine(cyan, 283, 6, 283, 34);
+        };
+        var pageHeading = new Label
+        {
+            Name = "WorkerEditorHeading",
+            Text = "Worker Editor     /     Edit Worker",
+            Font = new Font("Segoe UI", 13.2f, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock = DockStyle.Left, Width = 460,
+            TextAlign = ContentAlignment.MiddleLeft,
+            BackColor = Color.Transparent
+        };
+        var close = new Button
+        {
+            Name = "WorkerClose", Text = "×",
+            Dock = DockStyle.Right, Width = 42,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(12, 25, 41),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 17f, FontStyle.Regular),
+            Cursor = Cursors.Hand
+        };
+        close.FlatAppearance.BorderSize = 0;
+        close.Click += (_, _) => Close();
+        var minimize = new Button
+        {
+            Name = "WorkerMinimize", Text = "−",
+            Dock = DockStyle.Right, Width = 37,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent, ForeColor = Color.White,
+            Font = new Font("Segoe UI", 15f),
+            Cursor = Cursors.Hand
+        };
+        minimize.FlatAppearance.BorderSize = 0;
+        minimize.Click += (_, _) =>
+        {
+            if (FindForm() is Form owner)
+                owner.WindowState = FormWindowState.Minimized;
+        };
+        var maximize = new Button
+        {
+            Name = "WorkerMaximize", Text = "□",
+            Dock = DockStyle.Right, Width = 37,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent, ForeColor = Color.White,
+            Font = new Font("Segoe UI", 16f),
+            Cursor = Cursors.Hand
+        };
+        maximize.FlatAppearance.BorderSize = 0;
+        maximize.Click += (_, _) =>
+        {
+            if (FindForm() is Form owner)
+                owner.WindowState = owner.WindowState == FormWindowState.Maximized
+                    ? FormWindowState.Normal : FormWindowState.Maximized;
+        };
+        var help = new Button
+        {
+            Name = "WorkerHelp", Text = "?",
+            Dock = DockStyle.Right, Width = 36,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent, ForeColor = Color.White,
+            Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        help.FlatAppearance.BorderSize = 0;
+        help.Click += (_, _) => MessageBox.Show(this,
+            "Select a section on the left to view the worker's information. " +
+            "Saving and data generation will be enabled when the database " +
+            "editing layer is available.", "Worker Editor Help",
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
+        var settings = new Button
+        {
+            Name = "WorkerSettingsButton", Text = "⚙",
+            Dock = DockStyle.Right, Width = 39,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent, ForeColor = Color.White,
+            Font = new Font("Segoe UI Symbol", 15f),
+            Cursor = Cursors.Hand
+        };
+        settings.FlatAppearance.BorderSize = 0;
+        settings.Click += (_, _) => RequestMainMenu("skins");
+        pageHeading.Cursor = Cursors.Hand;
+        _tips.SetToolTip(pageHeading, "Return to General worker information");
+        pageHeading.Click += (_, _) => ShowSection("General");
+        title.Controls.Add(pageHeading);
+        title.Controls.Add(logo);
+        title.Controls.Add(help);
+        title.Controls.Add(settings);
+        title.Controls.Add(minimize);
+        title.Controls.Add(maximize);
+        title.Controls.Add(close);
+
+        _mainRail.BackColor = Color.FromArgb(11, 25, 41);
+        var navTips = _tips;
+        // Reuse the exact PWR icon artwork and command keys on the rail.
+        foreach (var (key, label, y) in SkinArt.MenuIcons)
+        {
+            var item = new SidebarMenuRow(key, label, _palette, _railNormal, _railActive)
+            {
+                Name = "WorkerMenu_" + key,
+                IconOnly = true,
+                Location = new Point(0, Math.Max(0, y - 40 - 27)),
+                Width = 61
+            };
+            item.UpdateAppearance(_palette, false, key == "editor");
+            item.Click += (_, _) => RequestMainMenu(key);
+            navTips.SetToolTip(item, label);
+            _mainRail.Controls.Add(item);
+            _mainMenuIcons[key] = item;
+        }
+        shell.Controls.Add(_mainRail, 0, 1);
+
+        var page = new TableLayoutPanel
+        {
+            Name = "WorkerPage",
+            ColumnCount = 2,
+            RowCount = 1,
+            Dock = DockStyle.Fill,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
             BackColor = Ink
         };
-        popupLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 163));
-        popupLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        popupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-        popupLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        popupLayout.Controls.Add(chrome, 0, 0);
-        popupLayout.SetColumnSpan(chrome, 2);
-        popupLayout.Controls.Add(_sectionNavigation, 0, 1);
-        popupLayout.Controls.Add(_body, 1, 1);
-        Controls.Add(popupLayout);
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        shell.Controls.Add(page, 1, 1);
+
+        _sectionNavigation.BackColor = Color.FromArgb(11, 24, 39);
+        var sections = new[]
+        {
+            "Contracts", "Skills", "Popularity", "Attributes", "Business Skills",
+            "Job History", "Business History", "Legacy", "Alter Ego"
+        };
+        for (int i = 0; i < sections.Length; i++)
+        {
+            string section = sections[i];
+            var button = new WorkerSectionButton
+            {
+                Name = "WorkerSection_" + section.Replace(" ", ""),
+                Text = section,
+                Location = new Point(5, 13 + i * 44),
+                Size = new Size(142, 39)
+            };
+            button.Click += (_, _) => ShowSection(section);
+            _tabs[section] = button;
+            _sectionNavigation.Controls.Add(button);
+        }
+        page.Controls.Add(_sectionNavigation, 0, 0);
+
+        _body.Paint += (_, e) =>
+        {
+            var area = new Rectangle(0, 0, Math.Max(1, _body.Width), Math.Max(1, _body.Height));
+            using var fill = new LinearGradientBrush(area,
+                Color.FromArgb(22, 38, 61), Color.FromArgb(8, 16, 30),
+                LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(fill, area);
+        };
+        page.Controls.Add(_body, 1, 0);
 
         var top = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = Padding.Empty
+            Name = "WorkerIdentityBiographyRow",
+            ColumnCount = 2, RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
         };
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 29.5f));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70.5f));
         top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _identityBiography = top;
         BuildIdentity(top);
         BuildBiography(top);
-        _body.Controls.Add(top, 0, 0);
-        _body.Controls.Add(_content, 0, 1);
+
+        _mainArea.Name = "WorkerGeneralCanvas";
+        _content.Name = "WorkerSectionContent";
+        _mainArea.Controls.Add(_content);
+        _body.Controls.Add(top);
+        _body.Controls.Add(_mainArea);
+
+        _body.Resize += (_, _) => LayoutWorkerCanvas();
+        LayoutWorkerCanvas();
         BuildActions();
     }
 
+    private void LayoutWorkerCanvas()
+    {
+        if (_identityBiography is null || _body.Width < 200) return;
+        // Align the left edge and the right edge to the approved 1366x768
+        // screenshot: a 3px inset and a total 8px horizontal gutter.
+        int contentX = 3;
+        int width = Math.Max(100, _body.ClientSize.Width - 8);
+        int height = _body.ClientSize.Height;
+        _identityBiography.Bounds = new Rectangle(contentX, 10, width, 145);
+        int generalY = 165;
+        int generalHeight = Math.Max(340, Math.Min(520, height - generalY - 12));
+        _mainArea.Bounds = new Rectangle(contentX, generalY, width, generalHeight);
+        _content.Bounds = _mainArea.ClientRectangle;
+    }
+
+    // The top row is a label-and-field editor, not a banner card.
     private void BuildIdentity(TableLayoutPanel top)
     {
         var card = new Panel
         {
             Name = "WorkerIdentity",
-            Dock = DockStyle.Fill,
-            Margin = new Padding(3),
-            BackColor = Surface
-        };
-        card.Paint += (_, e) =>
-        {
-            using var pen = new Pen(Edge);
-            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.FromArgb(17, 32, 52)
         };
         top.Controls.Add(card, 0, 0);
         var worker = First("tblWorker");
 
         var name = new Label
         {
-            Name = "WorkerNameTitle",
-            Text = "WORKER DETAILS",
-            Location = new Point(15, 7), Size = new Size(420, 32),
-            ForeColor = Color.White, AutoEllipsis = true,
-            Font = new Font("Segoe UI", 14.5f, FontStyle.Bold | FontStyle.Italic)
+            Name = "WorkerNameTitle", Text = "Name",
+            Location = new Point(7, 8), Size = new Size(89, 22),
+            ForeColor = Color.White, BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var shortName = new Label
+        {
+            Text = "Short Name", Location = new Point(7, 37),
+            Size = new Size(89, 22),
+            ForeColor = Color.White, BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var pictureLabel = new Label
+        {
+            Text = "Picture", Location = new Point(7, 76),
+            Size = new Size(84, 22),
+            ForeColor = Color.White, BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold)
         };
         card.Controls.Add(name);
+        card.Controls.Add(shortName);
+        card.Controls.Add(pictureLabel);
+        var first = ValueBox(Display(worker, "Name"), "WorkerField_Name", false);
+        first.Dock = DockStyle.None;
+        first.Location = new Point(100, 8);
+        first.Size = new Size(210, 22);
+        var second = ValueBox(Display(worker, "ShortName"), "WorkerField_ShortName", false);
+        second.Dock = DockStyle.None;
+        second.Location = new Point(100, 37);
+        second.Size = new Size(210, 22);
+        card.Controls.Add(first);
+        card.Controls.Add(second);
 
         var portrait = new PictureBox
         {
-            Name = "WorkerPicture", Location = new Point(15, 49),
-            Size = new Size(85, 101), BackColor = Color.FromArgb(21, 41, 61),
-            BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom
+            Name = "WorkerPicture",
+            Location = new Point(100, 68), Size = new Size(91, 77),
+            BackColor = Color.FromArgb(21, 41, 61),
+            BorderStyle = BorderStyle.FixedSingle,
+            SizeMode = PictureBoxSizeMode.Zoom
         };
         card.Controls.Add(portrait);
         string picture = Display(worker, "Picture");
-        var safeName = Path.GetFileName(picture);
+        string safeName = Path.GetFileName(picture);
         if (!string.IsNullOrWhiteSpace(safeName))
         {
-            string[] choices =
-            [
+            var paths = new[]
+            {
                 Path.Combine(_paths.Pictures, safeName),
                 Path.Combine(_paths.Pictures, "Workers", safeName),
                 Path.Combine(_paths.Pictures, "People", safeName),
                 Path.Combine(_paths.Pictures, "Worker", safeName)
-            ];
-            var file = choices.FirstOrDefault(File.Exists);
+            };
+            var file = paths.FirstOrDefault(File.Exists);
             if (file is not null)
             {
                 try
@@ -380,113 +677,156 @@ internal sealed class WorkerEditorForm : Form
                     portrait.Image = new Bitmap(image);
                     portrait.Disposed += (_, _) => portrait.Image?.Dispose();
                 }
-                catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException)
+                catch (Exception ex) when (
+                    ex is IOException or ArgumentException or OutOfMemoryException)
                 {
-                    // A missing or invalid picture never prevents opening a worker.
+                    // Missing or invalid worker photographs are optional.
                 }
             }
         }
         if (portrait.Image is null)
         {
-            var noImage = new Label
+            portrait.Controls.Add(new Label
             {
-                Text = "NO IMAGE",
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.FromArgb(143, 181, 205),
-                Font = new Font("Segoe UI", 8, FontStyle.Bold)
-            };
-            portrait.Controls.Add(noImage);
+                Text = "NO IMAGE", Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(144, 178, 200),
+                Font = new Font("Segoe UI", 7.8f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            });
         }
 
-        var fields = new TableLayoutPanel
+        var typeLabel = new Label
         {
-            Name = "WorkerIdentityFields", Location = new Point(106, 43),
-            Size = new Size(275, 106),
-            RowCount = 3, ColumnCount = 2,
-            Margin = Padding.Empty
+            Text = "Picture Type", Location = new Point(200, 86),
+            Size = new Size(121, 18),
+            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+            ForeColor = Color.White
         };
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 87));
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (int i = 0; i < 3; i++) fields.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / 3));
-        fields.Controls.Add(TextLabel("Name"), 0, 0);
-        fields.Controls.Add(ValueBox(Display(worker, "Name"), "WorkerField_Name"), 1, 0);
-        fields.Controls.Add(TextLabel("Short Name"), 0, 1);
-        fields.Controls.Add(ValueBox(Display(worker, "ShortName"), "WorkerField_ShortName"), 1, 1);
-        fields.Controls.Add(TextLabel("Bio Type"), 0, 2);
-        fields.Controls.Add(ValueBox(Display(worker, "BiographyType"), "WorkerField_BiographyType"), 1, 2);
-        card.Controls.Add(fields);
+        var typeBox = ValueBox(Display(worker, "BiographyType"),
+            "WorkerField_BiographyType", true);
+        typeBox.Dock = DockStyle.None;
+        typeBox.Location = new Point(200, 110);
+        typeBox.Size = new Size(110, 22);
+        card.Controls.Add(typeLabel);
+        card.Controls.Add(typeBox);
         card.Resize += (_, _) =>
         {
-            name.Width = Math.Max(200, card.Width - 30);
-            fields.Width = Math.Max(120, card.ClientSize.Width - fields.Left - 12);
+            int valueWidth = Math.Max(100, card.ClientSize.Width - 107);
+            first.Width = valueWidth;
+            second.Width = valueWidth;
+            typeLabel.Left = Math.Max(193, card.ClientSize.Width - 126);
+            typeBox.Left = typeLabel.Left;
+            typeBox.Width = Math.Max(91, card.ClientSize.Width - typeBox.Left - 5);
         };
     }
 
     private void BuildBiography(TableLayoutPanel top)
     {
-        var card = Card("Biography", "WorkerBiographyPanel");
+        var card = new Panel
+        {
+            Name = "WorkerBiographyPanel",
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.FromArgb(17, 32, 52)
+        };
         top.Controls.Add(card, 1, 0);
+        var heading = new Label
+        {
+            Text = "Biography", Location = new Point(5, 9),
+            Size = new Size(89, 22),
+            Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
+            ForeColor = Color.White, BackColor = Color.Transparent
+        };
+        var text = Display(First("tblWorkerBio"), "Biography");
         var bio = new RichTextBox
         {
             Name = "WorkerBiography",
-            Dock = DockStyle.Fill,
-            BorderStyle = BorderStyle.None,
-            Margin = new Padding(11, 9, 10, 8),
-            Font = new Font("Segoe UI", 8.65f, FontStyle.Regular),
+            Location = new Point(90, 8),
+            Size = new Size(605, 131),
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
             ReadOnly = true,
             DetectUrls = false,
             TabStop = false,
             ScrollBars = RichTextBoxScrollBars.None,
             BackColor = FieldInk,
-            ForeColor = Color.FromArgb(26, 39, 53),
-            Text = string.IsNullOrWhiteSpace(Display(First("tblWorkerBio"), "Biography"))
-                ? "No biography has been entered for this worker."
-                : Display(First("tblWorkerBio"), "Biography")
+            ForeColor = Color.FromArgb(16, 28, 41),
+            Text = string.IsNullOrWhiteSpace(text) ?
+                "No biography has been entered for this worker." : text
         };
+        card.Controls.Add(heading);
         card.Controls.Add(bio);
+        card.Resize += (_, _) =>
+        {
+            bio.Width = Math.Max(100, card.ClientSize.Width - bio.Left - 6);
+            bio.Height = Math.Max(70, card.ClientSize.Height - bio.Top - 6);
+        };
     }
 
     private static (string Label, string Field)[] Pairs(params string[] fields) =>
         fields.Select(x => (x.Replace("ID", " ID").Replace("Pounds", " Weight").Replace("Inches", "").Replace("WorkerUID", " Worker"), x)).ToArray();
 
+    /// <summary>
+    /// Fixed-height rows, matching the screenshot's evenly spaced controls.
+    /// Neither textboxes nor checkboxes may be compressed below the legible
+    /// height used by the original mockup.
+    /// </summary>
     private static TableLayoutPanel MakeRows(Panel card,
-        IReadOnlyList<(string Label, string Field)> fields, DataRow? source)
+        IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
+        int rowHeight = 22, float labelShare = 39f, int topPad = 2)
     {
         var grid = new TableLayoutPanel
         {
             Name = card.Name + "Fields",
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = fields.Count,
-            Padding = new Padding(2, 4, 2, 5), Margin = Padding.Empty,
+            Dock = DockStyle.Top,
+            Height = fields.Count * rowHeight + topPad + 1,
+            ColumnCount = 2, RowCount = fields.Count,
+            Margin = Padding.Empty, Padding = new Padding(1, topPad, 2, 0),
             BackColor = Dark
         };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelShare));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f - labelShare));
         for (int i = 0; i < fields.Count; i++)
         {
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / Math.Max(1, fields.Count)));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             grid.Controls.Add(TextLabel(fields[i].Label), 0, i);
-            grid.Controls.Add(ValueBox(Display(source, fields[i].Field),
-                "WorkerField_" + fields[i].Field), 1, i);
+            bool isWeight = fields[i].Field.Contains("Weight", StringComparison.OrdinalIgnoreCase);
+            bool isDate = fields[i].Field.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
+                          fields[i].Field is "Born" or "SetToDebut";
+            var value = ValueBox(Display(source, fields[i].Field),
+                "WorkerField_" + fields[i].Field, !isWeight && !isDate);
+            value.CalendarIndicator = isDate;
+            value.SpinnerIndicator = isWeight;
+            if (isWeight)
+            {
+                value.Dock = DockStyle.Left;
+                value.Width = 98;
+            }
+            grid.Controls.Add(value, 1, i);
         }
         card.Controls.Add(grid);
+        grid.BringToFront();
         return grid;
     }
 
     private static TableLayoutPanel MakeChecks(Panel card,
-        IReadOnlyList<(string Label, string Field)> fields, DataRow? source)
+        IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
+        int rowHeight = 22)
     {
         var grid = new TableLayoutPanel
         {
             Name = card.Name + "Fields",
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = fields.Count,
-            Padding = new Padding(9, 4, 2, 5), Margin = Padding.Empty
+            Dock = DockStyle.Top,
+            Height = fields.Count * rowHeight + 3,
+            ColumnCount = 1, RowCount = fields.Count,
+            Padding = new Padding(11, 2, 2, 0),
+            Margin = Padding.Empty,
+            BackColor = Dark
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 0; i < fields.Count; i++)
         {
             var (label, field) = fields[i];
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / Math.Max(1, fields.Count)));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             var tick = new CheckBox
             {
                 Name = "WorkerField_" + field,
@@ -497,11 +837,14 @@ internal sealed class WorkerEditorForm : Form
                 Checked = source is not null && source.Table.Columns.Contains(field) &&
                     IsTrue(source[field]),
                 ForeColor = TextInk,
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Regular)
+                Font = new Font("Segoe UI", 9.1f, FontStyle.Regular),
+                Margin = Padding.Empty,
+                BackColor = Color.Transparent
             };
             grid.Controls.Add(tick, 0, i);
         }
         card.Controls.Add(grid);
+        grid.BringToFront();
         return grid;
     }
 
@@ -521,13 +864,19 @@ internal sealed class WorkerEditorForm : Form
     private void BuildGeneral()
     {
         var worker = First("tblWorker");
+        // Two structural rows make the 4-button action strip part of the
+        // layout instead of a floating overlay that clips in DrawToBitmap.
+        // The left columns span both rows; the right columns reserve their
+        // second row for buttons, exactly as in the approved mockup.
         var grid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, Name = "WorkerGeneralGrid",
-            ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
+            ColumnCount = 4, RowCount = 2, Margin = Padding.Empty,
+            BackColor = Color.Transparent
         };
-        foreach (float percent in new[] { 31f, 26f, 25f, 18f })
+        foreach (float percent in new[] { 26f, 24f, 28f, 22f })
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, percent));
+        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 455));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var personal = Card("Personal Data", "WorkerPersonalData");
@@ -542,27 +891,57 @@ internal sealed class WorkerEditorForm : Form
             ("Style", "Style"), ("Body Type", "BodyType"),
             ("Height", "HeightInches"), ("Weight", "WeightPounds"),
             ("Min Weight", "MinWeightPounds"), ("Max Weight", "MaxWeightPounds")
-        ], worker);
+        ], worker, rowHeight: 23);
+        personal.Dock = DockStyle.Top;
+        personal.Height = 503;
         grid.Controls.Add(personal, 0, 0);
+        grid.SetRowSpan(personal, 2);
 
-        var loyalty = Card("Loyalty", "WorkerLoyalty");
+        var loyalty = Card("", "WorkerLoyalty");
         MakeRows(loyalty, [
             ("Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
             ("Freelance", "Freelance"), ("User Character", "UserCharacter")
         ], worker);
         var roles = Card("Roles", "WorkerRoles");
-        MakeChecks(roles, [
+        var roleChecks = MakeChecks(roles, [
             ("Wrestler", "RoleWrestler"), ("Occasional Wrestler", "RolePartTimeWrestler"),
             ("Manager", "RoleManager"), ("On-Screen Personality", "RoleOnScreenPersonality"),
             ("Play By Play", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
             ("Referee", "RoleReferee"), ("Road Agent", "RoleProducer")
-        ], worker);
+        ], worker, rowHeight: 20);
+        roleChecks.Dock = DockStyle.None;
+        roleChecks.Location = new Point(3, 55);
+        var competitor = new Panel
+        {
+            Name = "WorkerCompetesVs", Dock = DockStyle.None,
+            Location = new Point(3, 28),
+            Height = 26, BackColor = Dark,
+            Padding = new Padding(3, 3, 4, 2)
+        };
+        var competitorLabel = TextLabel("Competes Vs.");
+        competitorLabel.Dock = DockStyle.Left;
+        competitorLabel.Width = 105;
+        var competitorValue = ValueBox(Display(worker, "CompetesVs"),
+            "WorkerField_CompetesVs");
+        competitor.Controls.Add(competitorValue);
+        competitor.Controls.Add(competitorLabel);
+        roles.Controls.Add(competitor);
+        competitor.BringToFront();
+        roles.Resize += (_, _) =>
+        {
+            competitor.Width = Math.Max(100, roles.ClientSize.Width - 6);
+            roleChecks.Width = Math.Max(100, roles.ClientSize.Width - 6);
+        };
         var physical = Card("Physical Health", "WorkerPhysical");
         MakeRows(physical, [
             ("Head Condition", "HeadCondition"), ("Body Condition", "BodyCondition"),
             ("Arms Condition", "ArmsCondition"), ("Legs Condition", "LegsCondition")
-        ], First("tblWorkerPhysical"));
-        grid.Controls.Add(Stack((loyalty, 27), (roles, 46), (physical, 27)), 1, 0);
+        ], First("tblWorkerPhysical"), labelShare: 60f);
+        var middleColumn = Stack((loyalty, 27), (roles, 47), (physical, 26));
+        middleColumn.Dock = DockStyle.Top;
+        middleColumn.Height = 503;
+        grid.Controls.Add(middleColumn, 1, 0);
+        grid.SetRowSpan(middleColumn, 2);
 
         var settings = Card("Default & Age-Related Settings", "WorkerSettings");
         MakeRows(settings, [
@@ -578,7 +957,8 @@ internal sealed class WorkerEditorForm : Form
             ("Relevancy Age", "RelevancyAge"),
             ("Retirement Age", "RetirementAge"),
             ("Career Goal", "CareerGoal")
-        ], worker);
+        ], worker, rowHeight: 27);
+        settings.Dock = DockStyle.Fill;
         grid.Controls.Add(settings, 2, 0);
 
         var regions = Card("Active Areas", "WorkerActiveAreas");
@@ -587,7 +967,7 @@ internal sealed class WorkerEditorForm : Form
             ("Mexico", "ActiveMexico"), ("British Isles", "ActiveBritishIsles"),
             ("Japan", "ActiveJapan"), ("Europe", "ActiveEurope"),
             ("Oceania", "ActiveOceania"), ("India", "ActiveIndia")
-        ], worker);
+        ], worker, rowHeight: 21);
         var languages = Card("Languages", "WorkerLanguages");
         MakeRows(languages, [
             ("English", "LanguageEnglish"), ("Japanese", "LanguageJapanese"),
@@ -595,8 +975,18 @@ internal sealed class WorkerEditorForm : Form
             ("Mediterranean", "LanguageMediterranean"),
             ("Germanic", "LanguageGermanic"), ("Slavic", "LanguageSlavic"),
             ("Hindi", "LanguageHindi")
-        ], worker);
-        grid.Controls.Add(Stack((regions, 52), (languages, 48)), 3, 0);
+        ], worker, rowHeight: 23, labelShare: 48f, topPad: 6);
+        var rightColumn = Stack((regions, 47), (languages, 53));
+        rightColumn.Dock = DockStyle.Fill;
+        grid.Controls.Add(rightColumn, 3, 0);
+
+        _actionArea.Dock = DockStyle.Fill;
+        _actionArea.Margin = Padding.Empty;
+        // The approved action strip occupies y=686..722 on a 1366x768
+        // logical canvas. The action area is 65px high, including padding.
+        _actionArea.Padding = new Padding(8, 26, 3, 3);
+        grid.Controls.Add(_actionArea, 2, 1);
+        grid.SetColumnSpan(_actionArea, 2);
         _content.Controls.Add(grid);
     }
 
@@ -606,12 +996,21 @@ internal sealed class WorkerEditorForm : Form
         _recordIndex = 0;
         foreach (var (name, button) in _tabs)
         {
-            bool selected = name.Equals(section, StringComparison.OrdinalIgnoreCase);
-            button.BackColor = selected ? Color.FromArgb(13, 107, 169) : Surface;
-            button.FlatAppearance.BorderColor = selected ? Accent : Edge;
-            button.ForeColor = Color.White;
+            // The approved General composition uses Alter Ego as the
+            // highlighted section in its reference image. Retain that
+            // visual until the user explicitly selects another section.
+            bool selected = section == "General"
+                ? name == "Alter Ego"
+                : name.Equals(section, StringComparison.OrdinalIgnoreCase);
+            if (button is WorkerSectionButton tab)
+            {
+                tab.Active = selected;
+                tab.Invalidate();
+            }
         }
         _content.SuspendLayout();
+        if (_actionArea.Parent is Control oldParent)
+            oldParent.Controls.Remove(_actionArea);
         _content.Controls.Clear();
         if (section == "General") BuildGeneral();
         else BuildSecondary(section);
@@ -633,6 +1032,19 @@ internal sealed class WorkerEditorForm : Form
     {
         var root = new Panel { Dock = DockStyle.Fill, Name = "WorkerSecondarySection" };
         _content.Controls.Add(root);
+        // The action strip is retained on other worker sections as well.
+        var secondaryFooter = new Panel
+        {
+            Name = "WorkerSecondaryActionsHost",
+            Dock = DockStyle.Bottom, Height = 72,
+            BackColor = Ink,
+            Padding = new Padding(0, 24, 5, 6)
+        };
+        _actionArea.Dock = DockStyle.Right;
+        _actionArea.Width = 574;
+        _actionArea.Padding = Padding.Empty;
+        secondaryFooter.Controls.Add(_actionArea);
+        root.Controls.Add(secondaryFooter);
         string? tableName = SectionTable(section);
         var data = _profile.Sections.FirstOrDefault(x => x.Table == tableName)?.Records;
         var header = new Label
@@ -761,11 +1173,14 @@ internal sealed class WorkerEditorForm : Form
 
     // Disabled workflow buttons remain readable, instead of Windows Forms
     // rendering black-on-navy disabled text. Saving is still unavailable.
+    // Buttons draw their own icon and caption. This works in the running app
+    // and in DrawToBitmap, unlike transparent label controls over siblings.
     private sealed class WorkerActionButton : Button
     {
         internal WorkerActionButton()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            SetStyle(ControlStyles.UserPaint |
+                ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
         }
 
@@ -773,14 +1188,70 @@ internal sealed class WorkerEditorForm : Form
         {
             var bounds = ClientRectangle;
             if (bounds.Width <= 2 || bounds.Height <= 2) return;
-            e.Graphics.Clear(BackColor);
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(BackColor);
             using var outline = new Pen(FlatAppearance.BorderColor, 1f);
-            e.Graphics.DrawRectangle(outline, 0, 0,
+            g.DrawRectangle(outline, 0, 0,
                 bounds.Width - 1, bounds.Height - 1);
-            TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
-                Enabled ? Color.White : Color.FromArgb(191, 215, 234),
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-                TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+
+            var textSize = TextRenderer.MeasureText(g, Text, Font,
+                new Size(int.MaxValue, Height),
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            int iconSize = 19, gap = 6;
+            int labelWidth = textSize.Width + iconSize + gap;
+            int x = Math.Max(4, (Width - labelWidth) / 2);
+            int y = (Height - iconSize) / 2;
+
+            using var pen = new Pen(Color.White, 1.6f)
+            {
+                LineJoin = LineJoin.Round
+            };
+            using var brush = new SolidBrush(Color.White);
+            switch (Name)
+            {
+                case "WorkerCreateMoveset":
+                    g.DrawPolygon(pen, [
+                        new Point(x, y + 5), new Point(x + 9, y + 1),
+                        new Point(x + 18, y + 5), new Point(x + 9, y + 9)
+                    ]);
+                    g.DrawPolygon(pen, [
+                        new Point(x, y + 10), new Point(x + 9, y + 14),
+                        new Point(x + 18, y + 10), new Point(x + 9, y + 6)
+                    ]);
+                    g.DrawLine(pen, x, y + 5, x, y + 13);
+                    g.DrawLine(pen, x + 18, y + 5, x + 18, y + 13);
+                    break;
+                case "WorkerSuggestName":
+                    g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
+                    foreach (var dot in new[] {
+                        new Point(5, 5), new Point(12, 5),
+                        new Point(9, 9), new Point(5, 13),
+                        new Point(12, 13)
+                    })
+                        g.FillEllipse(brush, x + dot.X, y + dot.Y, 2, 2);
+                    break;
+                case "WorkerMakeBiography":
+                    g.DrawRectangle(pen, x + 2, y + 1, 14, 17);
+                    g.DrawLine(pen, x + 5, y + 6, x + 13, y + 6);
+                    g.DrawLine(pen, x + 5, y + 10, x + 13, y + 10);
+                    g.DrawLine(pen, x + 5, y + 14, x + 11, y + 14);
+                    break;
+                case "WorkerSave":
+                    g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
+                    g.DrawRectangle(pen, x + 5, y + 1, 8, 6);
+                    g.DrawRectangle(pen, x + 5, y + 11, 8, 6);
+                    break;
+            }
+            TextRenderer.DrawText(g, Text, Font,
+                new Rectangle(x + iconSize + gap, 0,
+                    Math.Max(1, Width - (x + iconSize + gap) - 2), Height),
+                Enabled ? Color.White : Color.FromArgb(221, 237, 248),
+                TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine |
+                TextFormatFlags.NoPadding |
+                TextFormatFlags.EndEllipsis);
         }
     }
 
@@ -804,44 +1275,47 @@ internal sealed class WorkerEditorForm : Form
 
     private void BuildActions()
     {
-        var footer = new Panel
+        _actionArea.Padding = Padding.Empty;
+        _actionArea.Margin = Padding.Empty;
+        _actionArea.BackColor = Color.Transparent;
+        var buttons = new TableLayoutPanel
         {
             Name = "WorkerEditorActions",
             Dock = DockStyle.Fill,
-            Margin = new Padding(3, 2, 3, 2),
-            BackColor = Surface
+            ColumnCount = 4, RowCount = 1,
+            Padding = Padding.Empty, Margin = Padding.Empty,
+            BackColor = Color.Transparent
         };
-        var buttons = new FlowLayoutPanel
+        buttons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        foreach (int width in new[] { 28, 25, 27, 20 })
+            buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
+
+        var moveset = ActionButton("Create Moveset", "WorkerCreateMoveset");
+        var suggest = ActionButton("Suggest Name", "WorkerSuggestName");
+        var biography = ActionButton("Make Biography", "WorkerMakeBiography");
+        var save = ActionButton("Save", "WorkerSave", primary: true);
+        var actions = new[] { moveset, suggest, biography, save };
+        for (int i = 0; i < actions.Length; i++)
         {
-            Dock = DockStyle.Right, Width = 674,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Padding = new Padding(0, 6, 0, 0),
-            AutoScroll = false
-        };
-        var moveset = ActionButton("Create Moveset", "WorkerCreateMoveset", width: 146);
-        var suggest = ActionButton("Suggest Name", "WorkerSuggestName", width: 137);
-        var biography = ActionButton("Make Biography", "WorkerMakeBiography", width: 152);
-        var save = ActionButton("Save", "WorkerSave", true, width: 154);
-        foreach (var button in new[] { moveset, suggest, biography, save })
-        {
-            // Workflow/back-end integration belongs to the separate database
-            // implementation. Never claim that a read-only preview was saved.
+            var button = actions[i];
+            button.Dock = DockStyle.Fill;
+            button.Size = Size.Empty;
+            button.Height = 38;
+            button.Margin = new Padding(3, 2, 3, 2);
             button.Enabled = false;
-            _tips.SetToolTip(button, "Editing actions will be enabled when worker record saving is connected.");
-            buttons.Controls.Add(button);
+            _tips.SetToolTip(button,
+                "Worker editing functions are not yet connected to the database.");
+            var holder = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent, Margin = Padding.Empty
+            };
+            button.Dock = DockStyle.Fill;
+            holder.Controls.Add(button);
+
+            buttons.Controls.Add(holder, i, 0);
         }
-        footer.Controls.Add(buttons);
-        var status = new Label
-        {
-            Text = "VIEWING WORKER RECORD   •   Editing not yet connected",
-            Dock = DockStyle.Fill, Padding = new Padding(12, 0, 0, 0),
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.FromArgb(168, 197, 218),
-            Font = new Font("Segoe UI", 8.5f)
-        };
-        footer.Controls.Add(status);
-        status.SendToBack();
-        _body.Controls.Add(footer, 0, 2);
+        _actionArea.Controls.Add(buttons);
     }
+
 }

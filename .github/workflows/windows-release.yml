@@ -39,8 +39,17 @@ jobs:
       - name: Verify the menu, skins, folder layout and MDB file-management routines
         shell: pwsh
         run: |
+          $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.21 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.23 smoke test failed: $LASTEXITCODE" }
+
+      - name: Upload Worker Editor visual verification screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Worker-Editor-Visual-Preview
+          path: worker-editor-preview.png
+          if-no-files-found: warn
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -72,7 +81,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.21 complete game ZIP
+      - name: Assemble the Version 0.5.23 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -96,7 +105,7 @@ jobs:
         run: |
           Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
           if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.5.21.0") {
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.5.23.0") {
             throw "Standalone EXE file version does not match this release"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -127,36 +136,39 @@ jobs:
       - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.21
-          name: Pro Wrestling Revolution 0.5.21 - Worker Editor Popup
+          tag_name: v0.5.23
+          name: Pro Wrestling Revolution 0.5.23 - Worker Editor Mockup Fidelity
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Version 0.5.21 corrects the Worker Editor interface to behave as an
-            in-game popup layered over the Database Editor, without opening a
-            separate full-window desktop form. The original main-menu icon
-            strip remains in the launcher and is not duplicated in the worker
-            popup. The approved blue Worker Editor styling, compact fixed
-            general layout and worker section views are retained, with panel
-            header/field overlap corrections and more readable action buttons.
+            Version 0.5.23 refines the existing Worker Editor to follow the
+            approved blue PWR visual mockup. The native WinForms worker screen
+            retains its exact fixed 1366x768 logical canvas. The identity,
+            biography, four-column fields, section headers, left navigation
+            buttons and lower-right actions use measured reference positions.
 
-            Existing players: download ONLY ProWrestlingRevolution.exe or use
-            Check for Updates. The in-game updater replaces the EXE alone.
-            Skins, custom title artwork, Databases, saves, Pictures, System
-            files, and settings are preserved. No skin assets were changed.
+            Worker Editor action labels and icons are drawn directly on their
+            controls to remain visible on Windows. Section buttons use the
+            blue active-state gradient from the reference. The worker record
+            values are still read from the selected universe MDB; absent
+            images and blank fields remain truthful to the underlying data.
+            Worker editing and saving remain disabled until safe persistence
+            is implemented. No extra scrolling or duplicate worker data is
+            introduced. The UI is an in-game overlay, not a desktop window.
 
-            New players: use the complete game ZIP in a new writable folder.
-            Do not extract that ZIP over an existing customized installation.
-            Older updaters retain the historically named ZIP fallback.
+            Existing players: use Check for Updates or download ONLY the
+            standalone ProWrestlingRevolution.exe. This preserves all skins,
+            databases, pictures, saves, settings and custom title artwork.
+            Developers in Visual Studio should pull main and rebuild.
+            The complete game ZIP is only for new installations and should
+            never be extracted over a customized installation.
 
-            Viewing and navigating worker information works with native PRW
-            MDB records. Worker editing, saving, and generation actions remain
-            disabled until a safe database writing workflow is implemented.
-            The v0.5.20 standalone update and development build protections
-            remain unchanged. All other editor categories are unaffected.
+            No skin assets or skin-loading code were changed. The v0.5.20
+            standalone updater and development-build safety protections are
+            retained.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip

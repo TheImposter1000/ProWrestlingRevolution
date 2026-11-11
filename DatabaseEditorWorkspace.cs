@@ -1011,68 +1011,52 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     }
 
     /// <summary>
-    /// Display worker details as a child popup over the database directory.
-    /// The real main-menu icon rail belongs to the launcher and remains
-    /// unchanged. No independent desktop window or skin replacement is used.
+    /// The editor is a game-layer popup, not a separate desktop window.
+    /// It fills the launcher client so the visible result matches the
+    /// approved Worker Editor screenshot. The database workspace and
+    /// previously selected skin remain untouched underneath it.
     /// </summary>
     private void OpenWorkerPopup(PrwWorkerProfile profile)
     {
-        if (Controls.Find("WorkerEditorOverlay", false).Length != 0) return;
+        if (FindForm() is not Form launcher) return;
+        if (launcher.Controls.Find("WorkerEditorOverlay", false).Length != 0) return;
 
         var overlay = new Panel
         {
-            Name = "WorkerEditorOverlay",
-            Dock = DockStyle.Fill,
-            BackColor = Ink,
-            Margin = Padding.Empty,
-            TabStop = true
+            Name = "WorkerEditorOverlay", Dock = DockStyle.Fill,
+            BackColor = Ink, Margin = Padding.Empty,
+            Padding = Padding.Empty, TabStop = true
         };
+        var worker = new WorkerEditorForm(_paths, _skin, profile);
 
-        // Retain the database directory visibly behind the popup. A snapshot
-        // is used solely as a dimmed in-memory backdrop; no skin file is read,
-        // written, transformed or replaced.
-        Bitmap? backdrop = null;
-        if (ClientSize.Width > 0 && ClientSize.Height > 0)
+        bool cleaned = false;
+        void CleanUp()
         {
-            try
-            {
-                backdrop = new Bitmap(ClientSize.Width, ClientSize.Height);
-                DrawToBitmap(backdrop, new Rectangle(Point.Empty, ClientSize));
-                overlay.BackgroundImage = backdrop;
-                overlay.BackgroundImageLayout = ImageLayout.None;
-            }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-            {
-                backdrop?.Dispose();
-                backdrop = null;
-            }
-        }
-        overlay.Paint += (_, args) =>
-        {
-            using var shade = new SolidBrush(Color.FromArgb(176, 4, 11, 20));
-            args.Graphics.FillRectangle(shade, overlay.ClientRectangle);
-        };
-
-        var worker = new WorkerEditorForm(_paths, _skin, profile)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            StartPosition = FormStartPosition.Manual
-        };
-        bool removed = false;
-        worker.Disposed += (_, _) =>
-        {
-            if (removed) return;
-            removed = true;
+            if (cleaned) return;
+            cleaned = true;
             if (!overlay.IsDisposed)
             {
-                Controls.Remove(overlay);
+                launcher.Controls.Remove(overlay);
                 overlay.Dispose();
             }
-            backdrop?.Dispose();
+        }
+        worker.CloseRequested += (_, _) =>
+        {
+            var destination = worker.RequestedNavigation;
+            CleanUp();
+            if (destination is not null)
+            {
+                // Do not change the game page while the worker overlay is
+                // disposing its controls.
+                if (launcher.IsHandleCreated)
+                    launcher.BeginInvoke(new Action(() => _navigate?.Invoke(destination)));
+                else
+                    _navigate?.Invoke(destination);
+            }
         };
+        worker.Disposed += (_, _) => CleanUp();
 
-        Controls.Add(overlay);
+        launcher.Controls.Add(overlay);
         overlay.BringToFront();
         overlay.Controls.Add(worker);
         worker.FitInside(overlay);

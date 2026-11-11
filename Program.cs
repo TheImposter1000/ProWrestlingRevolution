@@ -1,3 +1,5 @@
+using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -334,7 +336,19 @@ internal static class Program
                     new PrwProfileSection("tblWorkerBio", biographyTable)
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
+            using (var workerHost = new Panel
             {
+                Name = "WorkerVisualTestHost",
+                Size = new System.Drawing.Size(SkinArt.WindowWidth, SkinArt.WindowHeight)
+            })
+            {
+                // The CI desktop may be smaller than the fixed game canvas.
+                // Hosting the form as a child avoids OS-level top-window
+                // clamping and exercises the exact in-game popup layout.
+                workerHost.Controls.Add(workerEditor);
+                workerEditor.FitInside(workerHost);
+                workerEditor.Show();
+                Application.DoEvents();
                 if (workerEditor.Controls.Find("WorkerEditorBody", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerGeneralGrid", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerPersonalData", true).Length != 1 ||
@@ -343,7 +357,7 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerLanguages", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerBiography", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerPopupLayout", true).Length != 1 ||
-                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 0 ||
+                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
@@ -367,10 +381,17 @@ internal static class Program
                     .Single() as TableLayoutPanel;
                 var tabColumn = workerEditor.Controls.Find("WorkerSectionNavigation", true).Single();
                 var workerBody = workerEditor.Controls.Find("WorkerEditorBody", true).Single();
+                var workerPage = workerEditor.Controls.Find("WorkerPage", true)
+                    .SingleOrDefault() as TableLayoutPanel;
+                var mainRail = workerEditor.Controls.Find("WorkerMainMenuRail", true).Single();
                 if (popupLayout is null || popupLayout.ColumnCount != 2 ||
-                    tabColumn.Right > workerBody.Left ||
-                    tabColumn.Width < 155 || workerBody.Width < 900)
-                    throw new Exception("Worker popup columns overlap or are too narrow.");
+                    workerPage is null || workerPage.ColumnCount != 2 ||
+                    mainRail.Width != 61 || tabColumn.Width != 158 ||
+                    tabColumn.Right > workerBody.Left || workerBody.Width < 1000)
+                    throw new Exception("Worker editor icon rail, tabs and data area must not overlap. " +
+                        $"Form={workerEditor.Size}, rail={mainRail.Bounds}, tabs={tabColumn.Bounds}, " +
+                        $"body={workerBody.Bounds}, page={workerPage?.Bounds}, " +
+                        $"popup={popupLayout?.Bounds}.");
                 var personal = workerEditor.Controls.Find("WorkerPersonalData", true).Single();
                 var personalHeading = workerEditor.Controls.Find("WorkerPersonalDataHeading", true).Single();
                 var personalFields = workerEditor.Controls.Find("WorkerPersonalDataFields", true).Single();
@@ -378,6 +399,44 @@ internal static class Program
                 if (personalFields.Top < personalHeading.Bottom ||
                     personalFields.Bottom > personal.ClientSize.Height)
                     throw new Exception("Worker fields overlap their section header.");
+                var picture = workerEditor.Controls.Find("WorkerPicture", true).Single();
+                var biography = workerEditor.Controls.Find("WorkerBiography", true).Single();
+                var identity = workerEditor.Controls.Find("WorkerIdentity", true).Single();
+                var titleRow = workerEditor.Controls.Find("WorkerIdentityBiographyRow", true).Single();
+                if (titleRow.Height < 140 || picture.Right > identity.Width ||
+                    biography.Width < 500 || biography.Height < 115)
+                    throw new Exception("Worker top identity/biography panels diverge from the approved mockup.");
+                var footer = workerEditor.Controls.Find("WorkerEditorActions", true).Single();
+                var actionArea = workerEditor.Controls.Find("WorkerActionArea", true).Single();
+                var generalCanvas = workerEditor.Controls.Find("WorkerGeneralCanvas", true).Single();
+                var generalGrid = workerEditor.Controls.Find("WorkerGeneralGrid", true)
+                    .SingleOrDefault() as TableLayoutPanel;
+                if (footer.Width < 540 || footer.Top < 0 ||
+                    generalGrid is null || generalGrid.RowCount != 2 ||
+                    actionArea.Parent != generalGrid ||
+                    generalGrid.GetRow(actionArea) != 1 ||
+                    generalGrid.GetColumn(actionArea) != 2 ||
+                    generalGrid.GetColumnSpan(actionArea) != 2 ||
+                    actionArea.Height < 65)
+                    throw new Exception("Worker actions must use the dedicated lower-right grid row.");
+
+                // Render the actual WinForms control tree on the CI runner.
+                // This preview is a diagnostic artifact and does not alter
+                // installed artwork or any skin files.
+                string? previewPath = Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                if (!string.IsNullOrWhiteSpace(previewPath))
+                {
+                    workerEditor.CreateControl();
+                    workerEditor.PerformLayout();
+                    using var preview = new System.Drawing.Bitmap(
+                        workerEditor.ClientSize.Width, workerEditor.ClientSize.Height);
+                    workerEditor.DrawToBitmap(preview,
+                        new System.Drawing.Rectangle(
+                            System.Drawing.Point.Empty, preview.Size));
+                    preview.Save(previewPath,
+                        System.Drawing.Imaging.ImageFormat.Png);
+                    Console.WriteLine("Worker preview saved to " + previewPath);
+                }
             }
 
             // Update installers now accept a raw Windows executable rather
