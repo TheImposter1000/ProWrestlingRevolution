@@ -759,9 +759,34 @@ internal sealed class WorkerEditorForm : Form
             .First(x => x.Name == "WorkerSecondaryTitle").BringToFront();
     }
 
+    // Disabled workflow buttons remain readable, instead of Windows Forms
+    // rendering black-on-navy disabled text. Saving is still unavailable.
+    private sealed class WorkerActionButton : Button
+    {
+        internal WorkerActionButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var bounds = ClientRectangle;
+            if (bounds.Width <= 2 || bounds.Height <= 2) return;
+            e.Graphics.Clear(BackColor);
+            using var outline = new Pen(FlatAppearance.BorderColor, 1f);
+            e.Graphics.DrawRectangle(outline, 0, 0,
+                bounds.Width - 1, bounds.Height - 1);
+            TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
+                Enabled ? Color.White : Color.FromArgb(191, 215, 234),
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+        }
+    }
+
     private static Button ActionButton(string label, string name, bool primary = false, int width = 148)
     {
-        var button = new Button
+        var button = new WorkerActionButton
         {
             Name = name, Text = label,
             Size = new Size(width, 35),
