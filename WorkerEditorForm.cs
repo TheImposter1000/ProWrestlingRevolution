@@ -1250,7 +1250,7 @@ internal sealed class WorkerEditorForm : UserControl
                     g.DrawLine(pen, x + 18, y + 5, x + 18, y + 13);
                     break;
                 case "suggest":
-                    g.DrawRoundedRectangle(pen, new Rectangle(x + 1, y + 1, 16, 16), 3);
+                    g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
                     foreach (var dot in new[] {
                         new Point(5, 5), new Point(12, 5), new Point(9, 9),
                         new Point(5, 13), new Point(12, 13)
