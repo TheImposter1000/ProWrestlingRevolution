@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.18 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.20 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -72,7 +72,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.18 portable game ZIP
+      - name: Assemble the Version 0.5.20 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -86,41 +86,82 @@ jobs:
           if (-not (Test-Path "publish/Databases/README.txt")) { throw "Databases folder missing" }
           if (Test-Path "publish/Data/Scenarios/Genesis.json") { throw "Legacy JSON scenario accidentally included" }
           Get-ChildItem publish -Filter *.pdb | Remove-Item -Force
+          # This is the COMPLETE game package. Keep its historical ZIP filename
+          # so pre-0.5.20 updaters can still extract ONLY the EXE automatically.
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.18 game ZIP
+      - name: Verify direct EXE update matches the complete game
+        shell: pwsh
+        run: |
+          Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
+          if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.5.20.0") {
+            throw "Standalone EXE file version does not match this release"
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead("ProWrestlingRevolution-Windows-x64.zip")
+          $extracted = "pwr-verify-complete-exe.exe"
+          try {
+            $entry = $archive.GetEntry("ProWrestlingRevolution.exe")
+            if ($null -eq $entry) { throw "Complete game ZIP is missing the application EXE" }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $extracted)
+            $zipHash = (Get-FileHash $extracted -Algorithm SHA256).Hash
+            $exeHash = (Get-FileHash "ProWrestlingRevolution.exe" -Algorithm SHA256).Hash
+            if ($zipHash -ne $exeHash) { throw "Standalone EXE differs from complete game EXE" }
+          }
+          finally {
+            $archive.Dispose()
+            Remove-Item $extracted -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload standalone update EXE and complete game ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ProWrestlingRevolution-Windows-x64
-          path: ProWrestlingRevolution-Windows-x64.zip
+          name: ProWrestlingRevolution-Release
+          path: |
+            ProWrestlingRevolution.exe
+            ProWrestlingRevolution-Windows-x64.zip
           retention-days: 90
 
-      - name: Publish direct Windows game download
+      - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.18
-          name: Pro Wrestling Revolution 0.5.18 - Native Editor Metadata MDB
+          tag_name: v0.5.20
+          name: Pro Wrestling Revolution 0.5.20 - Standalone EXE Updates
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Adds a dedicated System/PRWEditor.mdb for Database Editor category
-            names, field captions, display order, visibility, and field groups.
+            EXISTING PLAYERS: Download ProWrestlingRevolution.exe alone,
+            or use the in-game Check for Updates button. The updater now
+            verifies and downloads the direct EXE from GitHub, replaces only
+            the executable and restarts. Databases, saves, Pictures, Skins,
+            System, settings and custom title artwork are untouched.
 
-            This Access MDB is separate from the native PRWDefault.mdb game
-            data and is generated from the PRW schema using Jackcess. It
-            follows Access metadata concepts observed in TEW9Access.mdb
-            without copying TEW worker/company records or distributing TEW data.
-            A missing or inaccessible editor MDB falls back to native names.
+            NEW PLAYERS: Download ProWrestlingRevolution-Windows-x64.zip,
+            the COMPLETE GAME containing the executable and default folders.
+            Extract it into its own writable directory. Do not extract the
+            complete game ZIP over an existing customized installation.
 
-            The in-app executable updater installs the bundled editor MDB on
-            launch when missing. Existing universes, careers, settings,
-            skins, pictures and user-customized editor MDB files are preserved.
+            The complete ZIP keeps its historical filename so updaters in
+            versions before 0.5.20 can still bootstrap safely. Those older
+            updaters extract only the EXE. After upgrading, future updates
+            download the standalone EXE directly, without any ZIP extraction.
 
-            Retains the version 0.5.17 worker editor and its navigation.
+            Source-code archives are supplied automatically by GitHub.
+            The updater checks GitHub's SHA-256 asset digest, verifies the
+            Windows executable and version, and preserves an EXE backup.
+
+            Visual Studio developers must update through Git Pull and
+            Clean/Rebuild, not through the in-game updater. The application
+            refuses to overwrite build output under Repos/bin/Debug or Release
+            to prevent release-vs-debug game-folder changes.
+
+            The v0.5.19 Database Editor and native MDB data features are
+            retained without changing existing universes, skins or saves.
           files: |
+            ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
-            System/PRWEditor.mdb

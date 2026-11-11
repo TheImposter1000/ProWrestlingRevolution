@@ -92,6 +92,7 @@ internal static class Program
     private static void SmokeTest()
     {
         PrwSchema.AssertDefinitionIntegrity();
+        EditorCategoryDirectory.AssertMenuContract();
         var root = Path.Combine(Path.GetTempPath(), "PWR-phase1-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -202,6 +203,34 @@ internal static class Program
             // Construct the actual launcher (without showing a window) and verify its
             // fixed logical canvas. This catches regressions in the native menu layout.
             ApplicationConfiguration.Initialize();
+
+            // Construct a company profile without ACE so CI also verifies the
+            // linked editor's section navigation and detail grid.
+            var sampleCompany = new System.Data.DataTable("tblFed");
+            sampleCompany.Columns.Add("UID", typeof(int));
+            sampleCompany.Columns.Add("Name", typeof(string));
+            sampleCompany.Rows.Add(1, "Example Company");
+            var sampleContract = new System.Data.DataTable("tblContract");
+            sampleContract.Columns.Add("UID", typeof(int));
+            sampleContract.Columns.Add("FedUID", typeof(int));
+            sampleContract.Rows.Add(11, 1);
+            using (var companyView = new LinkedRecordEditorForm(
+                "tblFed", "Example Company",
+                EditorMetadataCatalog.Load(paths.EditorMetadataDatabase),
+                [
+                    new PrwProfileSection("tblFed", sampleCompany),
+                    new PrwProfileSection("tblContract", sampleContract)
+                ]))
+            {
+                var rows = companyView.Controls.Find("LinkedRecordFields", true)
+                    .SingleOrDefault() as DataGridView;
+                if (companyView.Name != "CompanyEditorForm" ||
+                    companyView.ClientSize.Width != SkinArt.WindowWidth ||
+                    companyView.Controls.Find("EntitySection_tblContract", true).Length != 1 ||
+                    rows is null || rows.Columns.Count != 3 || rows.Rows.Count != 2)
+                    throw new Exception(
+                        "Company profile must show the parent record and linked contract section.");
+            }
             using (var launcher = new LauncherForm(paths))
             {
                 if (launcher.ClientSize.Width != SkinArt.WindowWidth ||
@@ -330,23 +359,39 @@ internal static class Program
                     throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
             }
 
-            // Updates may carry game data files in the ZIP, but the installer
-            // must extract only the executable and never touch those files.
-            var sampleArchive = Path.Combine(root, "update-test.zip");
-            using (var archive = System.IO.Compression.ZipFile.Open(
-                sampleArchive, System.IO.Compression.ZipArchiveMode.Create))
-            {
-                using (var output = archive.CreateEntry(
-                    "ProWrestlingRevolution.exe").Open())
-                    output.Write(new byte[] { 0x4D, 0x5A, 0, 0 });
-                using (var output = archive.CreateEntry(
-                    "Databases/ShouldNotBeExtracted.mdb").Open())
-                    output.Write(new byte[] { 0x41 });
-            }
-            GameUpdate.ExtractApplication(sampleArchive,
-                Path.Combine(root, "sample-new.exe"));
-            if (File.Exists(Path.Combine(root, "Databases", "ShouldNotBeExtracted.mdb")))
-                throw new Exception("Updater extracted game data files.");
+            // Update installers now accept a raw Windows executable rather
+            // than extracting arbitrary files from release ZIP archives.
+            var sampleExe = Path.Combine(root, "sample-new.exe");
+            var sampleBytes = new byte[256];
+            sampleBytes[0] = (byte)'M';
+            sampleBytes[1] = (byte)'Z';
+            BitConverter.GetBytes(128).CopyTo(sampleBytes, 0x3C);
+            sampleBytes[128] = (byte)'P';
+            sampleBytes[129] = (byte)'E';
+            File.WriteAllBytes(sampleExe, sampleBytes);
+            GameUpdate.ValidateApplication(sampleExe);
+
+            var fakeZip = Path.Combine(root, "not-an-exe.exe");
+            var fakeArchiveBytes = new byte[256];
+            fakeArchiveBytes[0] = (byte)'P';
+            fakeArchiveBytes[1] = (byte)'K';
+            File.WriteAllBytes(fakeZip, fakeArchiveBytes);
+            bool zipRejected = false;
+            try { GameUpdate.ValidateApplication(fakeZip); }
+            catch (InvalidDataException) { zipRejected = true; }
+            if (!zipRejected)
+                throw new Exception("ZIP data was incorrectly accepted as an update EXE.");
+
+            // Protect source builds from an in-place upgrade to the published
+            // executable, which would change their game asset directory.
+            if (!GameUpdate.IsSourceBuildOutput(Path.Combine(
+                    debugOutput, "ProWrestlingRevolution.exe")) ||
+                !GameUpdate.IsSourceBuildOutput(Path.Combine(
+                    sourceCheckout, "bin", "Release", "net10.0-windows",
+                    "ProWrestlingRevolution.exe")) ||
+                GameUpdate.IsSourceBuildOutput(Path.Combine(
+                    standaloneOutput, "ProWrestlingRevolution.exe")))
+                throw new Exception("Developer build updater protection failed.");
 
             var fixture = Path.Combine(root, "sample.mdb");
             var header = new byte[2048];

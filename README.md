@@ -1,6 +1,60 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.18 adds a dedicated native MDB for Database Editor captions and ordering, separate from the existing game universe database.
+An original Windows desktop wrestling management project. Version 0.5.20 separates standalone EXE updates from the complete game installation.
+
+## Version 0.5.20: standalone EXE updates
+
+Each GitHub release now provides a raw **ProWrestlingRevolution.exe** for
+updating an existing game, and **ProWrestlingRevolution-Windows-x64.zip**
+as the **complete game** for first-time installation. GitHub automatically
+provides the tagged source code. There is no separate update ZIP.
+
+The full installation ZIP deliberately retains its original filename so
+older Check for Updates clients can still upgrade: the previous updater
+extracts only the EXE from that ZIP. From v0.5.20 onwards, Check for
+Updates directly downloads the EXE, checks GitHub's published SHA-256
+digest and the executable version, backs up the old EXE and restarts.
+It never installs or modifies Databases, Pictures, Skins, System or saves.
+
+**Do not extract the complete ZIP over an existing customized game.**
+For installed games, download only the EXE or use Check for Updates.
+When developing via Visual Studio under the Repos/bin output folders,
+use Git Pull, Clean Solution and Rebuild Solution. The in-game updater
+now refuses to replace a developer build with a Release executable,
+because the two builds can use different folder-resolution rules.
+
+## Version 0.5.19: alphabetical, relationship-based Database Editor
+
+The Current Section menu is now an alphabetical list of primary wrestling
+entities, not a list of every physical Access table. The existing 14-table
+native PRW database shows **Companies**, **Match Types** and **Workers**.
+Workers remain selected initially when available, so existing worker editing
+workflows still start with the wrestler directory.
+
+The worker editor brings together identity, biographies, popularity, skills,
+physical condition, alternative identities, attributes and employment records.
+Double-clicking a company opens a dedicated linked company record screen with
+its contracts and contract biographies. Double-clicking a match type opens a
+dedicated linked match screen with its ring setups and allowed finishes.
+These tabs use only declared PRW foreign-key relationships; they do not
+join records by name, position or guessed identifiers.
+
+The categories and linked record section labels come from
+`System/PRWEditor.mdb`, with native names as a safe fallback. Categories
+and linked section names display alphabetically; the primary entity tab
+remains first. The generator also writes metadata category entries in
+alphabetical order. Player records stay in the selected universe MDB.
+
+Before grouping records, the editor validates the ten native core tables
+and their columns. Any imported database that does not pass that check
+continues to show its original tables separately, alphabetically, with the
+generic record browser. This prevents a TEW or other external MDB from
+being treated as a PRW universe merely because some table names match.
+
+The company and match profile sections are currently **read-only**.
+Validated record editing, including Add, Delete and Copy, remains a
+separate feature. Existing MDBs, save games, skins, settings and user
+changes to `PRWEditor.mdb` are not modified by this release.
 
 ## Version 0.5.18: separate Database Editor metadata MDB
 
@@ -204,7 +258,7 @@ Every direct folder in Skins appears in the selector, even if it has just one im
 
 The LowerBars directory is retained for compatibility with later screens, but not used on the title screen. Custom artwork files are not uploaded to GitHub or overwritten by the game.
 
-IMPORTANT: If you install this release in a fresh folder, copy your own skin and MDB data into that folder. When launching through Visual Studio, the runtime skin folder is normally under bin/Debug/net10.0-windows/ rather than the source directory. Use the game's Open Skins Folder button to confirm the actual path.
+IMPORTANT: If you install the complete game in a new folder, place your existing custom skins and MDB data in that installation's data folders rather than replacing them. Visual Studio Debug builds under a Repos checkout use the parent game directory when its Databases, Pictures, Skins and System folders are present. Use the game's Open Skins Folder button to confirm the active path.
 
 ## MDB structure
 
@@ -236,29 +290,20 @@ The Windows smoke test checks that the sidebar is 200 pixels wide, contains all 
 
 The seven main-menu entries now form a continuous, evenly spaced navigation group; the former blank gap before Achievements has been removed. The MAIN MENU heading and thin line, New Game's blue blade shape, icons, label positions and top bar align more closely with the reference. No title-screen JPG, logo, tagline or crowd artwork has been edited. Because the original user artwork is intentionally preserved, its embedded logo can still have a different size or composition from the reference mockup. All file paths, Access data handling and skin selection remain unchanged.
 
-## In-app updates (version 0.5.4 and later)
+## In-app updates (version 0.5.20 and later)
 
-Click **Check for Updates** at the bottom of the sidebar. The game uses GitHub's
-**latest stable release** and checks it against the version embedded in the
-Windows executable. If newer, it asks for your approval, downloads the official
-portable ZIP from this repository, verifies the release asset SHA-256 digest,
-and checks that the ZIP contains a newer Windows executable. It extracts **only**
-the root \`ProWrestlingRevolution.exe\` and starts a temporary copy of the
-current executable, which waits for the game to exit, replaces the installed
-executable, and restarts Pro Wrestling Revolution.
+The updater checks GitHub's latest stable release. If a newer version
+exists, it downloads the standalone `ProWrestlingRevolution.exe`
+release asset, verifies the GitHub SHA-256 digest and the executable's
+Windows version, then replaces the installed EXE using a temporary
+helper process. A backup of the previous executable is saved in
+`.pwr-updates/`. Game data folders and the custom skin are not touched.
 
-The updater does **not** unpack or overwrite Databases, SaveGames, Skins,
-Pictures, System or user settings. Each successful replacement keeps a copy
-of the former executable in \`.pwr-updates/\` for recovery. If a download or
-digest check fails, the running game is unaffected. If Windows cannot replace
-the executable (for example, because of permissions), the user sees an error.
+The existing installation folder must be writable. Visual Studio builds
+are deliberately not updated in place; pull and rebuild source code instead.
 
-The game must be installed in a **writable folder**. Automatic updates do not
-write into protected Program Files directories or elevate privileges. The
-installer deliberately updates **application executable only**; future releases
-which require external runtime dependencies must extend this protocol.
-
-**Migration:** v0.5.3 and earlier have no automatic updater. Install v0.5.4
-once from GitHub, preserving your existing data folders, to enable automatic
-updates for subsequent stable versions. Releases must use non-prerelease tags
-such as \`v0.5.5\` for the GitHub latest endpoint.
+**Backward compatibility:** The complete game ZIP keeps the legacy
+`ProWrestlingRevolution-Windows-x64.zip` asset name. v0.5.19 and earlier
+updaters still download that ZIP and extract only its executable, allowing
+them to move to the standalone updater in v0.5.20. v0.5.3 and older
+versions have no automatic updater and must be installed once manually.
