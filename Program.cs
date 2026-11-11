@@ -279,6 +279,49 @@ internal static class Program
 
             }
 
+            // Fixed Worker Editor is an interface-only view: verify its
+            // screenshot-based layout using in-memory worker records. It
+            // must not need the Access provider for UI construction.
+            var workerTable = new System.Data.DataTable("tblWorker");
+            workerTable.Columns.Add("UID", typeof(int));
+            workerTable.Columns.Add("Name", typeof(string));
+            workerTable.Columns.Add("ShortName", typeof(string));
+            workerTable.Rows.Add(1, "Sample Worker", "Sample");
+            var biographyTable = new System.Data.DataTable("tblWorkerBio");
+            biographyTable.Columns.Add("Biography", typeof(string));
+            biographyTable.Rows.Add("An example worker biography.");
+            var profile = new PrwWorkerProfile(
+                new PrwWorkerSummary(1, "Sample Worker", "Sample"),
+                [
+                    new PrwProfileSection("tblWorker", workerTable),
+                    new PrwProfileSection("tblWorkerBio", biographyTable)
+                ]);
+            using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
+            {
+                if (workerEditor.Controls.Find("WorkerEditorBody", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerGeneralGrid", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerPersonalData", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerSettings", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerActiveAreas", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerLanguages", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerBiography", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
+                    throw new Exception("Worker Editor fixed general layout is missing.");
+                if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
+                    throw new Exception("Worker Editor navigation sections are incomplete.");
+                var save = workerEditor.Controls.Find("WorkerSave", true)
+                    .SingleOrDefault() as Button;
+                if (save is null || save.Enabled)
+                    throw new Exception("Worker Editor cannot claim unsupported MDB saving.");
+                if (workerEditor.AutoScroll ||
+                    workerEditor.Controls.Find("WorkerSectionContent", true)
+                        .OfType<ScrollableControl>().Any(control => control.AutoScroll))
+                    throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
+            }
+
             // Updates may carry game data files in the ZIP, but the installer
             // must extract only the executable and never touch those files.
             var sampleArchive = Path.Combine(root, "update-test.zip");

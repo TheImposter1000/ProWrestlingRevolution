@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.16 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.17 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -55,7 +55,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.16 portable game ZIP
+      - name: Assemble the Version 0.5.17 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -72,7 +72,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.16 game ZIP
+      - name: Upload complete Version 0.5.17 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -82,25 +82,28 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.16
-          name: Pro Wrestling Revolution 0.5.16 - Expanded Default Database
+          tag_name: v0.5.17
+          name: Pro Wrestling Revolution 0.5.17 - Worker Editor Interface
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            This update replaces the base PRWDefault.mdb using the supplied
-            PRW_Default(2).mdb, with 14 native tables and 12 relationships.
-            New tables cover federations, match definitions, match ring setups,
-            and match finishes.
+            Version 0.5.17 introduces the fixed, no-scrolling PWR Worker Editor,
+            following the approved blue worker edit reference. Open the worker
+            screen by double-clicking a worker in the database editor.
+            Personal Data, Biography, Loyalty, Roles, Physical Health,
+            Age-Related Settings, Active Areas, and Languages are shown only
+            in their designated groups. The side sections show the actual
+            native MDB worker-linked records without duplicating general data.
 
-            On installation, an existing System/PRWDefault.mdb is copied into
-            System/TemplateBackups before being replaced. Databases, career
-            saves, pictures, skins, settings, and custom assets remain intact.
-            New Database uses the expanded template; existing universes are
-            not modified. Subsequent manual edits to the current base are kept.
+            All displayed values come from the selected worker's MDB record.
+            The current screen is read-only until the separate worker editing
+            and save workflows are integrated. Create Moveset, Suggest Name,
+            Make Biography, and Save are deliberately disabled rather than
+            silently writing or falsely claiming to save data.
 
-            The previous version 0.5.15 interface and MDB settings support
-            remain in place. Native MDB record access requires Windows ACE.
+            The compact main-menu icon rail and existing database and save
+            management functionality are preserved.
           files: ProWrestlingRevolution-Windows-x64.zip
