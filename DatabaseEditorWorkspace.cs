@@ -21,6 +21,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private static readonly Color Soft = Color.FromArgb(170, 191, 207);
 
     private readonly AppPaths _paths;
+    private readonly SkinPalette _skin;
     private readonly Action _goBack;
     private readonly ComboBox _section = new();
     private readonly ComboBox _massField = new();
@@ -273,6 +274,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     internal DatabaseEditorWorkspace(AppPaths paths, SkinPalette skin, Action goBack)
     {
         _paths = paths;
+        _skin = skin;
         _goBack = goBack;
         Dock = DockStyle.Fill;
         BackColor = Ink;
@@ -933,6 +935,12 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         {
             var profile = PrwWorkerRepository.Load(
                 _universe.MdbPath, entry.Row["UID"], _password);
+            using var workerEditor = new WorkerEditorForm(_paths, _skin, profile);
+            if (FindForm() is Form launcher)
+                workerEditor.FillLauncherWindow(launcher);
+            workerEditor.ShowDialog(FindForm());
+            return;
+
             foreach (var section in profile.Sections)
             {
                 int index = 0;
