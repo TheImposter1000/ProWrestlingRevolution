@@ -28,6 +28,7 @@ internal static class Program
 
             ApplicationConfiguration.Initialize();
             var paths = new AppPaths(FindGameRoot());
+            MessageBox.Show("Game folder: " + paths.Root + "\nExecutable folder: " + AppContext.BaseDirectory);
             paths.EnsureLayout();
             Application.Run(new LauncherForm(paths));
             return 0;

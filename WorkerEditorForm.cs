@@ -45,7 +45,7 @@ internal sealed class WorkerEditorForm : Form
         _profile = profile;
 
         Name = "WorkerEditorForm";
-        Text = "Pro Wrestling Revolution | Worker Editor";
+        Text = "Pro Wrestling Revolution";
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;
@@ -289,8 +289,8 @@ internal sealed class WorkerEditorForm : Form
         // Keep the top chrome, main-menu icons and section buttons visible
         // while the remaining space is reserved for the worker fields.
         Controls.SetChildIndex(chrome, 0);
-        Controls.SetChildIndex(_mainRail, 1);
-        Controls.SetChildIndex(_sectionNavigation, 2);
+        Controls.SetChildIndex(_mainRail, 2);
+        Controls.SetChildIndex(_sectionNavigation, 1);
         Controls.SetChildIndex(_body, 3);
 
         var top = new TableLayoutPanel
