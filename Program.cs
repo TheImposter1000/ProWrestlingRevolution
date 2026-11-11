@@ -407,9 +407,10 @@ internal static class Program
                 var actionArea = workerEditor.Controls.Find("WorkerActionArea", true).Single();
                 var generalCanvas = workerEditor.Controls.Find("WorkerGeneralCanvas", true).Single();
                 if (footer.Width < 540 || footer.Top < 0 ||
-                    actionArea.Top < generalCanvas.Bottom ||
-                    actionArea.Bottom > workerBody.ClientSize.Height)
-                    throw new Exception("Worker action buttons must remain fully visible below the data panels.");
+                    actionArea.Parent != generalCanvas ||
+                    actionArea.Top < 455 ||
+                    actionArea.Bottom > generalCanvas.ClientSize.Height)
+                    throw new Exception("Worker actions must occupy the lower-right reserved area.");
 
                 // Render the actual WinForms control tree on the CI runner.
                 // This preview is a diagnostic artifact and does not alter

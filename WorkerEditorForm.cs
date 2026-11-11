@@ -489,9 +489,9 @@ internal sealed class WorkerEditorForm : UserControl
         _mainArea.Name = "WorkerGeneralCanvas";
         _content.Name = "WorkerSectionContent";
         _mainArea.Controls.Add(_content);
+        _mainArea.Controls.Add(_actionArea);
         _body.Controls.Add(top);
         _body.Controls.Add(_mainArea);
-        _body.Controls.Add(_actionArea);
         _actionArea.BringToFront();
 
         _body.Resize += (_, _) => LayoutWorkerCanvas();
@@ -506,14 +506,14 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         _identityBiography.Bounds = new Rectangle(0, 10, width, 145);
         int generalY = 165;
-        int generalHeight = Math.Max(340, Math.Min(496, height - generalY - 22));
+        int generalHeight = Math.Max(340, Math.Min(524, height - generalY - 12));
         _mainArea.Bounds = new Rectangle(0, generalY, width, generalHeight);
-        _content.Bounds = _mainArea.ClientRectangle;
-        // Keep the four actions fully visible just below the data panels.
-        // They must never be obscured by the field card controls.
+        // The first two columns keep their full data height. The last two
+        // stop above the action row, as in the approved reference image.
+        _content.Bounds = new Rectangle(0, 0, width, Math.Min(496, generalHeight));
         _actionArea.Bounds = new Rectangle(
             Math.Max(0, width - 554),
-            Math.Max(0, height - 67),
+            Math.Min(472, Math.Max(0, generalHeight - 43)),
             Math.Min(552, width), 42);
         _actionArea.BringToFront();
     }
@@ -781,7 +781,8 @@ internal sealed class WorkerEditorForm : UserControl
         var grid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, Name = "WorkerGeneralGrid",
-            ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
+            ColumnCount = 4, RowCount = 1, Margin = Padding.Empty,
+            BackColor = Color.Transparent
         };
         foreach (float percent in new[] { 26f, 24f, 28f, 22f })
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, percent));
@@ -859,6 +860,8 @@ internal sealed class WorkerEditorForm : UserControl
             ("Retirement Age", "RetirementAge"),
             ("Career Goal", "CareerGoal")
         ], worker);
+        settings.Dock = DockStyle.Top;
+        settings.Height = 448;
         grid.Controls.Add(settings, 2, 0);
 
         var regions = Card("Active Areas", "WorkerActiveAreas");
@@ -867,7 +870,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Mexico", "ActiveMexico"), ("British Isles", "ActiveBritishIsles"),
             ("Japan", "ActiveJapan"), ("Europe", "ActiveEurope"),
             ("Oceania", "ActiveOceania"), ("India", "ActiveIndia")
-        ], worker);
+        ], worker, rowHeight: 21);
         var languages = Card("Languages", "WorkerLanguages");
         MakeRows(languages, [
             ("English", "LanguageEnglish"), ("Japanese", "LanguageJapanese"),
@@ -876,8 +879,12 @@ internal sealed class WorkerEditorForm : UserControl
             ("Germanic", "LanguageGermanic"), ("Slavic", "LanguageSlavic"),
             ("Hindi", "LanguageHindi")
         ], worker, labelShare: 52f);
-        grid.Controls.Add(Stack((regions, 48), (languages, 52)), 3, 0);
+        var rightColumn = Stack((regions, 47), (languages, 53));
+        rightColumn.Dock = DockStyle.Top;
+        rightColumn.Height = 448;
+        grid.Controls.Add(rightColumn, 3, 0);
         _content.Controls.Add(grid);
+        _actionArea.BringToFront();
     }
 
     private void ShowSection(string section)
