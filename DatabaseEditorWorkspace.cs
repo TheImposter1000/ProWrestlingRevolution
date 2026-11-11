@@ -986,12 +986,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         {
             var profile = PrwWorkerRepository.Load(
                 _universe.MdbPath, entry.Row["UID"], _password);
-            using var workerEditor = new WorkerEditorForm(_paths, _skin, profile);
-            if (FindForm() is Form launcher)
-                workerEditor.FillLauncherWindow(launcher);
-            workerEditor.ShowDialog(FindForm());
-            if (workerEditor.RequestedNavigation is string requested)
-                _navigate?.Invoke(requested);
+            OpenWorkerPopup(profile);
             return;
         }
         else
@@ -1013,6 +1008,81 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         bar.Controls.Add(open);
         dialog.Controls.Add(bar);
         dialog.ShowDialog(FindForm());
+    }
+
+    /// <summary>
+    /// Display worker details as a child popup over the database directory.
+    /// The real main-menu icon rail belongs to the launcher and remains
+    /// unchanged. No independent desktop window or skin replacement is used.
+    /// </summary>
+    private void OpenWorkerPopup(PrwWorkerProfile profile)
+    {
+        if (Controls.Find("WorkerEditorOverlay", false).Length != 0) return;
+
+        var overlay = new Panel
+        {
+            Name = "WorkerEditorOverlay",
+            Dock = DockStyle.Fill,
+            BackColor = Ink,
+            Margin = Padding.Empty,
+            TabStop = true
+        };
+
+        // Retain the database directory visibly behind the popup. A snapshot
+        // is used solely as a dimmed in-memory backdrop; no skin file is read,
+        // written, transformed or replaced.
+        Bitmap? backdrop = null;
+        if (ClientSize.Width > 0 && ClientSize.Height > 0)
+        {
+            try
+            {
+                backdrop = new Bitmap(ClientSize.Width, ClientSize.Height);
+                DrawToBitmap(backdrop, new Rectangle(Point.Empty, ClientSize));
+                overlay.BackgroundImage = backdrop;
+                overlay.BackgroundImageLayout = ImageLayout.None;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                backdrop?.Dispose();
+                backdrop = null;
+            }
+        }
+        overlay.Paint += (_, args) =>
+        {
+            using var shade = new SolidBrush(Color.FromArgb(176, 4, 11, 20));
+            args.Graphics.FillRectangle(shade, overlay.ClientRectangle);
+        };
+
+        var worker = new WorkerEditorForm(_paths, _skin, profile)
+        {
+            TopLevel = false,
+            FormBorderStyle = FormBorderStyle.None,
+            StartPosition = FormStartPosition.Manual
+        };
+        bool removed = false;
+        worker.Disposed += (_, _) =>
+        {
+            if (removed) return;
+            removed = true;
+            if (!overlay.IsDisposed)
+            {
+                Controls.Remove(overlay);
+                overlay.Dispose();
+            }
+            backdrop?.Dispose();
+        };
+
+        Controls.Add(overlay);
+        overlay.BringToFront();
+        overlay.Controls.Add(worker);
+        worker.FitInside(overlay);
+        overlay.Resize += (_, _) =>
+        {
+            if (!worker.IsDisposed) worker.FitInside(overlay);
+        };
+        worker.Show();
+        worker.BringToFront();
+        worker.Focus();
     }
 
     private void MassEdit()
