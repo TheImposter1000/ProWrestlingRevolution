@@ -762,8 +762,11 @@ internal sealed class DatabaseEditorWorkspace : UserControl
 
         try
         {
-            foreach (string name in _editorMetadata.OrderTables(
-                         AccessDatabase.TableNames(_universe.MdbPath, _password)))
+            // Show entity categories rather than exposing every relational
+            // support table as an independent editor screen.
+            foreach (string name in EditorCategoryDirectory.MainCategories(
+                         AccessDatabase.TableNames(_universe.MdbPath, _password),
+                         _editorMetadata))
                 _section.Items.Add(name);
             if (_section.Items.Count > 0)
             {
@@ -868,7 +871,8 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             var file = _universe is null ? null : new FileInfo(_universe.MdbPath);
             string summary = _universe is null ? "No database selected." :
                 "Database: " + _universe.Name +
-                "\nCategory: " + (_section.SelectedItem?.ToString() ?? "None") +
+                "\nCategory: " + (_section.SelectedItem is string currentTable
+                    ? _editorMetadata.CategoryLabel(currentTable) : "None") +
                 "\nRecords: " + _total.ToString("N0") +
                 "\nCategories: " + _section.Items.Count +
                 "\nFile size: " + (file!.Length / 1024d / 1024d).ToString("N1") + " MB" +
@@ -913,6 +917,22 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private void OpenRecordDetails()
     {
         if (_records.SelectedItem is not Entry entry) return;
+        if (_universe is not null &&
+            _section.SelectedItem is string category &&
+            (category == "tblFed" || category == "tblMatch") &&
+            entry.Row.Table.Columns.Contains("UID") &&
+            entry.Row["UID"] is not DBNull)
+        {
+            var linked = PrwRelatedProfileRepository.Load(
+                _universe.MdbPath, category, entry.Row["UID"], _password);
+            using var entityEditor = new LinkedRecordEditorForm(
+                category, entry.Name, _editorMetadata, linked);
+            if (FindForm() is Form launcher)
+                entityEditor.FillLauncherWindow(launcher);
+            entityEditor.ShowDialog(FindForm());
+            return;
+        }
+
         using var dialog = new Form
         {
             Text = entry.Name + " | Record Details",
