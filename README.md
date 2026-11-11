@@ -1,6 +1,39 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.18 adds a dedicated native MDB for Database Editor captions and ordering, separate from the existing game universe database.
+An original Windows desktop wrestling management project. Version 0.5.19 organizes the Database Editor around alphabetized wrestling categories and connected relational records.
+
+## Version 0.5.19: alphabetical, relationship-based Database Editor
+
+The Current Section menu is now an alphabetical list of primary wrestling
+entities, not a list of every physical Access table. The existing 14-table
+native PRW database shows **Companies**, **Match Types** and **Workers**.
+Workers remain selected initially when available, so existing worker editing
+workflows still start with the wrestler directory.
+
+The worker editor brings together identity, biographies, popularity, skills,
+physical condition, alternative identities, attributes and employment records.
+Double-clicking a company opens a dedicated linked company record screen with
+its contracts and contract biographies. Double-clicking a match type opens a
+dedicated linked match screen with its ring setups and allowed finishes.
+These tabs use only declared PRW foreign-key relationships; they do not
+join records by name, position or guessed identifiers.
+
+The categories and linked record section labels come from
+`System/PRWEditor.mdb`, with native names as a safe fallback. Categories
+and linked section names display alphabetically; the primary entity tab
+remains first. The generator also writes metadata category entries in
+alphabetical order. Player records stay in the selected universe MDB.
+
+Before grouping records, the editor validates the ten native core tables
+and their columns. Any imported database that does not pass that check
+continues to show its original tables separately, alphabetically, with the
+generic record browser. This prevents a TEW or other external MDB from
+being treated as a PRW universe merely because some table names match.
+
+The company and match profile sections are currently **read-only**.
+Validated record editing, including Add, Delete and Copy, remains a
+separate feature. Existing MDBs, save games, skins, settings and user
+changes to `PRWEditor.mdb` are not modified by this release.
 
 ## Version 0.5.18: separate Database Editor metadata MDB
 

@@ -91,6 +91,7 @@ internal static class Program
     private static void SmokeTest()
     {
         PrwSchema.AssertDefinitionIntegrity();
+        EditorCategoryDirectory.AssertMenuContract();
         var root = Path.Combine(Path.GetTempPath(), "PWR-phase1-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -201,6 +202,34 @@ internal static class Program
             // Construct the actual launcher (without showing a window) and verify its
             // fixed logical canvas. This catches regressions in the native menu layout.
             ApplicationConfiguration.Initialize();
+
+            // Construct a company profile without ACE so CI also verifies the
+            // linked editor's section navigation and detail grid.
+            var sampleCompany = new System.Data.DataTable("tblFed");
+            sampleCompany.Columns.Add("UID", typeof(int));
+            sampleCompany.Columns.Add("Name", typeof(string));
+            sampleCompany.Rows.Add(1, "Example Company");
+            var sampleContract = new System.Data.DataTable("tblContract");
+            sampleContract.Columns.Add("UID", typeof(int));
+            sampleContract.Columns.Add("FedUID", typeof(int));
+            sampleContract.Rows.Add(11, 1);
+            using (var companyView = new LinkedRecordEditorForm(
+                "tblFed", "Example Company",
+                EditorMetadataCatalog.Load(paths.EditorMetadataDatabase),
+                [
+                    new PrwProfileSection("tblFed", sampleCompany),
+                    new PrwProfileSection("tblContract", sampleContract)
+                ]))
+            {
+                var rows = companyView.Controls.Find("LinkedRecordFields", true)
+                    .SingleOrDefault() as DataGridView;
+                if (companyView.Name != "CompanyEditorForm" ||
+                    companyView.ClientSize.Width != SkinArt.WindowWidth ||
+                    companyView.Controls.Find("EntitySection_tblContract", true).Length != 1 ||
+                    rows is null || rows.Columns.Count != 3 || rows.Rows.Count != 2)
+                    throw new Exception(
+                        "Company profile must show the parent record and linked contract section.");
+            }
             using (var launcher = new LauncherForm(paths))
             {
                 if (launcher.ClientSize.Width != SkinArt.WindowWidth ||

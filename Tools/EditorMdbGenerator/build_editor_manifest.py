@@ -56,13 +56,19 @@ def write(name, header, rows):
         writer.writerow(header)
         writer.writerows(rows)
 
+# The metadata MDB itself also lists category definitions alphabetically,
+# independent of the order of physical Access tables in PrwSchema.cs.
+alphabetized = sorted(tables, key=lambda row: (
+    labels[row[0]][0].casefold(), row[0].casefold()
+))
 write("categories.tsv",
       ["TableName", "DisplayName", "DisplayOrder", "IsVisible", "Description"],
       [(table, labels[table][0], index + 1, "true", labels[table][1])
-       for index, (table, _, _) in enumerate(tables)])
+       for index, (table, _, _) in enumerate(alphabetized)])
 write("groups.tsv",
       ["TableName", "GroupName", "DisplayName", "DisplayOrder", "IsVisible"],
-      [(table, "General", labels[table][0], 1, "true") for table, _, _ in tables])
+      [(table, "General", labels[table][0], 1, "true")
+       for table, _, _ in alphabetized])
 write("fields.tsv",
       ["TableName", "FieldName", "DisplayLabel", "DisplayOrder",
        "IsVisible", "IsReadOnly", "GroupName"],

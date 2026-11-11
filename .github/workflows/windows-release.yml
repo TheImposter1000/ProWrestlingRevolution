@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.18 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.19 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -72,7 +72,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.18 portable game ZIP
+      - name: Assemble the Version 0.5.19 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -89,7 +89,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.18 game ZIP
+      - name: Upload complete Version 0.5.19 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -99,28 +99,34 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.18
-          name: Pro Wrestling Revolution 0.5.18 - Native Editor Metadata MDB
+          tag_name: v0.5.19
+          name: Pro Wrestling Revolution 0.5.19 - Alphabetical Linked Database Editor
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Adds a dedicated System/PRWEditor.mdb for Database Editor category
-            names, field captions, display order, visibility, and field groups.
+            Organizes the Database Editor around real wrestling entities
+            rather than exposing every Access relationship table at the top level.
 
-            This Access MDB is separate from the native PRWDefault.mdb game
-            data and is generated from the PRW schema using Jackcess. It
-            follows Access metadata concepts observed in TEW9Access.mdb
-            without copying TEW worker/company records or distributing TEW data.
-            A missing or inaccessible editor MDB falls back to native names.
+            Verified native PRW databases show three main categories in
+            alphabetical order: Companies, Match Types, and Workers.
+            Double-clicking a company or match opens a dedicated profile
+            with its related contract, contract biography, ring setup or
+            match finish sections. Workers retain the dedicated worker editor,
+            including its biographies, skills, popularity, attributes and
+            contracts.
 
-            The in-app executable updater installs the bundled editor MDB on
-            launch when missing. Existing universes, careers, settings,
-            skins, pictures and user-customized editor MDB files are preserved.
+            Category labels come from the separate PRWEditor.mdb when
+            available, while record values remain in the selected universe
+            database. Imported MDBs without the PRW schema retain an
+            alphabetized view of every original table.
 
-            Retains the version 0.5.17 worker editor and its navigation.
+            Existing universes, saved games, skins, settings and customized
+            metadata files remain unchanged. Company and match profiles
+            currently show linked data in read-only fields until editing
+            controls with validation are implemented.
           files: |
             ProWrestlingRevolution-Windows-x64.zip
             System/PRWEditor.mdb
