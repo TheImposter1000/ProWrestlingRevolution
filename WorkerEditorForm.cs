@@ -509,11 +509,11 @@ internal sealed class WorkerEditorForm : UserControl
         int generalHeight = Math.Max(340, Math.Min(496, height - generalY - 22));
         _mainArea.Bounds = new Rectangle(0, generalY, width, generalHeight);
         _content.Bounds = _mainArea.ClientRectangle;
-        // In the approved artwork the four buttons sit over the otherwise
-        // empty lower-right portion of the default/age and language cards.
+        // Keep the four actions fully visible just below the data panels.
+        // They must never be obscured by the field card controls.
         _actionArea.Bounds = new Rectangle(
             Math.Max(0, width - 554),
-            Math.Max(0, height - 92),
+            Math.Max(0, height - 67),
             Math.Min(552, width), 42);
         _actionArea.BringToFront();
     }

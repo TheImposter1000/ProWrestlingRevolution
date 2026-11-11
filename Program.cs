@@ -404,8 +404,12 @@ internal static class Program
                     biography.Width < 500 || biography.Height < 115)
                     throw new Exception("Worker top identity/biography panels diverge from the approved mockup.");
                 var footer = workerEditor.Controls.Find("WorkerEditorActions", true).Single();
-                if (footer.Width < 540 || footer.Top < 0)
-                    throw new Exception("Worker actions must remain in the lower-right location.");
+                var actionArea = workerEditor.Controls.Find("WorkerActionArea", true).Single();
+                var generalCanvas = workerEditor.Controls.Find("WorkerGeneralCanvas", true).Single();
+                if (footer.Width < 540 || footer.Top < 0 ||
+                    actionArea.Top < generalCanvas.Bottom ||
+                    actionArea.Bottom > workerBody.ClientSize.Height)
+                    throw new Exception("Worker action buttons must remain fully visible below the data panels.");
 
                 // Render the actual WinForms control tree on the CI runner.
                 // This preview is a diagnostic artifact and does not alter
