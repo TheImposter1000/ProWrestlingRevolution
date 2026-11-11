@@ -342,7 +342,6 @@ internal static class Program
                 // The CI desktop may be smaller than the fixed game canvas.
                 // Hosting the form as a child avoids OS-level top-window
                 // clamping and exercises the exact in-game popup layout.
-                workerEditor.TopLevel = false;
                 workerHost.Controls.Add(workerEditor);
                 workerEditor.FitInside(workerHost);
                 workerEditor.Show();

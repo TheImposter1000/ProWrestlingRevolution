@@ -1027,11 +1027,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             BackColor = Ink, Margin = Padding.Empty,
             Padding = Padding.Empty, TabStop = true
         };
-        var worker = new WorkerEditorForm(_paths, _skin, profile)
-        {
-            TopLevel = false, FormBorderStyle = FormBorderStyle.None,
-            StartPosition = FormStartPosition.Manual
-        };
+        var worker = new WorkerEditorForm(_paths, _skin, profile);
 
         bool cleaned = false;
         void CleanUp()
@@ -1044,7 +1040,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
                 overlay.Dispose();
             }
         }
-        worker.FormClosed += (_, _) =>
+        worker.CloseRequested += (_, _) =>
         {
             var destination = worker.RequestedNavigation;
             CleanUp();

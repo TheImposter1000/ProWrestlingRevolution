@@ -11,7 +11,7 @@ namespace ProWrestlingRevolution;
 /// replace the central content rather than repeating data on General.
 /// Database writes remain the responsibility of the separate editing layer.
 /// </summary>
-internal sealed class WorkerEditorForm : Form
+internal sealed class WorkerEditorForm : UserControl
 {
     private static readonly Color Ink = Color.FromArgb(9, 18, 31);
     private static readonly Color Surface = Color.FromArgb(17, 34, 53);
@@ -41,6 +41,10 @@ internal sealed class WorkerEditorForm : Form
     private TableLayoutPanel? _identityBiography;
 
     internal string? RequestedNavigation { get; private set; }
+    internal event EventHandler? CloseRequested;
+
+    internal void Close() =>
+        CloseRequested?.Invoke(this, EventArgs.Empty);
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette, PrwWorkerProfile profile)
     {
@@ -50,20 +54,15 @@ internal sealed class WorkerEditorForm : Form
 
         Name = "WorkerEditorForm";
         Text = "Pro Wrestling Revolution | Worker Editor";
-        FormBorderStyle = FormBorderStyle.None;
-        ShowInTaskbar = false;
-        StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
         AutoScaleMode = AutoScaleMode.None;
         Font = new Font("Segoe UI", 9f);
         BackColor = Ink;
         ForeColor = TextInk;
         DoubleBuffered = true;
-        KeyPreview = true;
         KeyDown += (_, e) =>
         {
             if (e.KeyCode != Keys.Escape) return;
-            DialogResult = DialogResult.Cancel;
             Close();
             e.Handled = true;
         };
@@ -92,6 +91,16 @@ internal sealed class WorkerEditorForm : Form
     {
         RequestedNavigation = key;
         Close();
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == Keys.Escape)
+        {
+            Close();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     private static Panel Card(string title, string name)
