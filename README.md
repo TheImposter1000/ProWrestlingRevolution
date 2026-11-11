@@ -1,6 +1,39 @@
 # Pro Wrestling Revolution
 
-An original Windows desktop wrestling management project. Version 0.5.16 replaces the built-in base database with PRW_Default(2).mdb, expanding the universe schema while preserving the existing settings and interface.
+An original Windows desktop wrestling management project. Version 0.5.18 adds a dedicated native MDB for Database Editor captions and ordering, separate from the existing game universe database.
+
+## Version 0.5.18: separate Database Editor metadata MDB
+
+The Database Editor now reads optional category captions, field labels,
+display order, and visibility from `System/PRWEditor.mdb`, independent
+of `System/PRWDefault.mdb` and player universes. This real Microsoft Jet
+MDB contains four metadata tables: `tblEditorCategory`,
+`tblEditorField`, `tblEditorGroup`, and `tblEditorSettings`.
+It is generated from the game's own 14-table `PrwSchema.cs`, rather
+than copying TEW game data. Its layout is informed by inspection of
+Access metadata properties in the uploaded TEW9Access.mdb.
+
+All record reads, writes, keys, filtering and mass edits continue to
+operate on the original field names of the selected `PWR.mdb`. The
+metadata MDB changes captions and display ordering only. Unknown
+tables and columns retain their native names. If the metadata MDB
+cannot be opened, the editor falls back to those native names.
+
+The portable Windows executable embeds the metadata MDB generated
+during the release build. A new installation extracts it to
+`System/PRWEditor.mdb` on startup. Existing editable copies are
+preserved rather than overwritten. Previous universes, careers,
+pictures, settings and skins are unchanged.
+
+For source developers, regenerate the MDB with Python, Java 17 and
+Maven before compiling if you want native display captions locally:
+
+    python Tools/EditorMdbGenerator/build_editor_manifest.py
+    mvn -f Tools/EditorMdbGenerator/pom.xml compile exec:java
+
+This Java build uses the open source Jackcess library. In standard
+published game builds no Java, Python or Maven installation is needed.
+Windows ACE OLE DB is still required to read and edit Access records.
 
 ## Version 0.5.16: expanded PRW default database
 
