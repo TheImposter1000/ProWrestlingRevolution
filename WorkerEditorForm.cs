@@ -876,7 +876,7 @@ internal sealed class WorkerEditorForm : UserControl
         };
         foreach (float percent in new[] { 26f, 24f, 28f, 22f })
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, percent));
-        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 456));
+        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 455));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var personal = Card("Personal Data", "WorkerPersonalData");
@@ -983,8 +983,8 @@ internal sealed class WorkerEditorForm : UserControl
         _actionArea.Dock = DockStyle.Fill;
         _actionArea.Margin = Padding.Empty;
         // The approved action strip occupies y=686..722 on a 1366x768
-        // logical canvas; the surrounding panel fields end at y=657.
-        _actionArea.Padding = new Padding(8, 25, 3, 3);
+        // logical canvas. The action area is 65px high, including padding.
+        _actionArea.Padding = new Padding(8, 26, 3, 3);
         grid.Controls.Add(_actionArea, 2, 1);
         grid.SetColumnSpan(_actionArea, 2);
         _content.Controls.Add(grid);
