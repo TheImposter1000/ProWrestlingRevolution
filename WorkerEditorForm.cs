@@ -27,13 +27,12 @@ internal sealed class WorkerEditorForm : Form
     private readonly PrwWorkerProfile _profile;
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _content = new() { Name = "WorkerSectionContent", Dock = DockStyle.Fill };
-    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Left, Width = 158 };
-    private readonly Panel _mainRail = new() { Name = "WorkerMainMenuRail", Dock = DockStyle.Left, Width = SkinArt.SidebarWidth };
+    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill };
     private readonly TableLayoutPanel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
-    private readonly Font _railRegular = new("Segoe UI", 10.5f);
-    private readonly Font _railBold = new("Segoe UI", 10.5f, FontStyle.Bold);
     private string _active = "General";
+    private Point? _dragStartScreen;
+    private Point _dragStartLocation;
     private int _recordIndex;
 
     internal string? RequestedNavigation { get; private set; }
@@ -49,7 +48,7 @@ internal sealed class WorkerEditorForm : Form
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(SkinArt.WindowWidth, SkinArt.WindowHeight);
+        ClientSize = new Size(1230, 682);
         AutoScaleMode = AutoScaleMode.None;
         Font = new Font("Segoe UI", 9f);
         BackColor = Ink;
@@ -69,18 +68,42 @@ internal sealed class WorkerEditorForm : Form
         Disposed += (_, _) =>
         {
             _tips.Dispose();
-            _railRegular.Dispose();
-            _railBold.Dispose();
         };
     }
 
-    internal void FillLauncherWindow(Form launcher)
+    // A borderless child form hosted inside the database workspace behaves as
+    // an in-game popup. It does not create another top-level application window.
+    internal void FitInside(Control host)
     {
-        StartPosition = FormStartPosition.Manual;
-        MinimumSize = Size.Empty;
-        MaximumSize = Size.Empty;
-        Bounds = launcher.Bounds;
+        int width = Math.Min(1230, Math.Max(1, host.ClientSize.Width - 20));
+        int height = Math.Min(682, Math.Max(1, host.ClientSize.Height - 18));
+        Size = new Size(width, height);
+        Location = new Point(
+            Math.Max(0, (host.ClientSize.Width - width) / 2),
+            Math.Max(0, (host.ClientSize.Height - height) / 2));
     }
+
+    private void BeginDrag(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        _dragStartScreen = MousePosition;
+        _dragStartLocation = Location;
+    }
+
+    private void DragPopup(object? sender, MouseEventArgs e)
+    {
+        if (_dragStartScreen is not Point start || e.Button != MouseButtons.Left ||
+            Parent is not Control host) return;
+        var current = MousePosition;
+        Location = new Point(
+            Math.Clamp(_dragStartLocation.X + current.X - start.X,
+                0, Math.Max(0, host.ClientSize.Width - Width)),
+            Math.Clamp(_dragStartLocation.Y + current.Y - start.Y,
+                0, Math.Max(0, host.ClientSize.Height - Height)));
+    }
+
+    private void EndDrag(object? sender, MouseEventArgs e) =>
+        _dragStartScreen = null;
 
     private static Panel Card(string title, string name)
     {
@@ -89,6 +112,7 @@ internal sealed class WorkerEditorForm : Form
             Name = name,
             Dock = DockStyle.Fill,
             Margin = new Padding(3),
+            Padding = new Padding(0, 27, 0, 0),
             BackColor = Dark
         };
         card.Paint += (_, e) =>
@@ -98,7 +122,10 @@ internal sealed class WorkerEditorForm : Form
         };
         var heading = new Panel
         {
-            Dock = DockStyle.Top, Height = 27,
+            Dock = DockStyle.None,
+            Location = Point.Empty,
+            Height = 27, Width = Math.Max(1, card.Width),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             BackColor = Header,
             Name = name + "Heading"
         };
@@ -219,36 +246,14 @@ internal sealed class WorkerEditorForm : Form
         chrome.Controls.Add(heading);
         chrome.Controls.Add(logo);
         chrome.Controls.Add(close);
-        Controls.Add(chrome);
-
-        _mainRail.BackColor = Color.FromArgb(10, 22, 35);
-        var railTooltips = _tips;
-        foreach (var (key, label, y) in SkinArt.MenuIcons)
+        // Move only by dragging the worker popup's header; section and save
+        // controls retain their independent click targets.
+        foreach (Control dragTarget in new Control[] { chrome, logo, heading })
         {
-            string caption = key switch
-            {
-                "back" => "Home",
-                "database" => "Database",
-                "editor" => "Editor",
-                _ => label
-            };
-            var item = new SidebarMenuRow(key, caption, _palette, _railRegular, _railBold)
-            {
-                Name = "WorkerMenu_" + key,
-                IconOnly = true,
-                Width = SkinArt.SidebarWidth,
-                Location = new Point(0, Math.Max(0, y - 67))
-            };
-            item.UpdateAppearance(_palette, false, key == "editor");
-            item.Click += (_, _) =>
-            {
-                RequestedNavigation = key;
-                Close();
-            };
-            railTooltips.SetToolTip(item, label);
-            _mainRail.Controls.Add(item);
+            dragTarget.MouseDown += BeginDrag;
+            dragTarget.MouseMove += DragPopup;
+            dragTarget.MouseUp += EndDrag;
         }
-        Controls.Add(_mainRail);
 
         _sectionNavigation.BackColor = Color.FromArgb(11, 23, 38);
         string[] sections =
@@ -277,21 +282,31 @@ internal sealed class WorkerEditorForm : Form
             _tabs[section] = button;
             _sectionNavigation.Controls.Add(button);
         }
-        Controls.Add(_sectionNavigation);
-
         _body.BackColor = Ink;
         _body.Padding = new Padding(4, 8, 7, 5);
         _body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _body.RowStyles.Add(new RowStyle(SizeType.Absolute, 162));
         _body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _body.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
-        Controls.Add(_body);
-        // Keep the top chrome, main-menu icons and section buttons visible
-        // while the remaining space is reserved for the worker fields.
-        Controls.SetChildIndex(chrome, 0);
-        Controls.SetChildIndex(_mainRail, 2);
-        Controls.SetChildIndex(_sectionNavigation, 1);
-        Controls.SetChildIndex(_body, 3);
+        // Explicit structural rows and columns avoid all Dock/Z-order overlap.
+        var popupLayout = new TableLayoutPanel
+        {
+            Name = "WorkerPopupLayout",
+            Dock = DockStyle.Fill,
+            ColumnCount = 2, RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            BackColor = Ink
+        };
+        popupLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 163));
+        popupLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        popupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        popupLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        popupLayout.Controls.Add(chrome, 0, 0);
+        popupLayout.SetColumnSpan(chrome, 2);
+        popupLayout.Controls.Add(_sectionNavigation, 0, 1);
+        popupLayout.Controls.Add(_body, 1, 1);
+        Controls.Add(popupLayout);
 
         var top = new TableLayoutPanel
         {
@@ -300,8 +315,8 @@ internal sealed class WorkerEditorForm : Form
             RowCount = 1,
             Margin = Padding.Empty
         };
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 37));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 63));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
         top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         BuildIdentity(top);
         BuildBiography(top);
@@ -386,11 +401,12 @@ internal sealed class WorkerEditorForm : Form
 
         var fields = new TableLayoutPanel
         {
-            Name = "WorkerIdentityFields", Location = new Point(106, 48),
-            Size = new Size(320, 105),
-            RowCount = 3, ColumnCount = 2
+            Name = "WorkerIdentityFields", Location = new Point(106, 43),
+            Size = new Size(275, 106),
+            RowCount = 3, ColumnCount = 2,
+            Margin = Padding.Empty
         };
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94));
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 87));
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 0; i < 3; i++) fields.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / 3));
         fields.Controls.Add(TextLabel("Name"), 0, 0);
@@ -403,7 +419,7 @@ internal sealed class WorkerEditorForm : Form
         card.Resize += (_, _) =>
         {
             name.Width = Math.Max(200, card.Width - 30);
-            fields.Width = Math.Max(180, card.Width - 118);
+            fields.Width = Math.Max(120, card.ClientSize.Width - fields.Left - 12);
         };
     }
 
@@ -424,10 +440,11 @@ internal sealed class WorkerEditorForm : Form
             ScrollBars = RichTextBoxScrollBars.None,
             BackColor = FieldInk,
             ForeColor = Color.FromArgb(26, 39, 53),
-            Text = Display(First("tblWorkerBio"), "Biography")
+            Text = string.IsNullOrWhiteSpace(Display(First("tblWorkerBio"), "Biography"))
+                ? "No biography has been entered for this worker."
+                : Display(First("tblWorkerBio"), "Biography")
         };
         card.Controls.Add(bio);
-        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
     }
 
     private static (string Label, string Field)[] Pairs(params string[] fields) =>
@@ -453,7 +470,6 @@ internal sealed class WorkerEditorForm : Form
                 "WorkerField_" + fields[i].Field), 1, i);
         }
         card.Controls.Add(grid);
-        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
         return grid;
     }
 
@@ -486,7 +502,6 @@ internal sealed class WorkerEditorForm : Form
             grid.Controls.Add(tick, 0, i);
         }
         card.Controls.Add(grid);
-        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
         return grid;
     }
 
@@ -744,9 +759,34 @@ internal sealed class WorkerEditorForm : Form
             .First(x => x.Name == "WorkerSecondaryTitle").BringToFront();
     }
 
+    // Disabled workflow buttons remain readable, instead of Windows Forms
+    // rendering black-on-navy disabled text. Saving is still unavailable.
+    private sealed class WorkerActionButton : Button
+    {
+        internal WorkerActionButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var bounds = ClientRectangle;
+            if (bounds.Width <= 2 || bounds.Height <= 2) return;
+            e.Graphics.Clear(BackColor);
+            using var outline = new Pen(FlatAppearance.BorderColor, 1f);
+            e.Graphics.DrawRectangle(outline, 0, 0,
+                bounds.Width - 1, bounds.Height - 1);
+            TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
+                Enabled ? Color.White : Color.FromArgb(191, 215, 234),
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+        }
+    }
+
     private static Button ActionButton(string label, string name, bool primary = false, int width = 148)
     {
-        var button = new Button
+        var button = new WorkerActionButton
         {
             Name = name, Text = label,
             Size = new Size(width, 35),

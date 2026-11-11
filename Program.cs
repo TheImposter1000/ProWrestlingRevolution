@@ -342,7 +342,8 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerActiveAreas", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerLanguages", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerBiography", true).Length != 1 ||
-                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerPopupLayout", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 0 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
@@ -357,6 +358,26 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerSectionContent", true)
                         .OfType<ScrollableControl>().Any(control => control.AutoScroll))
                     throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
+
+                // Test the two-column popup geometry instead of only verifying
+                // that its controls exist. This catches the overlapping sidebars
+                // and invisible-field regression from the previous release.
+                workerEditor.PerformLayout();
+                var popupLayout = workerEditor.Controls.Find("WorkerPopupLayout", true)
+                    .Single() as TableLayoutPanel;
+                var tabColumn = workerEditor.Controls.Find("WorkerSectionNavigation", true).Single();
+                var workerBody = workerEditor.Controls.Find("WorkerEditorBody", true).Single();
+                if (popupLayout is null || popupLayout.ColumnCount != 2 ||
+                    tabColumn.Right > workerBody.Left ||
+                    tabColumn.Width < 155 || workerBody.Width < 900)
+                    throw new Exception("Worker popup columns overlap or are too narrow.");
+                var personal = workerEditor.Controls.Find("WorkerPersonalData", true).Single();
+                var personalHeading = workerEditor.Controls.Find("WorkerPersonalDataHeading", true).Single();
+                var personalFields = workerEditor.Controls.Find("WorkerPersonalDataFields", true).Single();
+                personal.PerformLayout();
+                if (personalFields.Top < personalHeading.Bottom ||
+                    personalFields.Bottom > personal.ClientSize.Height)
+                    throw new Exception("Worker fields overlap their section header.");
             }
 
             // Update installers now accept a raw Windows executable rather
