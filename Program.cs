@@ -91,6 +91,7 @@ internal static class Program
     private static void SmokeTest()
     {
         PrwSchema.AssertDefinitionIntegrity();
+        EditorCategoryDirectory.AssertMenuContract();
         var root = Path.Combine(Path.GetTempPath(), "PWR-phase1-" + Guid.NewGuid().ToString("N"));
         try
         {
