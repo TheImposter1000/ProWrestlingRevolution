@@ -258,7 +258,7 @@ Every direct folder in Skins appears in the selector, even if it has just one im
 
 The LowerBars directory is retained for compatibility with later screens, but not used on the title screen. Custom artwork files are not uploaded to GitHub or overwritten by the game.
 
-IMPORTANT: If you install this release in a fresh folder, copy your own skin and MDB data into that folder. When launching through Visual Studio, the runtime skin folder is normally under bin/Debug/net10.0-windows/ rather than the source directory. Use the game's Open Skins Folder button to confirm the actual path.
+IMPORTANT: If you install the complete game in a new folder, place your existing custom skins and MDB data in that installation's data folders rather than replacing them. Visual Studio Debug builds under a Repos checkout use the parent game directory when its Databases, Pictures, Skins and System folders are present. Use the game's Open Skins Folder button to confirm the active path.
 
 ## MDB structure
 
