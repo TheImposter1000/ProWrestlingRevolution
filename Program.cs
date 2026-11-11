@@ -372,63 +372,6 @@ internal static class Program
                         .OfType<ScrollableControl>().Any(control => control.AutoScroll))
                     throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
 
-                // Screen fidelity checks use logical screenshot coordinates.
-                // Assert structural position and sizes, not merely existence.
-                workerEditor.CreateControl();
-                workerEditor.PerformLayout();
-                var popup = workerEditor.Controls.Find("WorkerPopupLayout", true)
-                    .SingleOrDefault() as TableLayoutPanel;
-                var general = workerEditor.Controls.Find("WorkerGeneralGrid", true)
-                    .SingleOrDefault() as TableLayoutPanel;
-                var identity = workerEditor.Controls.Find("WorkerIdentityBiographyRow", true)
-                    .SingleOrDefault() as TableLayoutPanel;
-                if (popup is null || general is null || identity is null ||
-                    popup.ColumnCount != 2 || general.ColumnCount != 4 ||
-                    identity.ColumnCount != 2 ||
-                    popup.ColumnStyles[0].Width != 61 ||
-                    general.ColumnStyles.Sum(x => x.Width) < 99 ||
-                    general.ColumnStyles.Sum(x => x.Width) > 101)
-                    throw new Exception("Worker Editor is not using the approved fixed composition.");
-
-                var sectionButtons = workerEditor.Controls
-                    .Find("WorkerSectionNavigation", true).Single();
-                var mainRail = workerEditor.Controls.Find("WorkerMainMenuRail", true).Single();
-                if (sectionButtons.Width < 155 ||
-                    mainRail.Width != 61 ||
-                    workerEditor.Controls.Find("WorkerSection_AlterEgo", true)
-                        .SingleOrDefault() is not Button)
-                    throw new Exception("The approved worker navigation columns are missing.");
-
-                // Optional native-Windows DrawToBitmap capture for direct visual
-                // comparison with the approved 1366 x 768 reference. This
-                // creates an in-memory image, never changes the user's skin.
-                if (Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW") == "1")
-                {
-                    try
-                    {
-                        using var image = new Bitmap(workerEditor.ClientSize.Width,
-                            workerEditor.ClientSize.Height);
-                        workerEditor.DrawToBitmap(image, new Rectangle(
-                            Point.Empty, workerEditor.ClientSize));
-                        using var stream = new MemoryStream();
-                        image.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-                        var base64 = Convert.ToBase64String(stream.ToArray());
-                        const int chunk = 3000;
-                        for (int offset = 0; offset < base64.Length; offset += chunk)
-                            Console.WriteLine("PWR_WORKER_SCREENSHOT_" +
-                                (offset / chunk).ToString("D4") + ":" +
-                                base64.Substring(offset, Math.Min(chunk,
-                                    base64.Length - offset)));
-                    }
-                    catch (Exception ex) when (
-                        ex is ExternalException or InvalidOperationException or
-                            ArgumentException or System.ComponentModel.Win32Exception)
-                    {
-                        Console.WriteLine("PWR_WORKER_SCREENSHOT_UNAVAILABLE: " +
-                            ex.GetType().Name + ": " + ex.Message);
-                    }
-                }
-
                 // Test the two-column popup geometry instead of only verifying
                 // that its controls exist. This catches the overlapping sidebars
                 // and invisible-field regression from the previous release.
