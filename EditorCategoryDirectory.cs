@@ -8,17 +8,20 @@ namespace ProWrestlingRevolution;
 internal static class EditorCategoryDirectory
 {
     internal static IReadOnlyList<string> MainCategories(
-        IEnumerable<string> availableTables, EditorMetadataCatalog metadata)
+        IEnumerable<string> availableTables, EditorMetadataCatalog metadata,
+        bool nativePrwSchema)
     {
-        // Apply user choices for visibility, but do not treat individual
-        // biography/skill/contract tables as separate main categories.
+        // Only fold related tables in databases validated against the
+        // PRW schema. Imported TEW or third-party MDBs retain every table.
         var visible = metadata.OrderTables(availableTables);
         var names = visible.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var childTables = PrwSchema.Relationships
-            .Where(link => names.Contains(link.ParentTable) &&
-                           names.Contains(link.ChildTable))
-            .Select(link => link.ChildTable)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var childTables = nativePrwSchema
+            ? PrwSchema.Relationships
+                .Where(link => names.Contains(link.ParentTable) &&
+                               names.Contains(link.ChildTable))
+                .Select(link => link.ChildTable)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         return visible.Where(name => !childTables.Contains(name))
             .OrderBy(name => metadata.CategoryLabel(name),
@@ -32,18 +35,19 @@ internal static class EditorCategoryDirectory
         var metadata = EditorMetadataCatalog.Load("");
         string[] expected = ["tblFed", "tblMatch", "tblWorker"];
         string[] actual = MainCategories(PrwSchema.Tables.Select(t => t.Name),
-            metadata).ToArray();
+            metadata, nativePrwSchema: true).ToArray();
         if (!actual.SequenceEqual(expected, StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException(
                 "Main native editor categories must be Companies, Match Types, Workers.");
 
         var legacy = MainCategories(PrwSchema.Tables.Take(10).Select(t => t.Name),
-            metadata);
+            metadata, nativePrwSchema: true);
         if (legacy.Count != 1 || legacy[0] != PrwSchema.WorkerTable)
             throw new InvalidDataException(
                 "Older native databases must still group worker-linked records.");
 
-        var isolated = MainCategories(["tblContract", "OtherTable"], metadata);
+        var isolated = MainCategories(["tblContract", "OtherTable"], metadata,
+            nativePrwSchema: false);
         if (!isolated.SequenceEqual(["OtherTable", "tblContract"],
                 StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException(
