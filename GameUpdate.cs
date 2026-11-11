@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -19,8 +18,7 @@ internal static class GameUpdate
 {
     private const string ReleaseApi =
         "https://api.github.com/repos/TheImposter1000/ProWrestlingRevolution/releases/latest";
-    private const string AssetName = "ProWrestlingRevolution-Windows-x64.zip";
-    private const long MaxDownloadBytes = 300L * 1024 * 1024;
+    private const string AssetName = "ProWrestlingRevolution.exe";
     private const long MaxExeBytes = 300L * 1024 * 1024;
 
     private static readonly HttpClient Http = CreateClient();
@@ -30,6 +28,26 @@ internal static class GameUpdate
 
     internal static string DisplayVersion =>
         $"{InstalledVersion.Major}.{InstalledVersion.Minor}.{InstalledVersion.Build}";
+
+    // A published Release build must never overwrite Visual Studio output:
+    // the developer build can use different asset-directory resolution.
+    internal static bool IsSourceBuildOutput(string executablePath)
+    {
+        string directory = Path.GetDirectoryName(Path.GetFullPath(executablePath))!;
+        for (DirectoryInfo? folder = new(directory); folder is not null; folder = folder.Parent)
+        {
+            if (!folder.Name.Equals("Repos", StringComparison.OrdinalIgnoreCase))
+                continue;
+            string[] parts = Path.GetRelativePath(folder.FullName, directory)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return parts.Length >= 3 &&
+                parts[0].Equals("bin", StringComparison.OrdinalIgnoreCase) &&
+                (parts[1].Equals("Debug", StringComparison.OrdinalIgnoreCase) ||
+                 parts[1].Equals("Release", StringComparison.OrdinalIgnoreCase)) &&
+                File.Exists(Path.Combine(folder.FullName, "ProWrestlingRevolution.csproj"));
+        }
+        return false;
+    }
 
     private static HttpClient CreateClient()
     {
@@ -63,6 +81,21 @@ internal static class GameUpdate
                 return;
             }
 
+            var runningExe = Environment.ProcessPath
+                ?? throw new InvalidOperationException("Cannot identify the running application.");
+            if (IsSourceBuildOutput(runningExe))
+            {
+                MessageBox.Show(owner,
+                    "This is a Visual Studio development build. To update it, " +
+                    "use Git Pull, then Clean Solution and Rebuild Solution.\n\n" +
+                    "Check for Updates installs a published executable into " +
+                    "an independent game installation. Updating this developer " +
+                    "build would change which skins and settings it loads.",
+                    "Developer Build", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
             var choice = MessageBox.Show(owner,
                 $"Installed version: v{DisplayVersion}\n" +
                 $"Available version: {release.Tag}\n\n" +
@@ -73,8 +106,6 @@ internal static class GameUpdate
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (choice != DialogResult.Yes) return;
 
-            var runningExe = Environment.ProcessPath
-                ?? throw new InvalidOperationException("Cannot identify the running application.");
             if (!Path.GetFileName(runningExe).Equals(
                 "ProWrestlingRevolution.exe", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(
@@ -85,14 +116,13 @@ internal static class GameUpdate
             Directory.CreateDirectory(staging);
 
             button.Text = "Downloading...";
-            var archivePath = Path.Combine(staging, "release.zip");
-            await DownloadVerifiedAsync(release, archivePath);
+            var candidate = Path.Combine(staging, "new-version.exe");
+            await DownloadVerifiedAsync(release, candidate);
 
             button.Text = "Preparing...";
-            var candidate = Path.Combine(staging, "new-version.exe");
-            ExtractApplication(archivePath, candidate);
+            ValidateApplication(candidate);
 
-            // Ensure the executable embedded in the ZIP is actually the
+            // Ensure the downloaded EXE is actually the
             // version advertised by the publisher's release metadata.
             var candidateFileVersion = FileVersionInfo.GetVersionInfo(candidate).FileVersion;
             if (!Version.TryParse(candidateFileVersion, out var embeddedVersion) ||
@@ -186,8 +216,8 @@ internal static class GameUpdate
                 throw new InvalidDataException("The release download URL is not trusted.");
 
             long size = asset.GetProperty("size").GetInt64();
-            if (size < 1 || size > MaxDownloadBytes)
-                throw new InvalidDataException("The release archive is too large.");
+            if (size < 1 || size > MaxExeBytes)
+                throw new InvalidDataException("The release EXE is too large.");
 
             string digest = asset.GetProperty("digest").GetString() ?? "";
             if (!digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ||
@@ -199,7 +229,7 @@ internal static class GameUpdate
             return new Release(version, tag, url, size, digest[7..]);
         }
         throw new InvalidDataException(
-            "The latest release does not contain the Windows game download.");
+            "The latest release does not contain the standalone Windows EXE.");
     }
 
     private static async Task DownloadVerifiedAsync(Release release, string destination)
@@ -208,7 +238,7 @@ internal static class GameUpdate
             HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength is long length &&
-            length > MaxDownloadBytes)
+            length > MaxExeBytes)
             throw new InvalidDataException("The release download is too large.");
 
         await using (var input = await response.Content.ReadAsStreamAsync())
@@ -221,12 +251,12 @@ internal static class GameUpdate
             while ((read = await input.ReadAsync(buffer)) > 0)
             {
                 total += read;
-                if (total > MaxDownloadBytes)
+                if (total > MaxExeBytes)
                     throw new InvalidDataException("The download exceeded its size limit.");
                 await output.WriteAsync(buffer.AsMemory(0, read));
             }
             if (total != release.Size)
-                throw new InvalidDataException("The downloaded ZIP was incomplete.");
+                throw new InvalidDataException("The downloaded EXE was incomplete.");
         }
 
         await using var verify = File.OpenRead(destination);
@@ -235,20 +265,23 @@ internal static class GameUpdate
             throw new InvalidDataException("GitHub's SHA-256 checksum did not match.");
     }
 
-    internal static void ExtractApplication(string zipPath, string destination)
+    // Validate native Windows executable structure before staging an update.
+    // The downloaded file must be the direct EXE, never a ZIP archive.
+    internal static void ValidateApplication(string path)
     {
-        using var zip = ZipFile.OpenRead(zipPath);
-        // Extract ONLY the root executable. Never extract Databases/, Skins/,
-        // Pictures/, System/ or any unknown archive path into the live game.
-        var candidates = zip.Entries.Where(e =>
-            e.FullName.Equals("ProWrestlingRevolution.exe",
-                StringComparison.OrdinalIgnoreCase)).ToList();
-        if (candidates.Count != 1 || candidates[0].Length is < 1 or > MaxExeBytes)
-            throw new InvalidDataException("The update archive lacks a valid application.");
-        candidates[0].ExtractToFile(destination, overwrite: false);
-        using var file = File.OpenRead(destination);
-        if (file.ReadByte() != 'M' || file.ReadByte() != 'Z')
-            throw new InvalidDataException("The update executable is not a Windows program.");
+        using var stream = File.OpenRead(path);
+        if (stream.Length < 256 || stream.Length > MaxExeBytes)
+            throw new InvalidDataException("The downloaded EXE has an invalid size.");
+        using var reader = new BinaryReader(stream);
+        if (reader.ReadUInt16() != 0x5A4D) // MZ
+            throw new InvalidDataException("The download is not a Windows executable.");
+        stream.Position = 0x3C;
+        int peOffset = reader.ReadInt32();
+        if (peOffset < 0x40 || peOffset > stream.Length - 4)
+            throw new InvalidDataException("The downloaded EXE has no valid PE header.");
+        stream.Position = peOffset;
+        if (reader.ReadUInt32() != 0x00004550) // PE signature
+            throw new InvalidDataException("The downloaded EXE has an invalid PE header.");
     }
 
     internal static int ApplyFromHelper(string[] args)
