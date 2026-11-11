@@ -489,10 +489,8 @@ internal sealed class WorkerEditorForm : UserControl
         _mainArea.Name = "WorkerGeneralCanvas";
         _content.Name = "WorkerSectionContent";
         _mainArea.Controls.Add(_content);
-        _mainArea.Controls.Add(_actionArea);
         _body.Controls.Add(top);
         _body.Controls.Add(_mainArea);
-        _actionArea.BringToFront();
 
         _body.Resize += (_, _) => LayoutWorkerCanvas();
         LayoutWorkerCanvas();
@@ -506,16 +504,9 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         _identityBiography.Bounds = new Rectangle(0, 10, width, 145);
         int generalY = 165;
-        int generalHeight = Math.Max(340, Math.Min(524, height - generalY - 12));
+        int generalHeight = Math.Max(340, Math.Min(520, height - generalY - 12));
         _mainArea.Bounds = new Rectangle(0, generalY, width, generalHeight);
-        // The first two columns keep their full data height. The last two
-        // stop above the action row, as in the approved reference image.
-        _content.Bounds = new Rectangle(0, 0, width, Math.Min(496, generalHeight));
-        _actionArea.Bounds = new Rectangle(
-            Math.Max(0, width - 554),
-            Math.Min(472, Math.Max(0, generalHeight - 43)),
-            Math.Min(552, width), 42);
-        _actionArea.BringToFront();
+        _content.Bounds = _mainArea.ClientRectangle;
     }
 
     // The top row is a label-and-field editor, not a banner card.
@@ -778,14 +769,19 @@ internal sealed class WorkerEditorForm : UserControl
     private void BuildGeneral()
     {
         var worker = First("tblWorker");
+        // Two structural rows make the 4-button action strip part of the
+        // layout instead of a floating overlay that clips in DrawToBitmap.
+        // The left columns span both rows; the right columns reserve their
+        // second row for buttons, exactly as in the approved mockup.
         var grid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, Name = "WorkerGeneralGrid",
-            ColumnCount = 4, RowCount = 1, Margin = Padding.Empty,
+            ColumnCount = 4, RowCount = 2, Margin = Padding.Empty,
             BackColor = Color.Transparent
         };
         foreach (float percent in new[] { 26f, 24f, 28f, 22f })
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, percent));
+        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 448));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var personal = Card("Personal Data", "WorkerPersonalData");
@@ -801,7 +797,10 @@ internal sealed class WorkerEditorForm : UserControl
             ("Height", "HeightInches"), ("Weight", "WeightPounds"),
             ("Min Weight", "MinWeightPounds"), ("Max Weight", "MaxWeightPounds")
         ], worker);
+        personal.Dock = DockStyle.Top;
+        personal.Height = 496;
         grid.Controls.Add(personal, 0, 0);
+        grid.SetRowSpan(personal, 2);
 
         var loyalty = Card("", "WorkerLoyalty");
         MakeRows(loyalty, [
@@ -843,7 +842,11 @@ internal sealed class WorkerEditorForm : UserControl
             ("Head Condition", "HeadCondition"), ("Body Condition", "BodyCondition"),
             ("Arms Condition", "ArmsCondition"), ("Legs Condition", "LegsCondition")
         ], First("tblWorkerPhysical"), labelShare: 60f);
-        grid.Controls.Add(Stack((loyalty, 27), (roles, 47), (physical, 26)), 1, 0);
+        var middleColumn = Stack((loyalty, 27), (roles, 47), (physical, 26));
+        middleColumn.Dock = DockStyle.Top;
+        middleColumn.Height = 496;
+        grid.Controls.Add(middleColumn, 1, 0);
+        grid.SetRowSpan(middleColumn, 2);
 
         var settings = Card("Default & Age-Related Settings", "WorkerSettings");
         MakeRows(settings, [
@@ -860,8 +863,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Retirement Age", "RetirementAge"),
             ("Career Goal", "CareerGoal")
         ], worker);
-        settings.Dock = DockStyle.Top;
-        settings.Height = 448;
+        settings.Dock = DockStyle.Fill;
         grid.Controls.Add(settings, 2, 0);
 
         var regions = Card("Active Areas", "WorkerActiveAreas");
@@ -880,11 +882,15 @@ internal sealed class WorkerEditorForm : UserControl
             ("Hindi", "LanguageHindi")
         ], worker, labelShare: 52f);
         var rightColumn = Stack((regions, 47), (languages, 53));
-        rightColumn.Dock = DockStyle.Top;
-        rightColumn.Height = 448;
+        rightColumn.Dock = DockStyle.Fill;
         grid.Controls.Add(rightColumn, 3, 0);
+
+        _actionArea.Dock = DockStyle.Fill;
+        _actionArea.Margin = Padding.Empty;
+        _actionArea.Padding = new Padding(8, 24, 3, 6);
+        grid.Controls.Add(_actionArea, 2, 1);
+        grid.SetColumnSpan(_actionArea, 2);
         _content.Controls.Add(grid);
-        _actionArea.BringToFront();
     }
 
     private void ShowSection(string section)
@@ -899,6 +905,8 @@ internal sealed class WorkerEditorForm : UserControl
             button.ForeColor = Color.White;
         }
         _content.SuspendLayout();
+        if (_actionArea.Parent is Control oldParent)
+            oldParent.Controls.Remove(_actionArea);
         _content.Controls.Clear();
         if (section == "General") BuildGeneral();
         else BuildSecondary(section);
@@ -920,6 +928,19 @@ internal sealed class WorkerEditorForm : UserControl
     {
         var root = new Panel { Dock = DockStyle.Fill, Name = "WorkerSecondarySection" };
         _content.Controls.Add(root);
+        // The action strip is retained on other worker sections as well.
+        var secondaryFooter = new Panel
+        {
+            Name = "WorkerSecondaryActionsHost",
+            Dock = DockStyle.Bottom, Height = 72,
+            BackColor = Ink,
+            Padding = new Padding(0, 24, 5, 6)
+        };
+        _actionArea.Dock = DockStyle.Right;
+        _actionArea.Width = 574;
+        _actionArea.Padding = Padding.Empty;
+        secondaryFooter.Controls.Add(_actionArea);
+        root.Controls.Add(secondaryFooter);
         string? tableName = SectionTable(section);
         var data = _profile.Sections.FirstOrDefault(x => x.Table == tableName)?.Records;
         var header = new Label

@@ -406,11 +406,16 @@ internal static class Program
                 var footer = workerEditor.Controls.Find("WorkerEditorActions", true).Single();
                 var actionArea = workerEditor.Controls.Find("WorkerActionArea", true).Single();
                 var generalCanvas = workerEditor.Controls.Find("WorkerGeneralCanvas", true).Single();
+                var generalGrid = workerEditor.Controls.Find("WorkerGeneralGrid", true)
+                    .SingleOrDefault() as TableLayoutPanel;
                 if (footer.Width < 540 || footer.Top < 0 ||
-                    actionArea.Parent != generalCanvas ||
-                    actionArea.Top < 455 ||
-                    actionArea.Bottom > generalCanvas.ClientSize.Height)
-                    throw new Exception("Worker actions must occupy the lower-right reserved area.");
+                    generalGrid is null || generalGrid.RowCount != 2 ||
+                    actionArea.Parent != generalGrid ||
+                    generalGrid.GetRow(actionArea) != 1 ||
+                    generalGrid.GetColumn(actionArea) != 2 ||
+                    generalGrid.GetColumnSpan(actionArea) != 2 ||
+                    actionArea.Height < 65)
+                    throw new Exception("Worker actions must use the dedicated lower-right grid row.");
 
                 // Render the actual WinForms control tree on the CI runner.
                 // This preview is a diagnostic artifact and does not alter
