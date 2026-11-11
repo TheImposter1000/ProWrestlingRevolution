@@ -27,9 +27,9 @@ internal sealed class WorkerEditorForm : Form
     private readonly PrwWorkerProfile _profile;
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Ink };
-    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill };
-    private readonly Panel _mainRail = new() { Name = "WorkerMainMenuRail", Dock = DockStyle.Fill };
-    private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill };
+    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Panel _mainRail = new() { Name = "WorkerMainMenuRail", Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
     private string _active = "General";
     private int _recordIndex;
@@ -381,7 +381,7 @@ internal sealed class WorkerEditorForm : Form
             Padding = Padding.Empty,
             BackColor = Ink
         };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 154));
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         shell.Controls.Add(page, 1, 1);
@@ -432,8 +432,8 @@ internal sealed class WorkerEditorForm : Form
             Margin = Padding.Empty,
             Padding = Padding.Empty
         };
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 29));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 71));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 29.5f));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70.5f));
         top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _identityBiography = top;
         BuildIdentity(top);
@@ -613,7 +613,7 @@ internal sealed class WorkerEditorForm : Form
         var bio = new RichTextBox
         {
             Name = "WorkerBiography",
-            Location = new Point(98, 8),
+            Location = new Point(90, 8),
             Size = new Size(605, 131),
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Segoe UI", 9.1f, FontStyle.Regular),

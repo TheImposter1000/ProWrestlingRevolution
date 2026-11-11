@@ -333,9 +333,18 @@ internal static class Program
                     new PrwProfileSection("tblWorkerBio", biographyTable)
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
+            using (var workerHost = new Panel
             {
-                // The native controls only receive their final bounds after
-                // their parent window is shown. Capture the actual layout.
+                Name = "WorkerVisualTestHost",
+                Size = new System.Drawing.Size(SkinArt.WindowWidth, SkinArt.WindowHeight)
+            })
+            {
+                // The CI desktop may be smaller than the fixed game canvas.
+                // Hosting the form as a child avoids OS-level top-window
+                // clamping and exercises the exact in-game popup layout.
+                workerEditor.TopLevel = false;
+                workerHost.Controls.Add(workerEditor);
+                workerEditor.FitInside(workerHost);
                 workerEditor.Show();
                 Application.DoEvents();
                 if (workerEditor.Controls.Find("WorkerEditorBody", true).Length != 1 ||
@@ -375,7 +384,7 @@ internal static class Program
                 var mainRail = workerEditor.Controls.Find("WorkerMainMenuRail", true).Single();
                 if (popupLayout is null || popupLayout.ColumnCount != 2 ||
                     workerPage is null || workerPage.ColumnCount != 2 ||
-                    mainRail.Width != 61 || tabColumn.Width != 154 ||
+                    mainRail.Width != 61 || tabColumn.Width != 158 ||
                     tabColumn.Right > workerBody.Left || workerBody.Width < 1000)
                     throw new Exception("Worker editor icon rail, tabs and data area must not overlap. " +
                         $"Form={workerEditor.Size}, rail={mainRail.Bounds}, tabs={tabColumn.Bounds}, " +
