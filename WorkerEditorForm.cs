@@ -392,10 +392,10 @@ internal sealed class WorkerEditorForm : UserControl
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using var swoosh = new Pen(Color.FromArgb(31, 155, 225), 2.4f);
             g.DrawArc(swoosh, new Rectangle(18, 3, 111, 28), 188, 143);
-            using var large = new Font("Segoe UI", 22f, FontStyle.Bold | FontStyle.Italic);
+            using var large = new Font("Segoe UI", 28f, FontStyle.Bold | FontStyle.Italic);
             using var small = new Font("Segoe UI", 9.3f, FontStyle.Bold | FontStyle.Italic);
             using var white = new SolidBrush(Color.White);
-            g.DrawString("PWR", large, white, new PointF(19, -4));
+            g.DrawString("PWR", large, white, new PointF(19, -7));
             g.DrawString("PRO WRESTLING", small, white, new PointF(133, 5));
             g.DrawString("REVOLUTION", small, white, new PointF(133, 20));
             using var cyan = new Pen(Accent, 1f);
