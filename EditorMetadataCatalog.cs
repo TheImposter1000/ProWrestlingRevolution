@@ -74,8 +74,21 @@ internal sealed class EditorMetadataCatalog
             .ToArray();
     }
 
-    internal string CategoryLabel(string name) =>
-        _categories.TryGetValue(name, out var category) ? category.Label : name;
+    internal string CategoryLabel(string name)
+    {
+        if (_categories.TryGetValue(name, out var category))
+            return category.Label;
+
+        // The three primary entity labels remain readable when a source
+        // checkout has not generated the optional PRWEditor.mdb yet.
+        if (name.Equals("tblFed", StringComparison.OrdinalIgnoreCase))
+            return "Companies";
+        if (name.Equals("tblMatch", StringComparison.OrdinalIgnoreCase))
+            return "Match Types";
+        if (name.Equals("tblWorker", StringComparison.OrdinalIgnoreCase))
+            return "Workers";
+        return name;
+    }
 
     internal string FieldLabel(string table, string field) =>
         _fields.TryGetValue(table + "." + field, out var label) ? label : field;
