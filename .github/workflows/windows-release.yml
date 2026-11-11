@@ -121,4 +121,6 @@ jobs:
             skins, pictures and user-customized editor MDB files are preserved.
 
             Retains the version 0.5.17 worker editor and its navigation.
-          files: ProWrestlingRevolution-Windows-x64.zip
+          files: |
+            ProWrestlingRevolution-Windows-x64.zip
+            System/PRWEditor.mdb
