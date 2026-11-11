@@ -136,13 +136,23 @@ internal sealed class WorkerEditorForm : UserControl
             using var pen = new Pen(Accent);
             e.Graphics.DrawLine(pen, 0, heading.Height - 1, heading.Width, heading.Height - 1);
         };
+        string symbol = title switch
+        {
+            "Personal Data" => "▤",
+            "Roles" => "♟",
+            "Physical Health" => "♥",
+            "Default & Age-Related Settings" => "⚙",
+            "Active Areas" => "◎",
+            "Languages" => "▣",
+            _ => ""
+        };
         var label = new Label
         {
-            Text = title.ToUpperInvariant(),
+            Text = string.IsNullOrEmpty(symbol) ? title : symbol + "  " + title,
             Dock = DockStyle.Fill,
             Padding = new Padding(11, 0, 0, 0),
             TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.Transparent
         };
@@ -278,19 +288,30 @@ internal sealed class WorkerEditorForm : UserControl
         shell.Controls.Add(title, 0, 0);
         shell.SetColumnSpan(title, 2);
 
-        var logo = new Label
+        var logo = new Panel
         {
             Name = "WorkerBrand", Dock = DockStyle.Left,
-            Width = 275, BackColor = Color.Transparent,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10f, FontStyle.Bold | FontStyle.Italic),
-            Text = "   PWR   PRO WRESTLING\n               REVOLUTION",
-            TextAlign = ContentAlignment.MiddleLeft
+            Width = 300, BackColor = Color.Transparent
+        };
+        logo.Paint += (_, args) =>
+        {
+            var g = args.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var swoosh = new Pen(Color.FromArgb(31, 155, 225), 2.4f);
+            g.DrawArc(swoosh, new Rectangle(18, 3, 111, 28), 188, 143);
+            using var large = new Font("Segoe UI", 22f, FontStyle.Bold | FontStyle.Italic);
+            using var small = new Font("Segoe UI", 9.3f, FontStyle.Bold | FontStyle.Italic);
+            using var white = new SolidBrush(Color.White);
+            g.DrawString("PWR", large, white, new PointF(19, -4));
+            g.DrawString("PRO WRESTLING", small, white, new PointF(133, 5));
+            g.DrawString("REVOLUTION", small, white, new PointF(133, 20));
+            using var cyan = new Pen(Accent, 1f);
+            g.DrawLine(cyan, 283, 6, 283, 34);
         };
         var pageHeading = new Label
         {
             Name = "WorkerEditorHeading",
-            Text = "WORKER EDITOR     /     EDIT WORKER",
+            Text = "Worker Editor     /     Edit Worker",
             Font = new Font("Segoe UI", 13.2f, FontStyle.Bold),
             ForeColor = Color.White,
             Dock = DockStyle.Left, Width = 460,
@@ -324,6 +345,22 @@ internal sealed class WorkerEditorForm : UserControl
             if (FindForm() is Form owner)
                 owner.WindowState = FormWindowState.Minimized;
         };
+        var maximize = new Button
+        {
+            Name = "WorkerMaximize", Text = "□",
+            Dock = DockStyle.Right, Width = 37,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent, ForeColor = Color.White,
+            Font = new Font("Segoe UI", 16f),
+            Cursor = Cursors.Hand
+        };
+        maximize.FlatAppearance.BorderSize = 0;
+        maximize.Click += (_, _) =>
+        {
+            if (FindForm() is Form owner)
+                owner.WindowState = owner.WindowState == FormWindowState.Maximized
+                    ? FormWindowState.Normal : FormWindowState.Maximized;
+        };
         var help = new Button
         {
             Name = "WorkerHelp", Text = "?",
@@ -355,10 +392,11 @@ internal sealed class WorkerEditorForm : UserControl
         pageHeading.Click += (_, _) => ShowSection("General");
         title.Controls.Add(pageHeading);
         title.Controls.Add(logo);
-        title.Controls.Add(close);
-        title.Controls.Add(minimize);
-        title.Controls.Add(settings);
         title.Controls.Add(help);
+        title.Controls.Add(settings);
+        title.Controls.Add(minimize);
+        title.Controls.Add(maximize);
+        title.Controls.Add(close);
 
         _mainRail.BackColor = Color.FromArgb(11, 25, 41);
         var navTips = _tips;
@@ -654,7 +692,7 @@ internal sealed class WorkerEditorForm : UserControl
     /// </summary>
     private static TableLayoutPanel MakeRows(Panel card,
         IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
-        int rowHeight = 22)
+        int rowHeight = 22, float labelShare = 39f)
     {
         var grid = new TableLayoutPanel
         {
@@ -665,8 +703,8 @@ internal sealed class WorkerEditorForm : UserControl
             Margin = Padding.Empty, Padding = new Padding(1, 2, 2, 0),
             BackColor = Dark
         };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 39));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 61));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelShare));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f - labelShare));
         for (int i = 0; i < fields.Count; i++)
         {
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
@@ -775,11 +813,14 @@ internal sealed class WorkerEditorForm : UserControl
             ("Manager", "RoleManager"), ("On-Screen Personality", "RoleOnScreenPersonality"),
             ("Play By Play", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
             ("Referee", "RoleReferee"), ("Road Agent", "RoleProducer")
-        ], worker);
+        ], worker, rowHeight: 20);
+        roleChecks.Dock = DockStyle.None;
+        roleChecks.Location = new Point(3, 55);
         var competitor = new Panel
         {
-            Name = "WorkerCompetesVs", Dock = DockStyle.Top,
-            Height = 27, BackColor = Dark,
+            Name = "WorkerCompetesVs", Dock = DockStyle.None,
+            Location = new Point(3, 28),
+            Height = 26, BackColor = Dark,
             Padding = new Padding(3, 3, 4, 2)
         };
         var competitorLabel = TextLabel("Competes Vs.");
@@ -791,12 +832,16 @@ internal sealed class WorkerEditorForm : UserControl
         competitor.Controls.Add(competitorLabel);
         roles.Controls.Add(competitor);
         competitor.BringToFront();
-        roleChecks.SendToBack();
+        roles.Resize += (_, _) =>
+        {
+            competitor.Width = Math.Max(100, roles.ClientSize.Width - 6);
+            roleChecks.Width = Math.Max(100, roles.ClientSize.Width - 6);
+        };
         var physical = Card("Physical Health", "WorkerPhysical");
         MakeRows(physical, [
             ("Head Condition", "HeadCondition"), ("Body Condition", "BodyCondition"),
             ("Arms Condition", "ArmsCondition"), ("Legs Condition", "LegsCondition")
-        ], First("tblWorkerPhysical"));
+        ], First("tblWorkerPhysical"), labelShare: 60f);
         grid.Controls.Add(Stack((loyalty, 27), (roles, 47), (physical, 26)), 1, 0);
 
         var settings = Card("Default & Age-Related Settings", "WorkerSettings");
@@ -830,7 +875,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Mediterranean", "LanguageMediterranean"),
             ("Germanic", "LanguageGermanic"), ("Slavic", "LanguageSlavic"),
             ("Hindi", "LanguageHindi")
-        ], worker);
+        ], worker, labelShare: 52f);
         grid.Controls.Add(Stack((regions, 48), (languages, 52)), 3, 0);
         _content.Controls.Add(grid);
     }
@@ -1069,7 +1114,26 @@ internal sealed class WorkerEditorForm : UserControl
             button.Enabled = false;
             _tips.SetToolTip(button,
                 "Worker editing functions are not yet connected to the database.");
-            buttons.Controls.Add(button, i, 0);
+            var holder = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent, Margin = Padding.Empty
+            };
+            button.Dock = DockStyle.Fill;
+            holder.Controls.Add(button);
+            var caption = new Label
+            {
+                Name = button.Name + "Caption",
+                Text = button.Text,
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            holder.Controls.Add(caption);
+            caption.BringToFront();
+            buttons.Controls.Add(holder, i, 0);
         }
         _actionArea.Controls.Add(buttons);
     }
