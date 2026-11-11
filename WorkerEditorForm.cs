@@ -32,8 +32,6 @@ internal sealed class WorkerEditorForm : Form
     private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
     private string _active = "General";
-    private Point? _dragStartScreen;
-    private Point _dragStartLocation;
     private int _recordIndex;
     private readonly Font _railNormal = new("Segoe UI", 10f);
     private readonly Font _railActive = new("Segoe UI", 10f, FontStyle.Bold);

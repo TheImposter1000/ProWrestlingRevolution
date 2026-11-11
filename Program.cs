@@ -334,6 +334,10 @@ internal static class Program
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             {
+                // The native controls only receive their final bounds after
+                // their parent window is shown. Capture the actual layout.
+                workerEditor.Show();
+                Application.DoEvents();
                 if (workerEditor.Controls.Find("WorkerEditorBody", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerGeneralGrid", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerPersonalData", true).Length != 1 ||
@@ -373,7 +377,10 @@ internal static class Program
                     workerPage is null || workerPage.ColumnCount != 2 ||
                     mainRail.Width != 61 || tabColumn.Width != 154 ||
                     tabColumn.Right > workerBody.Left || workerBody.Width < 1000)
-                    throw new Exception("Worker editor icon rail, tabs and data area must not overlap.");
+                    throw new Exception("Worker editor icon rail, tabs and data area must not overlap. " +
+                        $"Form={workerEditor.Size}, rail={mainRail.Bounds}, tabs={tabColumn.Bounds}, " +
+                        $"body={workerBody.Bounds}, page={workerPage?.Bounds}, " +
+                        $"popup={popupLayout?.Bounds}.");
                 var personal = workerEditor.Controls.Find("WorkerPersonalData", true).Single();
                 var personalHeading = workerEditor.Controls.Find("WorkerPersonalDataHeading", true).Single();
                 var personalFields = workerEditor.Controls.Find("WorkerPersonalDataFields", true).Single();
