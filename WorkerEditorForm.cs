@@ -1195,6 +1195,92 @@ internal sealed class WorkerEditorForm : UserControl
         }
     }
 
+    /// <summary>
+    /// Vector action icons reproduce the approved screenshot without relying
+    /// on decorative Unicode characters that turn into missing-glyph squares
+    /// on some Windows machines. This draws no new skin assets.
+    /// </summary>
+    private sealed class WorkerActionCaption : Control
+    {
+        private readonly string _kind;
+
+        internal WorkerActionCaption(string kind, string text)
+        {
+            _kind = kind;
+            Text = text;
+            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold);
+            ForeColor = Color.White;
+            BackColor = Color.Transparent;
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 20 || Height < 20) return;
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var measure = TextRenderer.MeasureText(g, Text, Font,
+                new Size(int.MaxValue, Height),
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            int glyphWidth = 19, gap = 6;
+            int totalWidth = glyphWidth + gap + measure.Width;
+            int x = Math.Max(5, (Width - totalWidth) / 2);
+            int y = (Height - glyphWidth) / 2;
+            using var pen = new Pen(Color.White, 1.6f)
+            {
+                LineJoin = LineJoin.Round
+            };
+            using var brush = new SolidBrush(Color.White);
+
+            switch (_kind)
+            {
+                case "moveset":
+                    g.DrawPolygon(pen, [
+                        new Point(x, y + 5), new Point(x + 9, y + 1),
+                        new Point(x + 18, y + 5), new Point(x + 9, y + 9)
+                    ]);
+                    g.DrawPolygon(pen, [
+                        new Point(x, y + 10), new Point(x + 9, y + 14),
+                        new Point(x + 18, y + 10), new Point(x + 9, y + 6)
+                    ]);
+                    g.DrawLine(pen, x, y + 5, x, y + 13);
+                    g.DrawLine(pen, x + 18, y + 5, x + 18, y + 13);
+                    break;
+                case "suggest":
+                    g.DrawRoundedRectangle(pen, new Rectangle(x + 1, y + 1, 16, 16), 3);
+                    foreach (var dot in new[] {
+                        new Point(5, 5), new Point(12, 5), new Point(9, 9),
+                        new Point(5, 13), new Point(12, 13)
+                    })
+                        g.FillEllipse(brush, x + dot.X, y + dot.Y, 2, 2);
+                    break;
+                case "biography":
+                    g.DrawRectangle(pen, x + 2, y + 1, 14, 17);
+                    g.DrawLine(pen, x + 5, y + 6, x + 13, y + 6);
+                    g.DrawLine(pen, x + 5, y + 10, x + 13, y + 10);
+                    g.DrawLine(pen, x + 5, y + 14, x + 11, y + 14);
+                    break;
+                case "save":
+                    g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
+                    g.DrawRectangle(pen, x + 5, y + 1, 8, 6);
+                    g.DrawRectangle(pen, x + 5, y + 11, 8, 6);
+                    break;
+            }
+
+            TextRenderer.DrawText(g, Text, Font,
+                new Rectangle(x + glyphWidth + gap, 0,
+                    Math.Max(1, Width - (x + glyphWidth + gap) - 2), Height),
+                Color.White, TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.EndEllipsis |
+                TextFormatFlags.SingleLine |
+                TextFormatFlags.NoPadding);
+        }
+    }
+
     private static Button ActionButton(string label, string name, bool primary = false, int width = 148)
     {
         var button = new WorkerActionButton
@@ -1230,10 +1316,10 @@ internal sealed class WorkerEditorForm : UserControl
         foreach (int width in new[] { 28, 25, 27, 20 })
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
 
-        var moveset = ActionButton("▱  Create Moveset", "WorkerCreateMoveset");
-        var suggest = ActionButton("⚄  Suggest Name", "WorkerSuggestName");
-        var biography = ActionButton("▤  Make Biography", "WorkerMakeBiography");
-        var save = ActionButton("▣  Save", "WorkerSave", primary: true);
+        var moveset = ActionButton("Create Moveset", "WorkerCreateMoveset");
+        var suggest = ActionButton("Suggest Name", "WorkerSuggestName");
+        var biography = ActionButton("Make Biography", "WorkerMakeBiography");
+        var save = ActionButton("Save", "WorkerSave", primary: true);
         var actions = new[] { moveset, suggest, biography, save };
         for (int i = 0; i < actions.Length; i++)
         {
@@ -1252,16 +1338,21 @@ internal sealed class WorkerEditorForm : UserControl
             };
             button.Dock = DockStyle.Fill;
             holder.Controls.Add(button);
-            var caption = new Label
+            var caption = new WorkerActionCaption(
+                i switch
+                {
+                    0 => "moveset",
+                    1 => "suggest",
+                    2 => "biography",
+                    _ => "save"
+                }, button.Text)
             {
                 Name = button.Name + "Caption",
-                Text = button.Text,
-                Dock = DockStyle.Fill,
-                BackColor = Color.Transparent,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter
+                Dock = DockStyle.Fill
             };
+            // The caption owns both icon and label drawing; the disabled
+            // button underneath provides only its styled surface and border.
+            button.Text = "";
             holder.Controls.Add(caption);
             caption.BringToFront();
             buttons.Controls.Add(holder, i, 0);
