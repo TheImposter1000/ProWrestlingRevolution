@@ -21,6 +21,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private static readonly Color Soft = Color.FromArgb(170, 191, 207);
 
     private readonly AppPaths _paths;
+    private readonly EditorMetadataCatalog _editorMetadata;
     private readonly SkinPalette _skin;
     private readonly Action _goBack;
     private readonly Action<string>? _navigate;
@@ -276,6 +277,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         Action<string>? navigate = null)
     {
         _paths = paths;
+        _editorMetadata = EditorMetadataCatalog.Load(paths.EditorMetadataDatabase);
         _skin = skin;
         _goBack = goBack;
         _navigate = navigate;
@@ -456,6 +458,12 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         Add(Label("CURRENT SECTION", 26, true));
         _section.Name = "EditorCategorySelector";
         ConfigureCombo(_section);
+        _section.FormattingEnabled = true;
+        _section.Format += (_, e) =>
+        {
+            if (e.ListItem is string table)
+                e.Value = _editorMetadata.CategoryLabel(table);
+        };
         _section.SelectedIndexChanged += (_, _) => LoadRecords();
         Add(_section);
 
@@ -489,6 +497,12 @@ internal sealed class DatabaseEditorWorkspace : UserControl
 
         _massField.Name = "MassEditFieldSelector";
         ConfigureCombo(_massField);
+        _massField.FormattingEnabled = true;
+        _massField.Format += (_, e) =>
+        {
+            if (e.ListItem is string field && _section.SelectedItem is string table)
+                e.Value = _editorMetadata.FieldLabel(table, field);
+        };
         _massField.Items.Add("Choose a text field...");
         _massField.SelectedIndex = 0;
         Add(_massField);
@@ -748,7 +762,8 @@ internal sealed class DatabaseEditorWorkspace : UserControl
 
         try
         {
-            foreach (string name in AccessDatabase.TableNames(_universe.MdbPath, _password))
+            foreach (string name in _editorMetadata.OrderTables(
+                         AccessDatabase.TableNames(_universe.MdbPath, _password)))
                 _section.Items.Add(name);
             if (_section.Items.Count > 0)
             {
@@ -866,7 +881,9 @@ internal sealed class DatabaseEditorWorkspace : UserControl
                 {
                     string value = Convert.ToString(chosen.Row[c]) ?? "";
                     if (value.Length > 85) value = value[..85] + "...";
-                    summary += c.ColumnName + ": " + value + "\n";
+                    summary += _editorMetadata.FieldLabel(
+                        _section.SelectedItem?.ToString() ?? "", c.ColumnName) +
+                        ": " + value + "\n";
                 }
             }
             _notes.Text = summary;
@@ -949,8 +966,11 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         else
         {
             foreach (DataColumn col in entry.Row.Table.Columns)
-                details.Rows.Add(_section.SelectedItem?.ToString() ?? "",
-                    col.ColumnName, Convert.ToString(entry.Row[col]) ?? "");
+                details.Rows.Add(
+                    _editorMetadata.CategoryLabel(_section.SelectedItem?.ToString() ?? ""),
+                    _editorMetadata.FieldLabel(
+                        _section.SelectedItem?.ToString() ?? "", col.ColumnName),
+                    Convert.ToString(entry.Row[col]) ?? "");
         }
         dialog.Controls.Add(details);
 

@@ -15,6 +15,7 @@ public sealed class AppPaths
     public string SkinsRoot => Path.Combine(_root, "Skins");
     public string SystemRoot => Path.Combine(_root, "System");
     public string DefaultDatabase => Path.Combine(SystemRoot, PrwDefaultTemplate.Filename);
+    public string EditorMetadataDatabase => Path.Combine(SystemRoot, EditorMetadataTemplate.Filename);
     public string SettingsDatabase => _settings.DatabaseFile;
 
     public AppPaths(string root)
@@ -31,6 +32,7 @@ public sealed class AppPaths
         // Install or upgrade the local bundled base MDB. Older versions are
         // backed up first; subsequent user edits to this version are preserved.
         PrwDefaultTemplate.EnsureInstalled(SystemRoot);
+        EditorMetadataTemplate.EnsureInstalled(SystemRoot);
 
         // Build missing, original raster skin assets; existing user artwork is never overwritten.
         SkinArt.EnsurePack(Path.Combine(SkinsRoot, "Obsidian"), "Obsidian");

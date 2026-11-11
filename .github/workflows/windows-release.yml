@@ -21,11 +21,26 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Install Java for independent Jet MDB generation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build dedicated PRW editor metadata MDB
+        shell: pwsh
+        run: |
+          python Tools/EditorMdbGenerator/build_editor_manifest.py
+          if ($LASTEXITCODE -ne 0) { throw "Editor manifest generation failed" }
+          mvn -q -f Tools/EditorMdbGenerator/pom.xml compile exec:java
+          if ($LASTEXITCODE -ne 0) { throw "PRWEditor.mdb generation failed" }
+          if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Generated MDB not found" }
+
       - name: Verify the menu, skins, folder layout and MDB file-management routines
         shell: pwsh
         run: |
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.17 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.5.18 smoke test failed: $LASTEXITCODE" }
 
       - name: Build a self-contained Windows x64 desktop executable
         shell: pwsh
@@ -49,13 +64,15 @@ jobs:
               if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $file))) { throw "Missing published skin: $skin/$file" }
             }
           }
+          if (-not (Test-Path "publish/System/PRWEditor.mdb")) { throw "Editor metadata MDB was not bundled" }
+          if ((Get-Item "publish/System/PRWEditor.mdb").Length -lt 4096) { throw "Editor metadata MDB too small" }
           if (-not (Test-Path "publish/System/PRWDefault.mdb")) { throw "Local default template was not installed" }
           if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 434176) { throw "Default template size is incorrect" }
           if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.5.17 portable game ZIP
+      - name: Assemble the Version 0.5.18 portable game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -72,7 +89,7 @@ jobs:
           Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
           if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
 
-      - name: Upload complete Version 0.5.17 game ZIP
+      - name: Upload complete Version 0.5.18 game ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ProWrestlingRevolution-Windows-x64
@@ -82,28 +99,28 @@ jobs:
       - name: Publish direct Windows game download
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.5.17
-          name: Pro Wrestling Revolution 0.5.17 - Worker Editor Interface
+          tag_name: v0.5.18
+          name: Pro Wrestling Revolution 0.5.18 - Native Editor Metadata MDB
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Version 0.5.17 introduces the fixed, no-scrolling PWR Worker Editor,
-            following the approved blue worker edit reference. Open the worker
-            screen by double-clicking a worker in the database editor.
-            Personal Data, Biography, Loyalty, Roles, Physical Health,
-            Age-Related Settings, Active Areas, and Languages are shown only
-            in their designated groups. The side sections show the actual
-            native MDB worker-linked records without duplicating general data.
+            Adds a dedicated System/PRWEditor.mdb for Database Editor category
+            names, field captions, display order, visibility, and field groups.
 
-            All displayed values come from the selected worker's MDB record.
-            The current screen is read-only until the separate worker editing
-            and save workflows are integrated. Create Moveset, Suggest Name,
-            Make Biography, and Save are deliberately disabled rather than
-            silently writing or falsely claiming to save data.
+            This Access MDB is separate from the native PRWDefault.mdb game
+            data and is generated from the PRW schema using Jackcess. It
+            follows Access metadata concepts observed in TEW9Access.mdb
+            without copying TEW worker/company records or distributing TEW data.
+            A missing or inaccessible editor MDB falls back to native names.
 
-            The compact main-menu icon rail and existing database and save
-            management functionality are preserved.
-          files: ProWrestlingRevolution-Windows-x64.zip
+            The in-app executable updater installs the bundled editor MDB on
+            launch when missing. Existing universes, careers, settings,
+            skins, pictures and user-customized editor MDB files are preserved.
+
+            Retains the version 0.5.17 worker editor and its navigation.
+          files: |
+            ProWrestlingRevolution-Windows-x64.zip
+            System/PRWEditor.mdb
