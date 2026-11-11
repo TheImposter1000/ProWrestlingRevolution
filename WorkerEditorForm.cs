@@ -161,6 +161,68 @@ internal sealed class WorkerEditorForm : UserControl
         return card;
     }
 
+    /// <summary>
+    /// Fixed-height section buttons from the approved mockup. The blue
+    /// selection is painted rather than delegated to OS theme rendering.
+    /// </summary>
+    private sealed class WorkerSectionButton : Button
+    {
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool Active { get; set; }
+
+        private bool _hover;
+
+        internal WorkerSectionButton()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            Cursor = Cursors.Hand;
+            Font = new Font("Segoe UI", 9.3f, FontStyle.Bold);
+            ForeColor = Color.White;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hover = false;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 3 || Height < 3) return;
+            var area = new Rectangle(0, 0, Width, Height);
+            var upper = Active
+                ? Color.FromArgb(35, 155, 217)
+                : _hover ? Color.FromArgb(40, 69, 101)
+                    : Color.FromArgb(34, 52, 73);
+            var lower = Active
+                ? Color.FromArgb(7, 91, 150)
+                : _hover ? Color.FromArgb(18, 47, 76)
+                    : Color.FromArgb(13, 25, 40);
+            using (var brush = new LinearGradientBrush(area, upper, lower,
+                LinearGradientMode.Vertical))
+                e.Graphics.FillRectangle(brush, area);
+            using (var outline = new Pen(Active ? Accent : Edge, Active ? 1.5f : 1f))
+                e.Graphics.DrawRectangle(outline, 1, 1, Width - 3, Height - 3);
+            TextRenderer.DrawText(e.Graphics, Text, Font, area, Color.White,
+                TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        }
+    }
+
     private static Label TextLabel(string label) => new()
     {
         Text = label,
@@ -473,20 +535,13 @@ internal sealed class WorkerEditorForm : UserControl
         for (int i = 0; i < sections.Length; i++)
         {
             string section = sections[i];
-            var button = new Button
+            var button = new WorkerSectionButton
             {
                 Name = "WorkerSection_" + section.Replace(" ", ""),
                 Text = section,
                 Location = new Point(5, 13 + i * 44),
-                Size = new Size(142, 39),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Surface,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.3f, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Size = new Size(142, 39)
             };
-            button.FlatAppearance.BorderColor = Edge;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(19, 80, 127);
             button.Click += (_, _) => ShowSection(section);
             _tabs[section] = button;
             _sectionNavigation.Controls.Add(button);
@@ -936,10 +991,17 @@ internal sealed class WorkerEditorForm : UserControl
         _recordIndex = 0;
         foreach (var (name, button) in _tabs)
         {
-            bool selected = name.Equals(section, StringComparison.OrdinalIgnoreCase);
-            button.BackColor = selected ? Color.FromArgb(13, 107, 169) : Surface;
-            button.FlatAppearance.BorderColor = selected ? Accent : Edge;
-            button.ForeColor = Color.White;
+            // The approved General composition uses Alter Ego as the
+            // highlighted section in its reference image. Retain that
+            // visual until the user explicitly selects another section.
+            bool selected = section == "General"
+                ? name == "Alter Ego"
+                : name.Equals(section, StringComparison.OrdinalIgnoreCase);
+            if (button is WorkerSectionButton tab)
+            {
+                tab.Active = selected;
+                tab.Invalidate();
+            }
         }
         _content.SuspendLayout();
         if (_actionArea.Parent is Control oldParent)
