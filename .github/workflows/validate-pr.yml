@@ -16,6 +16,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate separate PRWEditor MDB and native schema manifest
+        shell: pwsh
+        run: |
+          python Tools/EditorMdbGenerator/build_editor_manifest.py
+          if ($LASTEXITCODE -ne 0) { throw "Editor metadata manifest generation failed" }
+          mvn -q -f Tools/EditorMdbGenerator/pom.xml compile exec:java
+          if ($LASTEXITCODE -ne 0) { throw "PRWEditor MDB generation failed" }
+          if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Missing editor metadata MDB" }
       - name: Build Windows Forms game
         run: dotnet build ProWrestlingRevolution.csproj -c Release
       - name: Run application smoke tests
@@ -34,6 +46,8 @@ jobs:
             if (-not (Test-Path $item)) { throw "Missing installed application data: $item" }
           }
           if (Test-Path "System/PRWDefault.mdb") { throw "Template was incorrectly installed in source repository" }
+          if (-not (Test-Path "publish/System/PRWEditor.mdb")) { throw "Editor metadata database is missing from publish output" }
+          if ((Get-Item "publish/System/PRWEditor.mdb").Length -lt 4096) { throw "Editor metadata MDB is unexpectedly short" }
           if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 434176) { throw "Replacement template length is incorrect" }
           if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
             throw "Published replacement template is not the uploaded MDB"
