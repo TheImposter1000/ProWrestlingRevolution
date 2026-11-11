@@ -321,7 +321,7 @@ internal sealed class WorkerEditorForm : UserControl
         minimize.FlatAppearance.BorderSize = 0;
         minimize.Click += (_, _) =>
         {
-            if (FindForm() is Form owner && owner != this)
+            if (FindForm() is Form owner)
                 owner.WindowState = FormWindowState.Minimized;
         };
         var help = new Button
