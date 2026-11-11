@@ -99,6 +99,13 @@ internal static class Program
             var originalIni = Path.Combine(paths.SystemRoot, "settings.ini");
             File.WriteAllText(originalIni, "Skin=Real\nDatabase=MDB\n", Encoding.UTF8);
             paths.EnsureLayout();
+            // A release build embeds and installs the editor label database.
+            // Local developer builds without the Java generator keep fallback labels.
+            if (typeof(EditorMetadataTemplate).Assembly
+                    .GetManifestResourceStream(EditorMetadataTemplate.Filename) is not null &&
+                (!File.Exists(paths.EditorMetadataDatabase) ||
+                 !AccessDatabase.LooksLikeMdb(paths.EditorMetadataDatabase)))
+                throw new Exception("Bundled editor metadata MDB was not installed locally.");
             if (paths.ReadSetting("Skin", "") != "Real" ||
                 paths.ReadSetting("Database", "") != "MDB")
                 throw new Exception("Original skin and database preferences were not migrated.");
