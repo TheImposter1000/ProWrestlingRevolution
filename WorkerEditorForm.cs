@@ -179,6 +179,14 @@ internal sealed class WorkerEditorForm : UserControl
             System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal bool DropDownIndicator { get; set; }
 
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool CalendarIndicator { get; set; }
+
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        internal bool SpinnerIndicator { get; set; }
+
         internal WorkerValue()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
@@ -199,20 +207,43 @@ internal sealed class WorkerEditorForm : UserControl
             e.Graphics.FillRectangle(gradient, rect);
             using var border = new Pen(Color.FromArgb(110, 145, 170));
             e.Graphics.DrawRectangle(border, 0, 0, rect.Width - 1, rect.Height - 1);
+            bool indicator = DropDownIndicator || CalendarIndicator || SpinnerIndicator;
             var textArea = new Rectangle(5, 0,
-                Math.Max(1, rect.Width - (DropDownIndicator ? 19 : 8)), rect.Height);
+                Math.Max(1, rect.Width - (indicator ? 20 : 8)), rect.Height);
             TextRenderer.DrawText(e.Graphics, Text, Font, textArea, ForeColor,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
                 TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis |
                 TextFormatFlags.SingleLine);
-            if (!DropDownIndicator) return;
             int x = rect.Width - 11, y = rect.Height / 2 + 1;
             using var arrow = new SolidBrush(Color.FromArgb(15, 35, 53));
-            e.Graphics.FillPolygon(arrow,
-            [
-                new Point(x - 4, y - 3), new Point(x + 4, y - 3),
-                new Point(x, y + 2)
-            ]);
+            if (DropDownIndicator)
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y - 3), new Point(x + 4, y - 3),
+                    new Point(x, y + 2)
+                ]);
+            if (SpinnerIndicator)
+            {
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y - 2), new Point(x + 4, y - 2),
+                    new Point(x, y - 6)
+                ]);
+                e.Graphics.FillPolygon(arrow,
+                [
+                    new Point(x - 4, y + 3), new Point(x + 4, y + 3),
+                    new Point(x, y + 7)
+                ]);
+            }
+            if (CalendarIndicator)
+            {
+                using var pen = new Pen(Color.FromArgb(32, 62, 84), 1f);
+                e.Graphics.DrawRectangle(pen, rect.Width - 20, (rect.Height - 14) / 2, 14, 13);
+                e.Graphics.DrawLine(pen, rect.Width - 20, (rect.Height - 14) / 2 + 4,
+                    rect.Width - 6, (rect.Height - 14) / 2 + 4);
+                e.Graphics.DrawLine(pen, rect.Width - 17, (rect.Height - 14) / 2 - 2,
+                    rect.Width - 17, (rect.Height - 14) / 2 + 2);
+            }
         }
     }
 
@@ -654,7 +685,7 @@ internal sealed class WorkerEditorForm : UserControl
             Location = new Point(90, 8),
             Size = new Size(605, 131),
             BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Segoe UI", 9.1f, FontStyle.Regular),
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
             ReadOnly = true,
             DetectUrls = false,
             TabStop = false,
@@ -683,15 +714,15 @@ internal sealed class WorkerEditorForm : UserControl
     /// </summary>
     private static TableLayoutPanel MakeRows(Panel card,
         IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
-        int rowHeight = 22, float labelShare = 39f)
+        int rowHeight = 22, float labelShare = 39f, int topPad = 2)
     {
         var grid = new TableLayoutPanel
         {
             Name = card.Name + "Fields",
             Dock = DockStyle.Top,
-            Height = fields.Count * rowHeight + 3,
+            Height = fields.Count * rowHeight + topPad + 1,
             ColumnCount = 2, RowCount = fields.Count,
-            Margin = Padding.Empty, Padding = new Padding(1, 2, 2, 0),
+            Margin = Padding.Empty, Padding = new Padding(1, topPad, 2, 0),
             BackColor = Dark
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelShare));
@@ -700,13 +731,19 @@ internal sealed class WorkerEditorForm : UserControl
         {
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             grid.Controls.Add(TextLabel(fields[i].Label), 0, i);
-            grid.Controls.Add(ValueBox(Display(source, fields[i].Field),
-                "WorkerField_" + fields[i].Field,
-                !fields[i].Field.Contains("Weight", StringComparison.OrdinalIgnoreCase) &&
-                !fields[i].Field.Contains("Date", StringComparison.OrdinalIgnoreCase) &&
-                !fields[i].Field.Equals("Born", StringComparison.OrdinalIgnoreCase) &&
-                !fields[i].Field.Equals("SetToDebut", StringComparison.OrdinalIgnoreCase)),
-                1, i);
+            bool isWeight = fields[i].Field.Contains("Weight", StringComparison.OrdinalIgnoreCase);
+            bool isDate = fields[i].Field.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
+                          fields[i].Field is "Born" or "SetToDebut";
+            var value = ValueBox(Display(source, fields[i].Field),
+                "WorkerField_" + fields[i].Field, !isWeight && !isDate);
+            value.CalendarIndicator = isDate;
+            value.SpinnerIndicator = isWeight;
+            if (isWeight)
+            {
+                value.Dock = DockStyle.Left;
+                value.Width = 98;
+            }
+            grid.Controls.Add(value, 1, i);
         }
         card.Controls.Add(grid);
         grid.BringToFront();
@@ -796,7 +833,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Style", "Style"), ("Body Type", "BodyType"),
             ("Height", "HeightInches"), ("Weight", "WeightPounds"),
             ("Min Weight", "MinWeightPounds"), ("Max Weight", "MaxWeightPounds")
-        ], worker);
+        ], worker, rowHeight: 23);
         personal.Dock = DockStyle.Top;
         personal.Height = 496;
         grid.Controls.Add(personal, 0, 0);
@@ -862,7 +899,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Relevancy Age", "RelevancyAge"),
             ("Retirement Age", "RetirementAge"),
             ("Career Goal", "CareerGoal")
-        ], worker);
+        ], worker, rowHeight: 27);
         settings.Dock = DockStyle.Fill;
         grid.Controls.Add(settings, 2, 0);
 
@@ -880,7 +917,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Mediterranean", "LanguageMediterranean"),
             ("Germanic", "LanguageGermanic"), ("Slavic", "LanguageSlavic"),
             ("Hindi", "LanguageHindi")
-        ], worker, labelShare: 52f);
+        ], worker, rowHeight: 23, labelShare: 48f, topPad: 6);
         var rightColumn = Stack((regions, 47), (languages, 53));
         rightColumn.Dock = DockStyle.Fill;
         grid.Controls.Add(rightColumn, 3, 0);
