@@ -586,14 +586,15 @@ internal sealed class WorkerEditorForm : UserControl
     private void LayoutWorkerCanvas()
     {
         if (_identityBiography is null || _body.Width < 200) return;
-        // The approved mockup reserves a 21px right-hand gutter.
-        // Both the top biography and four data columns share this boundary.
-        int width = Math.Max(100, _body.ClientSize.Width - 21);
+        // Align the left edge and the right edge to the approved 1366x768
+        // screenshot: a 3px inset and a total 8px horizontal gutter.
+        int contentX = 3;
+        int width = Math.Max(100, _body.ClientSize.Width - 8);
         int height = _body.ClientSize.Height;
-        _identityBiography.Bounds = new Rectangle(0, 10, width, 145);
+        _identityBiography.Bounds = new Rectangle(contentX, 10, width, 145);
         int generalY = 165;
         int generalHeight = Math.Max(340, Math.Min(520, height - generalY - 12));
-        _mainArea.Bounds = new Rectangle(0, generalY, width, generalHeight);
+        _mainArea.Bounds = new Rectangle(contentX, generalY, width, generalHeight);
         _content.Bounds = _mainArea.ClientRectangle;
     }
 
@@ -875,7 +876,7 @@ internal sealed class WorkerEditorForm : UserControl
         };
         foreach (float percent in new[] { 26f, 24f, 28f, 22f })
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, percent));
-        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 448));
+        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 456));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var personal = Card("Personal Data", "WorkerPersonalData");
@@ -892,7 +893,7 @@ internal sealed class WorkerEditorForm : UserControl
             ("Min Weight", "MinWeightPounds"), ("Max Weight", "MaxWeightPounds")
         ], worker, rowHeight: 23);
         personal.Dock = DockStyle.Top;
-        personal.Height = 496;
+        personal.Height = 503;
         grid.Controls.Add(personal, 0, 0);
         grid.SetRowSpan(personal, 2);
 
@@ -938,7 +939,7 @@ internal sealed class WorkerEditorForm : UserControl
         ], First("tblWorkerPhysical"), labelShare: 60f);
         var middleColumn = Stack((loyalty, 27), (roles, 47), (physical, 26));
         middleColumn.Dock = DockStyle.Top;
-        middleColumn.Height = 496;
+        middleColumn.Height = 503;
         grid.Controls.Add(middleColumn, 1, 0);
         grid.SetRowSpan(middleColumn, 2);
 
@@ -981,9 +982,9 @@ internal sealed class WorkerEditorForm : UserControl
 
         _actionArea.Dock = DockStyle.Fill;
         _actionArea.Margin = Padding.Empty;
-        // The approved action strip starts at y=675 and is 36px high at the
-        // fixed logical 1366x768 size, with open space beneath it.
-        _actionArea.Padding = new Padding(8, 22, 3, 14);
+        // The approved action strip occupies y=686..722 on a 1366x768
+        // logical canvas; the surrounding panel fields end at y=657.
+        _actionArea.Padding = new Padding(8, 25, 3, 3);
         grid.Controls.Add(_actionArea, 2, 1);
         grid.SetColumnSpan(_actionArea, 2);
         _content.Controls.Add(grid);
