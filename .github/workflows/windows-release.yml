@@ -37,6 +37,8 @@ jobs:
           if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Generated MDB not found" }
 
       - name: Verify the menu, skins, folder layout and MDB file-management routines
+        env:
+          PWR_WORKER_PREVIEW: "1"
         shell: pwsh
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
