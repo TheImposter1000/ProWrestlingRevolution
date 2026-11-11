@@ -43,6 +43,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private DataTable? _loaded;
     private long _total;
     private bool _showSummary;
+    private bool _nativePrw;
     private string _password = "";
     private List<Entry> _allEntries = [];
 
@@ -732,6 +733,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         if (universes.Count == 0)
         {
             _universe = null;
+            _nativePrw = false;
             _dbName.Text = "NO DATABASE SELECTED";
             _count.Text = "";
             _notes.Text = "No MDB database is installed.\n\nUse Import Database below to add an existing Access MDB.";
@@ -758,15 +760,24 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         _massField.Items.Add("Choose a text field...");
         _massField.SelectedIndex = 0;
         _count.Text = "";
+        _nativePrw = false;
         if (_universe is null) return;
 
         try
         {
-            // Show entity categories rather than exposing every relational
-            // support table as an independent editor screen.
+            var available = AccessDatabase.TableNames(_universe.MdbPath, _password);
+            if (PrwSchema.Tables.Take(10).All(table =>
+                    available.Contains(table.Name, StringComparer.OrdinalIgnoreCase)))
+            {
+                using var connection = AccessDatabase.Open(_universe.MdbPath, _password);
+                _nativePrw = PrwSchema.Inspect(
+                    connection, requireExpandedTables: false).IsValid;
+            }
+
+            // A verified native PRW MDB has a short alphabetical entity menu.
+            // Non-native imported MDBs retain all their original table entries.
             foreach (string name in EditorCategoryDirectory.MainCategories(
-                         AccessDatabase.TableNames(_universe.MdbPath, _password),
-                         _editorMetadata))
+                         available, _editorMetadata, _nativePrw))
                 _section.Items.Add(name);
             if (_section.Items.Count > 0)
             {
@@ -917,7 +928,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private void OpenRecordDetails()
     {
         if (_records.SelectedItem is not Entry entry) return;
-        if (_universe is not null &&
+        if (_universe is not null && _nativePrw &&
             _section.SelectedItem is string category &&
             (category == "tblFed" || category == "tblMatch") &&
             entry.Row.Table.Columns.Contains("UID") &&
@@ -968,7 +979,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
 
         // Native PRW worker records include the linked biography, skills,
         // physical condition, popularity, contracts, and alternate identities.
-        if (_universe is not null &&
+        if (_universe is not null && _nativePrw &&
             string.Equals(_section.SelectedItem?.ToString(), PrwSchema.WorkerTable,
                 StringComparison.OrdinalIgnoreCase) &&
             entry.Row.Table.Columns.Contains("UID"))
