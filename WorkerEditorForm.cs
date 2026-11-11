@@ -286,7 +286,12 @@ internal sealed class WorkerEditorForm : Form
         _body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _body.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
         Controls.Add(_body);
-        _body.BringToFront();
+        // Keep the top chrome, main-menu icons and section buttons visible
+        // while the remaining space is reserved for the worker fields.
+        Controls.SetChildIndex(chrome, 0);
+        Controls.SetChildIndex(_mainRail, 1);
+        Controls.SetChildIndex(_sectionNavigation, 2);
+        Controls.SetChildIndex(_body, 3);
 
         var top = new TableLayoutPanel
         {
@@ -325,7 +330,7 @@ internal sealed class WorkerEditorForm : Form
         var name = new Label
         {
             Name = "WorkerNameTitle",
-            Text = _profile.Identity.Name.ToUpperInvariant(),
+            Text = "WORKER DETAILS",
             Location = new Point(15, 7), Size = new Size(420, 32),
             ForeColor = Color.White, AutoEllipsis = true,
             Font = new Font("Segoe UI", 14.5f, FontStyle.Bold | FontStyle.Italic)
@@ -422,7 +427,7 @@ internal sealed class WorkerEditorForm : Form
             Text = Display(First("tblWorkerBio"), "Biography")
         };
         card.Controls.Add(bio);
-        bio.BringToFront();
+        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
     }
 
     private static (string Label, string Field)[] Pairs(params string[] fields) =>
@@ -448,7 +453,7 @@ internal sealed class WorkerEditorForm : Form
                 "WorkerField_" + fields[i].Field), 1, i);
         }
         card.Controls.Add(grid);
-        grid.BringToFront();
+        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
         return grid;
     }
 
@@ -481,7 +486,7 @@ internal sealed class WorkerEditorForm : Form
             grid.Controls.Add(tick, 0, i);
         }
         card.Controls.Add(grid);
-        grid.BringToFront();
+        card.Controls.Find(card.Name + "Heading", false).First().BringToFront();
         return grid;
     }
 
@@ -735,7 +740,8 @@ internal sealed class WorkerEditorForm : Form
             grid.Controls.Add(group, i, 0);
         }
         parent.Controls.Add(grid);
-        grid.BringToFront();
+        parent.Controls.OfType<Label>()
+            .First(x => x.Name == "WorkerSecondaryTitle").BringToFront();
     }
 
     private static Button ActionButton(string label, string name, bool primary = false, int width = 148)

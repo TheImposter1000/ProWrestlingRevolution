@@ -23,6 +23,7 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private readonly AppPaths _paths;
     private readonly SkinPalette _skin;
     private readonly Action _goBack;
+    private readonly Action<string>? _navigate;
     private readonly ComboBox _section = new();
     private readonly ComboBox _massField = new();
     private readonly ComboBox _sort = new();
@@ -271,11 +272,13 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         }
     }
 
-    internal DatabaseEditorWorkspace(AppPaths paths, SkinPalette skin, Action goBack)
+    internal DatabaseEditorWorkspace(AppPaths paths, SkinPalette skin, Action goBack,
+        Action<string>? navigate = null)
     {
         _paths = paths;
         _skin = skin;
         _goBack = goBack;
+        _navigate = navigate;
         Dock = DockStyle.Fill;
         BackColor = Ink;
         ForeColor = Color.White;
@@ -939,21 +942,9 @@ internal sealed class DatabaseEditorWorkspace : UserControl
             if (FindForm() is Form launcher)
                 workerEditor.FillLauncherWindow(launcher);
             workerEditor.ShowDialog(FindForm());
+            if (workerEditor.RequestedNavigation is string requested)
+                _navigate?.Invoke(requested);
             return;
-
-            foreach (var section in profile.Sections)
-            {
-                int index = 0;
-                foreach (DataRow row in section.Records.Rows)
-                {
-                    index++;
-                    string group = section.Records.Rows.Count == 1
-                        ? section.Table : section.Table + " #" + index;
-                    foreach (DataColumn col in section.Records.Columns)
-                        details.Rows.Add(group, col.ColumnName,
-                            Convert.ToString(row[col]) ?? "");
-                }
-            }
         }
         else
         {

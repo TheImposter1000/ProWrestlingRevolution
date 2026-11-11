@@ -286,7 +286,7 @@ public sealed partial class LauncherForm : Form
         _editorPageTitle.Visible = true;
         ClearPageContent();
         _page.BackColor = Color.FromArgb(7, 18, 30);
-        _page.Controls.Add(new DatabaseEditorWorkspace(_paths, _skin, ShowHome));
+        _page.Controls.Add(new DatabaseEditorWorkspace(_paths, _skin, ShowHome, Navigate));
     }
 
     private void ShowSkins()
