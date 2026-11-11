@@ -586,7 +586,9 @@ internal sealed class WorkerEditorForm : UserControl
     private void LayoutWorkerCanvas()
     {
         if (_identityBiography is null || _body.Width < 200) return;
-        int width = _body.ClientSize.Width;
+        // The approved mockup reserves a 21px right-hand gutter.
+        // Both the top biography and four data columns share this boundary.
+        int width = Math.Max(100, _body.ClientSize.Width - 21);
         int height = _body.ClientSize.Height;
         _identityBiography.Bounds = new Rectangle(0, 10, width, 145);
         int generalY = 165;
@@ -979,7 +981,9 @@ internal sealed class WorkerEditorForm : UserControl
 
         _actionArea.Dock = DockStyle.Fill;
         _actionArea.Margin = Padding.Empty;
-        _actionArea.Padding = new Padding(8, 24, 3, 6);
+        // The approved action strip starts at y=675 and is 36px high at the
+        // fixed logical 1366x768 size, with open space beneath it.
+        _actionArea.Padding = new Padding(8, 22, 3, 14);
         grid.Controls.Add(_actionArea, 2, 1);
         grid.SetColumnSpan(_actionArea, 2);
         _content.Controls.Add(grid);
