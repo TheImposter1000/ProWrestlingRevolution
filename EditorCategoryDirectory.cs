@@ -36,7 +36,10 @@ internal static class EditorCategoryDirectory
         string[] expected = ["tblFed", "tblMatch", "tblWorker"];
         string[] actual = MainCategories(PrwSchema.Tables.Select(t => t.Name),
             metadata, nativePrwSchema: true).ToArray();
-        if (!actual.SequenceEqual(expected, StringComparer.OrdinalIgnoreCase))
+        if (!actual.SequenceEqual(expected, StringComparer.OrdinalIgnoreCase) ||
+            !actual.Select(metadata.CategoryLabel).SequenceEqual(
+                ["Companies", "Match Types", "Workers"],
+                StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException(
                 "Main native editor categories must be Companies, Match Types, Workers.");
 
