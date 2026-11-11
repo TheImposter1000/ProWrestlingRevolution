@@ -1206,15 +1206,15 @@ internal sealed class WorkerEditorForm : UserControl
 
         internal WorkerActionCaption(string kind, string text)
         {
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint, true);
             _kind = kind;
             Text = text;
             Font = new Font("Segoe UI", 9.1f, FontStyle.Bold);
             ForeColor = Color.White;
             BackColor = Color.Transparent;
-            SetStyle(ControlStyles.SupportsTransparentBackColor |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.UserPaint, true);
         }
 
         protected override void OnPaint(PaintEventArgs e)
