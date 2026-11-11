@@ -1172,11 +1172,14 @@ internal sealed class WorkerEditorForm : UserControl
 
     // Disabled workflow buttons remain readable, instead of Windows Forms
     // rendering black-on-navy disabled text. Saving is still unavailable.
+    // Buttons draw their own icon and caption. This works in the running app
+    // and in DrawToBitmap, unlike transparent label controls over siblings.
     private sealed class WorkerActionButton : Button
     {
         internal WorkerActionButton()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            SetStyle(ControlStyles.UserPaint |
+                ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
         }
 
@@ -1184,60 +1187,29 @@ internal sealed class WorkerEditorForm : UserControl
         {
             var bounds = ClientRectangle;
             if (bounds.Width <= 2 || bounds.Height <= 2) return;
-            e.Graphics.Clear(BackColor);
-            using var outline = new Pen(FlatAppearance.BorderColor, 1f);
-            e.Graphics.DrawRectangle(outline, 0, 0,
-                bounds.Width - 1, bounds.Height - 1);
-            TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
-                Enabled ? Color.White : Color.FromArgb(191, 215, 234),
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-                TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
-        }
-    }
-
-    /// <summary>
-    /// Vector action icons reproduce the approved screenshot without relying
-    /// on decorative Unicode characters that turn into missing-glyph squares
-    /// on some Windows machines. This draws no new skin assets.
-    /// </summary>
-    private sealed class WorkerActionCaption : Control
-    {
-        private readonly string _kind;
-
-        internal WorkerActionCaption(string kind, string text)
-        {
-            SetStyle(ControlStyles.SupportsTransparentBackColor |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.UserPaint, true);
-            _kind = kind;
-            Text = text;
-            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold);
-            ForeColor = Color.White;
-            BackColor = Color.Transparent;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            if (Width < 20 || Height < 20) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            var measure = TextRenderer.MeasureText(g, Text, Font,
+            g.Clear(BackColor);
+            using var outline = new Pen(FlatAppearance.BorderColor, 1f);
+            g.DrawRectangle(outline, 0, 0,
+                bounds.Width - 1, bounds.Height - 1);
+
+            var textSize = TextRenderer.MeasureText(g, Text, Font,
                 new Size(int.MaxValue, Height),
-                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
-            int glyphWidth = 19, gap = 6;
-            int totalWidth = glyphWidth + gap + measure.Width;
-            int x = Math.Max(5, (Width - totalWidth) / 2);
-            int y = (Height - glyphWidth) / 2;
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            int iconSize = 19, gap = 6;
+            int labelWidth = textSize.Width + iconSize + gap;
+            int x = Math.Max(4, (Width - labelWidth) / 2);
+            int y = (Height - iconSize) / 2;
+
             using var pen = new Pen(Color.White, 1.6f)
             {
                 LineJoin = LineJoin.Round
             };
             using var brush = new SolidBrush(Color.White);
-
-            switch (_kind)
+            switch (Name)
             {
-                case "moveset":
+                case "WorkerCreateMoveset":
                     g.DrawPolygon(pen, [
                         new Point(x, y + 5), new Point(x + 9, y + 1),
                         new Point(x + 18, y + 5), new Point(x + 9, y + 9)
@@ -1249,35 +1221,36 @@ internal sealed class WorkerEditorForm : UserControl
                     g.DrawLine(pen, x, y + 5, x, y + 13);
                     g.DrawLine(pen, x + 18, y + 5, x + 18, y + 13);
                     break;
-                case "suggest":
+                case "WorkerSuggestName":
                     g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
                     foreach (var dot in new[] {
-                        new Point(5, 5), new Point(12, 5), new Point(9, 9),
-                        new Point(5, 13), new Point(12, 13)
+                        new Point(5, 5), new Point(12, 5),
+                        new Point(9, 9), new Point(5, 13),
+                        new Point(12, 13)
                     })
                         g.FillEllipse(brush, x + dot.X, y + dot.Y, 2, 2);
                     break;
-                case "biography":
+                case "WorkerMakeBiography":
                     g.DrawRectangle(pen, x + 2, y + 1, 14, 17);
                     g.DrawLine(pen, x + 5, y + 6, x + 13, y + 6);
                     g.DrawLine(pen, x + 5, y + 10, x + 13, y + 10);
                     g.DrawLine(pen, x + 5, y + 14, x + 11, y + 14);
                     break;
-                case "save":
+                case "WorkerSave":
                     g.DrawRectangle(pen, x + 1, y + 1, 16, 16);
                     g.DrawRectangle(pen, x + 5, y + 1, 8, 6);
                     g.DrawRectangle(pen, x + 5, y + 11, 8, 6);
                     break;
             }
-
             TextRenderer.DrawText(g, Text, Font,
-                new Rectangle(x + glyphWidth + gap, 0,
-                    Math.Max(1, Width - (x + glyphWidth + gap) - 2), Height),
-                Color.White, TextFormatFlags.Left |
+                new Rectangle(x + iconSize + gap, 0,
+                    Math.Max(1, Width - (x + iconSize + gap) - 2), Height),
+                Enabled ? Color.White : Color.FromArgb(221, 237, 248),
+                TextFormatFlags.Left |
                 TextFormatFlags.VerticalCenter |
-                TextFormatFlags.EndEllipsis |
                 TextFormatFlags.SingleLine |
-                TextFormatFlags.NoPadding);
+                TextFormatFlags.NoPadding |
+                TextFormatFlags.EndEllipsis);
         }
     }
 
@@ -1338,23 +1311,7 @@ internal sealed class WorkerEditorForm : UserControl
             };
             button.Dock = DockStyle.Fill;
             holder.Controls.Add(button);
-            var caption = new WorkerActionCaption(
-                i switch
-                {
-                    0 => "moveset",
-                    1 => "suggest",
-                    2 => "biography",
-                    _ => "save"
-                }, button.Text)
-            {
-                Name = button.Name + "Caption",
-                Dock = DockStyle.Fill
-            };
-            // The caption owns both icon and label drawing; the disabled
-            // button underneath provides only its styled surface and border.
-            button.Text = "";
-            holder.Controls.Add(caption);
-            caption.BringToFront();
+
             buttons.Controls.Add(holder, i, 0);
         }
         _actionArea.Controls.Add(buttons);
