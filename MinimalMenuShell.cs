@@ -29,15 +29,18 @@ public sealed partial class LauncherForm
         bool isSkills = string.Equals(section, "Skills",
             StringComparison.OrdinalIgnoreCase);
         SkillsImmersiveMode = isSkills;
-        _sidebar.Visible = _currentPage != "HOME" && !isSkills;
+        bool isContractCanvas = section is "Contracts" or "Contract Editor";
+        _sidebar.Visible = _currentPage != "HOME" && !isSkills && !isContractCanvas;
         if (isWorker)
         {
-            var title = section == "General" ? "Worker Editor" : section!;
+            var title = section == "General" ? "Worker Editor" :
+                section == "Contract Editor" ? "Contracts" : section!;
             var detail = section switch
             {
                 "General" => "Edit Worker",
                 "Skills" => "Worker Skill Editor",
                 "Contracts" => "Worker Contracts",
+                "Contract Editor" => "Contract Editor",
                 "Popularity" => "Worker Popularity",
                 "Attributes" => "Worker Attributes",
                 "Business Skills" => "Worker Business Skills",
