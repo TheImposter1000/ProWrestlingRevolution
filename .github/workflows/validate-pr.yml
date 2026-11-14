@@ -30,8 +30,25 @@ jobs:
           if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Missing editor metadata MDB" }
       - name: Build Windows Forms game
         run: dotnet build ProWrestlingRevolution.csproj -c Release
-      - name: Run application smoke tests
-        run: dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
+      - name: Run application smoke tests and capture worker previews
+        shell: pwsh
+        run: |
+          $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
+          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Worker/Skills smoke tests failed" }
+
+      - name: Upload Worker Editor and Skills visual previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Worker-Editor-Draft-Visuals
+          path: |
+            worker-editor-preview.png
+            worker-skills-preview.png
+            worker-skills-compact-preview.png
+            worker-skills-header-preview.png
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify published runtime paths and base template
         shell: pwsh
         run: |
@@ -53,11 +70,24 @@ jobs:
             throw "Published replacement template is not the uploaded MDB"
           }
 
+      - name: Run real packaged Windows EXE smoke tests
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "publish/ProWrestlingRevolution.exe").Path
+          $verify = Start-Process -FilePath $exe -ArgumentList "--smoke" -PassThru -Wait
+          if ($verify.ExitCode -ne 0) { throw "Standalone Windows EXE failed smoke tests: $($verify.ExitCode)" }
+
+      - name: Inspect native PRW field types and sample values
+        shell: pwsh
+        run: |
+          mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
+          if ($LASTEXITCODE -ne 0) { throw "Native MDB field inspection failed" }
+
       - name: Upload standalone Windows test EXE
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PWR-v0.6.2-WorkerEditor-Test
+          name: PWR-Unreleased-Worker-Skills-Draft
           path: publish/ProWrestlingRevolution.exe
           if-no-files-found: error
           retention-days: 30

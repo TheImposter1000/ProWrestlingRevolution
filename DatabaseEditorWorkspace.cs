@@ -1066,6 +1066,8 @@ return;
             var cacheTimer = System.Diagnostics.Stopwatch.StartNew();
 
             cachedWorker.LoadProfile(profile);
+            (launcher as LauncherForm)?.SetWorkerSectionChrome(
+                cachedWorker.ActiveSection);
 
             cachedOverlay.Show();
             cachedOverlay.BringToFront();
@@ -1097,9 +1099,13 @@ return;
 
         _workerOverlayCache = overlay;
         _workerFormCache = worker;
+        worker.SectionChanged += section =>
+            (launcher as LauncherForm)?.SetWorkerSectionChrome(section);
+        (launcher as LauncherForm)?.SetWorkerSectionChrome(worker.ActiveSection);
 
         worker.CloseRequested += (_, _) =>
         {
+            (launcher as LauncherForm)?.SetWorkerSectionChrome(null);
             var destination = worker.RequestedNavigation;
 
             // Hide the editor instead of destroying it.

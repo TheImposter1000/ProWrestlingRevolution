@@ -170,6 +170,7 @@ public sealed partial class LauncherForm : Form
 
     private Panel NewPage(string pageName, string description, out Panel content)
     {
+        SetWorkerSectionChrome(null);
         _currentPage = pageName;
         _hoverIcon = null;
         // Interior pages need the regular navigation; the title hides it.

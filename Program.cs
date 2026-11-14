@@ -228,6 +228,13 @@ internal static class Program
                     section.Table == "tblWorker").Records.Rows[0];
                 newWorker["Name"] = "Regression Worker";
                 newWorker["ShortName"] = "Regression";
+                newWorker["Born"] = new DateTime(1997, 5, 12);
+                newWorker["CompetesVs"] = WorkerFieldRules.DivisionStorage[2];
+                newWorker["LanguageEnglish"] = 3;
+                var draftSkills = draft.Sections.Single(section =>
+                    section.Table == "tblWorkerSkills").Records.Rows[0];
+                draftSkills["Brawling"] = 61;
+                draftSkills["Charisma"] = 76;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, draft, null))
                     throw new Exception("New worker was not inserted.");
 
@@ -241,12 +248,26 @@ internal static class Program
 
                 loaded.Sections.Single(section => section.Table == "tblWorker")
                     .Records.Rows[0]["Name"] = "Regression Updated";
+                loaded.Sections.Single(section => section.Table == "tblWorkerSkills")
+                    .Records.Rows[0]["Brawling"] = 82;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, loaded, null))
                     throw new Exception("Existing worker edit was not persisted.");
 
                 var reloaded = PrwWorkerRepository.Load(first.MdbPath, created.Uid);
-                if (reloaded.Identity.Name != "Regression Updated")
-                    throw new Exception("Worker Save did not update the actual MDB.");
+                var savedWorker = reloaded.Sections.Single(section =>
+                    section.Table == "tblWorker").Records.Rows[0];
+                var savedSkills = reloaded.Sections.Single(section =>
+                    section.Table == "tblWorkerSkills").Records.Rows[0];
+                if (reloaded.Identity.Name != "Regression Updated" ||
+                    !Equals(savedSkills["Brawling"], 82) ||
+                    !Equals(savedSkills["Charisma"], 76) ||
+                    Convert.ToString(savedWorker["CompetesVs"]) !=
+                        WorkerFieldRules.DivisionStorage[2] ||
+                    Convert.ToInt32(savedWorker["LanguageEnglish"]) != 3 ||
+                    Convert.ToDateTime(savedWorker["Born"]).Date !=
+                        new DateTime(1997, 5, 12))
+                    throw new Exception(
+                        "Worker Save did not persist skills, dates, languages or division in the MDB.");
 
                 string backups = Path.Combine(first.DirectoryPath, "Backups");
                 if (Directory.Exists(backups) &&
@@ -358,6 +379,23 @@ internal static class Program
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
                     throw new Exception("Top utility controls must be flush with the header.");
                 
+                // Skills alone receives the tall PWR-branded 56px plaque.
+                // The four utility buttons remain in their real launcher bar.
+                launcher.SetWorkerSectionChrome("Skills");
+                if (topbar.Height != 56 ||
+                    !launcher.SkillsImmersiveMode ||
+                    topbar.Controls.Find("WorkerSkillsTopChrome", false)
+                        .SingleOrDefault() is not WorkerSkillsTopChrome skillsHeader ||
+                    skillsHeader.Height != 56 ||
+                    skillsHeader.Right > orderedChrome[0].Left ||
+                    controls.Any(button => button.Height != 56))
+                    throw new Exception("Skills header lost its reference proportions or obscured utilities.");
+                launcher.SetWorkerSectionChrome(null);
+                if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
+                    controls.Any(button => button.Height != 40))
+                    throw new Exception(
+                        "Leaving Skills did not restore the original header and icon rail.");
+
                 // The editor is a full-width directory. The name of the MDB is the
                 // central heading, and the mass-edit dropdown sits beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
@@ -401,6 +439,50 @@ internal static class Program
 
             }
 
+            WorkerSkillsEditor.AssertSchemaMapping();
+            if (WorkerFieldRules.LanguageLevels.Length != 4 ||
+                WorkerFieldRules.Divisions.Length != 3 ||
+                WorkerFieldRules.IsManual("LanguageFrench", null) ||
+                !WorkerFieldRules.IsManual("Born", null) ||
+                !WorkerFieldRules.IsManual("FaceGimmick", null) ||
+                !WorkerFieldRules.IsManual("WeightPounds", null) ||
+                !WorkerFieldRules.IsManual("HeadCondition", null))
+                throw new Exception("Worker field classifications diverged from design rules.");
+
+            var categorical = new System.Data.DataTable("tblWorker");
+            categorical.Columns.Add("CompetesVs", typeof(string));
+            categorical.Columns.Add("LanguageEnglish", typeof(string));
+            var categoricalRow = categorical.Rows.Add("", "");
+            var divisions = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "missing.mdb"), null,
+                categoricalRow, "CompetesVs");
+            var language = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "missing.mdb"), null,
+                categoricalRow, "LanguageEnglish");
+            if (divisions.Select(x => x.Label)
+                    .SequenceEqual(WorkerFieldRules.Divisions) == false ||
+                divisions.Select(x => Convert.ToString(x.Value))
+                    .SequenceEqual(WorkerFieldRules.DivisionStorage) == false ||
+                language.Select(x => x.Label)
+                    .SequenceEqual(WorkerFieldRules.LanguageLevels) == false ||
+                divisions.Count != 3 || language.Count != 4)
+                throw new Exception(
+                    "Competing divisions and language proficiency must have exact fixed choices.");
+
+            var manualDates = new System.Data.DataTable("tblWorker");
+            manualDates.Columns.Add("Born", typeof(DateTime));
+            manualDates.Columns.Add("HeadCondition", typeof(int));
+            var datesRow = manualDates.Rows.Add(DBNull.Value, DBNull.Value);
+            if (!WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-11-14",
+                    out var parsedDate, out _) || parsedDate is not DateTime ||
+                WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-22-14",
+                    out _, out _) ||
+                WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "145",
+                    out _, out _) ||
+                !WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "72",
+                    out var parsedCondition, out _) || !Equals(parsedCondition, 72))
+                throw new Exception("Manual date/physical numeric validation failed.");
+
             // Verify the Worker Editor's fixed layout using in-memory worker data.
             // UI checks do not need a database provider.
             var workerTable = new System.Data.DataTable("tblWorker");
@@ -416,6 +498,33 @@ internal static class Program
                 !boolChoices.Any(choice => Equals(choice.Value, false)) ||
                 !boolChoices.Any(choice => Equals(choice.Value, true)))
                 throw new Exception("Native Boolean worker dropdowns must offer Yes and No.");
+            var skillsTable = new System.Data.DataTable("tblWorkerSkills");
+            skillsTable.Columns.Add("WorkerUID", typeof(int));
+            foreach (var field in PrwSchema.Tables.Single(x => x.Name == "tblWorkerSkills")
+                         .Columns.Where(x => x != "WorkerUID"))
+                skillsTable.Columns.Add(field, typeof(int));
+            var sampleSkills = skillsTable.NewRow();
+            sampleSkills["WorkerUID"] = 1;
+            // Visual smoke values mirror the approved reference screenshot.
+            // They are in-memory examples, never changes to a universe.
+            sampleSkills["Brawling"] = 60;
+            sampleSkills["Puroresu"] = 40;
+            sampleSkills["Technical"] = 55;
+            sampleSkills["Psychology"] = 68;
+            sampleSkills["Charisma"] = 72;
+            sampleSkills["Microphone"] = 70;
+            sampleSkills["Basics"] = 65;
+            sampleSkills["Selling"] = 67;
+            sampleSkills["Safety"] = 75;
+            sampleSkills["Stamina"] = 77;
+            sampleSkills["PotentialPrimary"] = 70;
+            sampleSkills["PotentialMental"] = 72;
+            sampleSkills["PotentialPerformance"] = 80;
+            sampleSkills["PotentialFundamentals"] = 76;
+            sampleSkills["PotentialPhysical"] = 75;
+            skillsTable.Rows.Add(sampleSkills);
+            skillsTable.AcceptChanges();
+
             var biographyTable = new System.Data.DataTable("tblWorkerBio");
             biographyTable.Columns.Add("Biography", typeof(string));
             biographyTable.Rows.Add("An example worker biography.");
@@ -423,7 +532,8 @@ internal static class Program
                 new PrwWorkerSummary(1, "Sample Worker", "Sample"),
                 [
                     new PrwProfileSection("tblWorker", workerTable),
-                    new PrwProfileSection("tblWorkerBio", biographyTable)
+                    new PrwProfileSection("tblWorkerBio", biographyTable),
+                    new PrwProfileSection("tblWorkerSkills", skillsTable)
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             using (var workerHost = new Panel
@@ -452,11 +562,32 @@ internal static class Program
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
                     throw new Exception("Worker Editor must not add an extra Back to Database button.");
-                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true)
-                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity" ||
-                    workerEditor.Controls.Find("WorkerField_BiographyType", true)
-                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity")
-                    throw new Exception("Picture Type must sit alongside the worker portrait.");
+                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 0 ||
+                    workerEditor.Controls.Find("WorkerField_BiographyType", true).Length != 0)
+                    throw new Exception("BiographyType must not be mislabeled as Picture Type.");
+                var expectedRoleLabels = new Dictionary<string, string>
+                {
+                    ["RoleWrestler"] = "Wrestler",
+                    ["RolePartTimeWrestler"] = "Part-Time Wrestler",
+                    ["RoleManager"] = "Manager",
+                    ["RoleOnScreenPersonality"] = "On Screen Personality",
+                    ["RolePlayByPlay"] = "Play by Play Commentator",
+                    ["RoleColour"] = "Colour Commentator",
+                    ["RoleReferee"] = "Referee",
+                    ["RoleProducer"] = "Producer"
+                };
+                foreach (var (field, label) in expectedRoleLabels)
+                    if (workerEditor.Controls.Find("WorkerField_" + field, true)
+                            .SingleOrDefault() is not CheckBox role ||
+                        role.Text != label)
+                        throw new Exception("Worker role label mismatch: " + field);
+                if (workerEditor.Controls.Find("WorkerField_CompetesVs", true)
+                        .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton ||
+                    workerEditor.Controls.Find("WorkerField_Born", true)
+                        .SingleOrDefault() is not TextBox ||
+                    workerEditor.Controls.Find("WorkerField_FaceGimmick", true)
+                        .SingleOrDefault() is not TextBox)
+                    throw new Exception("Competing division and manual worker input types are incorrect.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
@@ -504,6 +635,120 @@ internal static class Program
                         again.Items.Count != 0 ||
                         again.BackColor == SystemColors.Control)
                         throw new Exception("Worker dropdown theme/lifetime regression.");
+                }
+
+                // Verify the new dedicated, database-bound Skills workspace
+                // without duplicating identity, biography or global navigation.
+                using (var skillsEditor = new WorkerSkillsEditor(profile, true, () => { }))
+                {
+                    skillsEditor.Size = new System.Drawing.Size(1150, 690);
+                    skillsEditor.CreateControl();
+                    skillsEditor.PerformLayout();
+                    if (skillsEditor.Controls.Find("SkillsFourPanels", true)
+                            .SingleOrDefault() is not TableLayoutPanel groups ||
+                        groups.ColumnCount != 2 || groups.RowCount != 2 ||
+                        skillsEditor.Controls.Find("SkillSlider_Brawling", true)
+                            .SingleOrDefault() is not SkillGlowSlider ||
+                        skillsEditor.Controls.Find("SkillSpinner_Brawling", true)
+                            .SingleOrDefault() is not SkillNumberSpinner ||
+                        skillsEditor.Controls.Find("SkillNumber_PotentialRefereeing", true)
+                            .SingleOrDefault() is not TextBox ||
+                        skillsEditor.Controls.Find("SkillPanel_In-Ring", true)
+                            .SingleOrDefault() is not SkillGlassPanel ||
+                        skillsEditor.Controls.Find("SkillNumber_", true).Length != 0 ||
+                        skillsEditor.Controls.Find("SkillsPreset", true)
+                            .SingleOrDefault() is not SkillChromePreset ||
+                        skillsEditor.Controls.Find("SkillsAutoBalance", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
+                        skillsEditor.Controls.Find("SkillsReset", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
+                        skillsEditor.Controls.Find("SkillsSave", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
+                        skillsEditor.Controls.Find("WorkerBiography", true).Length != 0 ||
+                        skillsEditor.Controls.Find("WorkerPicture", true).Length != 0)
+                        throw new Exception(
+                            "The illustrated four-panel Skills layout or real footer controls are incomplete.");
+
+                    if (groups.Controls.Cast<Control>().OfType<SkillGlassPanel>().Count() != 4 ||
+                        skillsEditor.Controls.Find("SkillsHeader_0", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillsHeader_3", true).Length != 1)
+                        throw new Exception("The four custom painted Skills headers are missing.");
+
+                    skillsEditor.SetRatingForSmoke("Brawling", 80);
+                    skillsEditor.SetRatingForSmoke("Aerial", 0);
+                    if (!Equals(sampleSkills["Brawling"], 80) ||
+                        !Equals(sampleSkills["Aerial"], 0) ||
+                        !Equals(sampleSkills["Technical"], 55))
+                        throw new Exception("Skills changes must preserve unset versus zero.");
+                    skillsEditor.ResetForSmoke();
+                    if (!Equals(sampleSkills["Brawling"], 60) ||
+                        sampleSkills["Aerial"] is not DBNull ||
+                        !Equals(sampleSkills["Charisma"], 72))
+                        throw new Exception("Skills Reset must restore original values.");
+                }
+
+                // The real game uses a 1366x768 window, leaving roughly
+                // 712 pixels below the Skills header. All 36 ratings must
+                // remain visible in that viewport without vertical scrolling.
+                using (var compactSkills = new WorkerSkillsEditor(
+                    profile, true, () => { })
+                { Size = new System.Drawing.Size(1366, 712) })
+                {
+                    compactSkills.CreateControl();
+                    compactSkills.PerformLayout();
+                    Application.DoEvents();
+                    var categoryPanels = compactSkills.Controls
+                        .Find("SkillsFourPanels", true)
+                        .Single() as TableLayoutPanel
+                        ?? throw new Exception("The compact Skills layout is missing.");
+                    foreach (var category in categoryPanels.Controls
+                        .Cast<Control>().OfType<SkillGlassPanel>())
+                    {
+                        var rows = category.Controls
+                            .OfType<TableLayoutPanel>()
+                            .SelectMany(panel => panel.Controls.OfType<FlowLayoutPanel>())
+                            .Single();
+                        rows.PerformLayout();
+                        if (rows.VerticalScroll.Visible ||
+                            rows.Controls.Cast<Control>().Last().Bottom >
+                            rows.ClientSize.Height - rows.Padding.Bottom + 2)
+                            throw new Exception(
+                                "At game resolution, one or more Skills ratings are clipped or scroll.");
+                        if (rows.Controls.Cast<Control>().Any(rating =>
+                            rating.Right > rows.ClientSize.Width -
+                                rows.Padding.Right + 3))
+                            throw new Exception(
+                                "Compact Skills rating inputs exceed the panel's right gutter.");
+                    }
+                    var longestSkill = compactSkills.Controls
+                        .Find("SkillLabel_PotentialFundamentals", true)
+                        .SingleOrDefault() as Label
+                        ?? throw new Exception("The Potential Fundamentals label is missing.");
+                    int requiredWidth = TextRenderer.MeasureText(
+                        longestSkill.Text, longestSkill.Font,
+                        new System.Drawing.Size(1000, 50),
+                        TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
+                        TextFormatFlags.SingleLine).Width;
+                    if (requiredWidth > longestSkill.ClientSize.Width)
+                        throw new Exception(
+                            "The compact Skills workspace clips a full skill label.");
+
+                    string? fullPreview =
+                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                    if (!string.IsNullOrWhiteSpace(fullPreview))
+                    {
+                        string compactPath = Path.Combine(
+                            Path.GetDirectoryName(fullPreview)!,
+                            "worker-skills-compact-preview.png");
+                        using var image = new System.Drawing.Bitmap(
+                            compactSkills.ClientSize.Width, compactSkills.ClientSize.Height);
+                        compactSkills.DrawToBitmap(image,
+                            new System.Drawing.Rectangle(
+                                System.Drawing.Point.Empty, image.Size));
+                        image.Save(compactPath,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Compact Skills preview saved to " + compactPath);
+                    }
                 }
 
                 // The current Worker Editor has a single-column popup shell
@@ -568,6 +813,94 @@ internal static class Program
                     preview.Save(previewPath,
                         System.Drawing.Imaging.ImageFormat.Png);
                     Console.WriteLine("Worker preview saved to " + previewPath);
+
+                    // Separate reference image for the dedicated 36-rating
+                    // Skills screen; no real player universe is opened.
+                    typeof(WorkerEditorForm).GetMethod("ShowSection",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)!
+                        .Invoke(workerEditor, ["Skills"]);
+                    Application.DoEvents();
+                    var livePage = workerEditor.Controls.Find("WorkerPage", true)
+                        .Single() as TableLayoutPanel;
+                    var liveBody = workerEditor.Controls.Find("WorkerEditorBody", true).Single();
+                    var liveRail = workerEditor.Controls.Find("WorkerSectionNavigation", true).Single();
+                    var liveSkills = workerEditor.Controls.Find("WorkerSkillsEditor", true)
+                        .SingleOrDefault() as WorkerSkillsEditor;
+                    if (livePage is null || liveSkills is null ||
+                        livePage.ColumnStyles[0].Width != 0 ||
+                        liveRail.Visible ||
+                        liveBody.Width < livePage.ClientSize.Width - 12 ||
+                        workerEditor.Controls.Find("WorkerIdentityBiographyRow", true)
+                            .Single().Visible)
+                        throw new Exception(
+                            "Skills must occupy the full Worker Editor width without tabs or biography.");
+
+                    // Back leaves the dedicated Skills screen, preserving
+                    // the Worker profile and restoring its normal navigation.
+                    workerEditor.Close();
+                    Application.DoEvents();
+                    if (workerEditor.ActiveSection != "General" ||
+                        livePage.ColumnStyles[0].Width != 158 ||
+                        liveBody.Width > livePage.ClientSize.Width - 140)
+                        throw new Exception("Back did not restore the standard Worker profile.");
+
+                    string skillPreview = Path.Combine(
+                        Path.GetDirectoryName(previewPath)!,
+                        "worker-skills-preview.png");
+                    // Preview editable skill controls, not disabled placeholders
+                    // from the deliberately read-only Worker Editor fixture.
+                    using var editableSkillsPreview = new WorkerSkillsEditor(
+                        profile, true, () => { })
+                    {
+                        // Reference comparison is authored for a 1650x928
+                        // desktop; render a wide editor viewport separately
+                        // from the actual 1366px in-game smoke layout.
+                        Size = new System.Drawing.Size(1672, 885)
+                    };
+                    editableSkillsPreview.CreateControl();
+                    editableSkillsPreview.PerformLayout();
+                    Application.DoEvents();
+                    foreach (var glass in editableSkillsPreview.Controls
+                        .Find("SkillsFourPanels", true).Single()
+                        .Controls.Cast<Control>().OfType<SkillGlassPanel>())
+                    {
+                        var rows = glass.Controls.OfType<TableLayoutPanel>()
+                            .SelectMany(c => c.Controls.OfType<FlowLayoutPanel>())
+                            .Single();
+                        if (rows.Controls.Cast<Control>().Any(rating =>
+                            rating.Right > rows.ClientSize.Width -
+                                rows.Padding.Right + 3))
+                            throw new Exception(
+                                "Reference-sized Skills numeric controls spill into the frame.");
+                    }
+                    using var skillImage = new System.Drawing.Bitmap(
+                        editableSkillsPreview.ClientSize.Width,
+                        editableSkillsPreview.ClientSize.Height);
+                    editableSkillsPreview.DrawToBitmap(skillImage,
+                        new System.Drawing.Rectangle(
+                            System.Drawing.Point.Empty, skillImage.Size));
+                    skillImage.Save(skillPreview,
+                        System.Drawing.Imaging.ImageFormat.Png);
+                    Console.WriteLine("Skills preview saved to " + skillPreview);
+
+                    using (var skillBar = new WorkerSkillsTopChrome
+                    {
+                        Size = new System.Drawing.Size(1672, 56)
+                    })
+                    {
+                        skillBar.CreateControl();
+                        using var barImage = new System.Drawing.Bitmap(1672, 56);
+                        skillBar.DrawToBitmap(barImage,
+                            new System.Drawing.Rectangle(0, 0, 1672, 56));
+                        string headerPreview = Path.Combine(
+                            Path.GetDirectoryName(previewPath)!,
+                            "worker-skills-header-preview.png");
+                        barImage.Save(headerPreview,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Skills header preview saved to " +
+                            headerPreview);
+                    }
                 }
             }
 

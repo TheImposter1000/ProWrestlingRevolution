@@ -13,10 +13,72 @@ public sealed partial class LauncherForm
     private readonly Label _menuHeader = new();
     private readonly Label _titleText = new();
     private readonly Label _editorPageTitle = new();
+    private WorkerSkillsTopChrome? _skillsTopChrome;
+    private int _normalTopbarHeight;
+    internal bool SkillsImmersiveMode { get; private set; }
     private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
     private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
+
+    /// <summary>
+    /// Temporarily uses the dedicated PWR Skills title plaque while the worker
+    /// Skills view is active. The normal utility buttons remain untouched.
+    /// Restoring the worker profile or database restores the standard header.
+    /// </summary>
+    internal void SetWorkerSectionChrome(string? section)
+    {
+        bool skills = string.Equals(section, "Skills",
+            StringComparison.OrdinalIgnoreCase);
+        SkillsImmersiveMode = skills;
+        // Skills is a standalone full-width workspace in the approved design.
+        // The global launcher icon rail must not be visible behind the editor.
+        // Normal sections and the database directory restore it immediately.
+        _sidebar.Visible = !skills;
+        _titleText.Visible = !skills;
+        _versionText.Visible = !skills;
+        _editorPageTitle.Visible = false;
+
+        if (!skills)
+        {
+            if (_skillsTopChrome is not null && !_skillsTopChrome.IsDisposed)
+                _skillsTopChrome.Visible = false;
+            if (_normalTopbarHeight > 0 && _topbar.Height != _normalTopbarHeight)
+                _topbar.Height = _normalTopbarHeight;
+            return;
+        }
+
+        if (_normalTopbarHeight == 0)
+            _normalTopbarHeight = _topbar.Height;
+        if (_topbar.Height != 56)
+            _topbar.Height = 56;
+
+        if (_skillsTopChrome is null || _skillsTopChrome.IsDisposed)
+        {
+            _skillsTopChrome = new WorkerSkillsTopChrome
+            {
+                Margin = Padding.Empty, Visible = false, TabStop = false
+            };
+            _skillsTopChrome.MouseDown += DragWindow;
+            _topbar.Controls.Add(_skillsTopChrome);
+            _topbar.SizeChanged += (_, _) => PositionSkillChrome();
+        }
+        PositionSkillChrome();
+        _skillsTopChrome.Visible = true;
+        _skillsTopChrome.BringToFront();
+        foreach (var utility in _topbar.Controls.OfType<TopUtilityButton>())
+            utility.BringToFront();
+    }
+
+    private void PositionSkillChrome()
+    {
+        if (_skillsTopChrome is null || _skillsTopChrome.IsDisposed) return;
+        int edge = _topbar.Controls.OfType<TopUtilityButton>()
+            .Select(button => button.Left).DefaultIfEmpty(
+                _topbar.ClientSize.Width - 200).Min();
+        _skillsTopChrome.Bounds = new Rectangle(0, 0,
+            Math.Max(0, edge), _topbar.ClientSize.Height);
+    }
 
     private void BuildChrome()
     {
@@ -241,6 +303,7 @@ public sealed partial class LauncherForm
 
     private void ShowHome()
     {
+        SetWorkerSectionChrome(null);
         _currentPage = "HOME";
         _hoverIcon = null;
         RenderSidebar();

@@ -1,5 +1,19 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.3: full Worker Skills Editor and MDB field corrections
+
+Version 0.6.3 includes the reference-matched, full-width Worker Skills Editor and revised Worker Editor input rules. Check for Updates installs the standalone Windows EXE; it does not replace existing database or skin files.
+
+The Worker Editor no longer shows a fictional Picture Type selection based on the unrelated `BiographyType` column. Birth, debut and death dates, height and weight measurements, physical conditions and face/heel gimmick names are now typed directly into the worker profile. Date and numeric inputs use explicit validation against the current MDB column type, while other categorical values keep real dropdown choices.
+
+The eight Worker Roles are Wrestler, Part-Time Wrestler, Manager, On Screen Personality, Play by Play Commentator, Colour Commentator, Referee and Producer. Competing Division offers Men's Division, Women's Division and Both Divisions, independently of gender identity. Languages offer exactly None, Passable, Basic and Fluent. The legacy `LoyaltyWorkerUID` database column is retained for compatibility, but its display and selectable IDs now refer to companies in `tblFed`, not workers. Worker saving validates the selected company's existence.
+
+Skills now has a dedicated, responsive four-panel workspace covering all 36 native `tblWorkerSkills` columns. Every rating has a synchronized slider and numeric input with a 0 to 100 range; unset values remain unset when allowed by the MDB. Modifications stay in the worker's in-memory DataRows until Save. Reset restores the values loaded when this worker was opened. Existing Worker Editor transactional saving, unsaved-change prompts and inline Save errors remain. The Skills screen does not repeat the worker's name, portrait or biography and does not show unrelated Create Moveset/Suggest Name/Make Biography controls.
+
+The visual design follows the approved 1672 x 941 screenshot, including its 56px PWR title plaque, bright cyan glass-bordered panels, faceted headers, custom Ring/Microphone/Physical/Clipboard icons, illuminated sliders, metallic spinner inputs, and full Preset / Auto Balance / Reset / Save action strip. Its reference screenshot values are used only in the in-memory visual smoke fixture. The Skills title overlay restores the usual launcher header when the editor exits.
+
+Preset offers defined, confirm-before-applying in-memory templates (Balanced at 50, or an In-Ring, Entertainment, Physical, or Commentary specialty). Auto Balance shifts only populated values toward an average of 50 without changing unset skills. Both are editor utilities, not official TEW simulation algorithms, and neither writes until Save is pressed. Reset restores loaded values. No replacement database or new skill fields are introduced. Automated Windows checks validate field mappings, the number and grouping of Skills controls, rendering, header toggling, and reset/zero/unset behavior. Live worker MDB writes still require the Microsoft ACE OLE DB provider. On GitHub runners without ACE, integration tests are skipped; run those checks against a copy of a universe on an ACE-enabled Windows PC.
+
 ## Version 0.6.2: Worker Editor stability and visual update
 
 The Worker Editor dropdown crash caused by disposing a WinForms `ContextMenuStrip` during its `Closed` event has been fixed. Field menus now reuse a live popup with the PWR dark-navy, cyan-outlined theme, and selected choices are applied after the popup interaction finishes. No worker data or existing database field choices have been replaced.
