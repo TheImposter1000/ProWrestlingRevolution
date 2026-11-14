@@ -26,7 +26,8 @@ internal static class PrwWorkerFieldOptions
             return [];
         var targetType = record.Table.Columns[field]!.DataType;
         if (field.Equals("LoyaltyWorkerUID", StringComparison.OrdinalIgnoreCase))
-            return WorkerChoices(selectedDatabase, password, targetType);
+            return WorkerChoices(selectedDatabase, password,
+                record.Table.Columns[field]!);
 
         var results = new Dictionary<string, Choice>(StringComparer.OrdinalIgnoreCase);
         void Add(object raw)
@@ -72,7 +73,8 @@ internal static class PrwWorkerFieldOptions
         // If the MDB itself contains a Yes/No text convention, expose both
         // states rather than only the currently populated one.
         if (targetType == typeof(string) &&
-            results.Keys.Any(k => k.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
+            results.Count > 0 &&
+            results.Keys.All(k => k.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
                                   k.Equals("No", StringComparison.OrdinalIgnoreCase)))
         {
             Add("No");
@@ -105,9 +107,14 @@ internal static class PrwWorkerFieldOptions
     }
 
     private static IReadOnlyList<Choice> WorkerChoices(
-        string database, string? password, Type targetType)
+        string database, string? password, DataColumn column)
     {
-        var choices = new List<Choice>();
+        Type targetType = column.DataType;
+        var choices = new List<Choice>
+        {
+            new Choice("(None)", column.AllowDBNull
+                ? DBNull.Value : Convert.ChangeType(0, targetType, CultureInfo.InvariantCulture))
+        };
         try
         {
             using var connection = AccessDatabase.Open(database, password);
