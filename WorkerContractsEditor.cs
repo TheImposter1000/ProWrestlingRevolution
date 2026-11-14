@@ -843,7 +843,6 @@ internal sealed class WorkerContractsEditor : UserControl
         title.Dock = DockStyle.Fill;
         title.Padding = new Padding(12, 0, 0, 0);
         header.Controls.Add(title);
-        frame.Controls.Add(header);
         var body = new Panel
         {
             Name = name + "Fields", Dock = DockStyle.Fill,
@@ -852,12 +851,13 @@ internal sealed class WorkerContractsEditor : UserControl
             Padding = new Padding(11, 10, 8, 9)
         };
         frame.Controls.Add(body);
+        frame.Controls.Add(header);
         header.BringToFront();
         void Arrange()
         {
             int inner = Math.Max(100, body.ClientSize.Width - 27);
             int gap = 7;
-            int textWidth = Math.Clamp((int)(inner * .43), 90, 156);
+            int textWidth = Math.Clamp((int)(inner * .53), 126, 172);
             int y = 10;
             foreach (var field in fields)
             {
@@ -1035,7 +1035,6 @@ internal sealed class WorkerContractsEditor : UserControl
         title.Padding = new Padding(12, 0, 0, 0);
         title.Dock = DockStyle.Fill;
         header.Controls.Add(title);
-        card.Controls.Add(header);
         var body = new FlowLayoutPanel
         {
             Name = "ContractRolesList", Dock = DockStyle.Fill,
@@ -1045,6 +1044,7 @@ internal sealed class WorkerContractsEditor : UserControl
             Padding = new Padding(12, 15, 4, 5)
         };
         card.Controls.Add(body);
+        card.Controls.Add(header);
         header.BringToFront();
         foreach (var (name, label) in new[]
         {
