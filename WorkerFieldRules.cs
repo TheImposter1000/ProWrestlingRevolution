@@ -52,7 +52,7 @@ internal static class WorkerFieldRules
         // tables are typed directly. Numeric category IDs in tblWorker are
         // not automatically mistaken for editable numerical ratings.
         return column is not null &&
-            !column.Table.TableName.Equals("tblWorker",
+            !string.Equals(column.Table?.TableName, "tblWorker",
                 StringComparison.OrdinalIgnoreCase) &&
             (column.DataType == typeof(DateTime) ||
              (column.DataType.IsPrimitive && column.DataType != typeof(bool)) ||
