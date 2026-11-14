@@ -1,8 +1,8 @@
 # Pro Wrestling Revolution
 
-## Unreleased development: Worker inputs and dedicated Skills Editor
+## Version 0.6.3: full Worker Skills Editor and MDB field corrections
 
-This section documents draft pull request #16. **It is not a published game update.** No release tag, merged change or new updater EXE is included.
+Version 0.6.3 includes the reference-matched, full-width Worker Skills Editor and revised Worker Editor input rules. Check for Updates installs the standalone Windows EXE; it does not replace existing database or skin files.
 
 The Worker Editor no longer shows a fictional Picture Type selection based on the unrelated `BiographyType` column. Birth, debut and death dates, height and weight measurements, physical conditions and face/heel gimmick names are now typed directly into the worker profile. Date and numeric inputs use explicit validation against the current MDB column type, while other categorical values keep real dropdown choices.
 
@@ -12,7 +12,7 @@ Skills now has a dedicated, responsive four-panel workspace covering all 36 nati
 
 The visual design follows the approved 1672 x 941 screenshot, including its 56px PWR title plaque, bright cyan glass-bordered panels, faceted headers, custom Ring/Microphone/Physical/Clipboard icons, illuminated sliders, metallic spinner inputs, and full Preset / Auto Balance / Reset / Save action strip. Its reference screenshot values are used only in the in-memory visual smoke fixture. The Skills title overlay restores the usual launcher header when the editor exits.
 
-Preset offers defined, confirm-before-applying in-memory templates (Balanced at 50, or an In-Ring, Entertainment, Physical, or Commentary specialty). Auto Balance shifts only populated values toward an average of 50 without changing unset skills. Both are editor utilities, not official TEW simulation algorithms, and neither writes until Save is pressed. Reset restores loaded values. No replacement database or new skill fields are introduced. Automated Windows checks validate field mappings, the number and grouping of Skills controls, rendering, header toggling, and reset/zero/unset behavior. A manual Windows test with Microsoft ACE OLE DB is still required before this draft can safely become a release.
+Preset offers defined, confirm-before-applying in-memory templates (Balanced at 50, or an In-Ring, Entertainment, Physical, or Commentary specialty). Auto Balance shifts only populated values toward an average of 50 without changing unset skills. Both are editor utilities, not official TEW simulation algorithms, and neither writes until Save is pressed. Reset restores loaded values. No replacement database or new skill fields are introduced. Automated Windows checks validate field mappings, the number and grouping of Skills controls, rendering, header toggling, and reset/zero/unset behavior. Live worker MDB writes still require the Microsoft ACE OLE DB provider. On GitHub runners without ACE, integration tests are skipped; run those checks against a copy of a universe on an ACE-enabled Windows PC.
 
 ## Version 0.6.2: Worker Editor stability and visual update
 
