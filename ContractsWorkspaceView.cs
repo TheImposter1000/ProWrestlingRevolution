@@ -32,6 +32,9 @@ internal sealed class ContractsWorkspaceView : UserControl
     private readonly Action _saved;
     private readonly IReadOnlyList<PrwContractStore.Employer> _employers;
     private readonly Image? _portrait;
+    // Shared, skin-aware Worker Editor artwork. The bitmap is owned by
+    // WorkerBackgroundCache and must not be disposed by this view.
+    private Bitmap? _workerArtwork;
     private readonly Dictionary<string, Image?> _logos = new(StringComparer.OrdinalIgnoreCase);
     private readonly DataTable _records;
     private readonly object _workerUid;
@@ -98,6 +101,10 @@ internal sealed class ContractsWorkspaceView : UserControl
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         BuildSelector();
         _selected = _records.Rows.Cast<DataRow>().FirstOrDefault();
+        // Match the other Worker sections; load a cached copy of the current
+        // skin's Worker_Editor.jpg instead of painting an unrelated arena.
+        HandleCreated += async (_, _) => await RestoreWorkerArtworkAsync();
+        _ = RestoreWorkerArtworkAsync();
         SetVisibleControls();
         Resize += (_, _) => PositionAll();
         Disposed += (_, _) =>
@@ -151,6 +158,32 @@ internal sealed class ContractsWorkspaceView : UserControl
             }
         return null;
     }
+
+    private async Task RestoreWorkerArtworkAsync()
+    {
+        try
+        {
+            string selected = _palette.Asset(
+                Path.Combine("Backgrounds", "Worker_Editor.jpg"));
+            string fallback = Path.Combine(_paths.SkinsRoot,
+                "Obsidian", "Backgrounds", "Worker_Editor.jpg");
+            string source = File.Exists(selected) ? selected : fallback;
+            var picture = await WorkerBackgroundCache.GetPreparedAsync(source,
+                new Size(DesignWidth, DesignHeight));
+            if (IsDisposed || Disposing || picture is null) return;
+            _workerArtwork = picture;
+            Invalidate();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                                      or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine("Contracts background: " + error.Message);
+        }
+    }
+
+    // The preview must contain the same skin art as the actual editor, even
+    // when the Windows CI worker has not finished its normal UI event loop.
+    internal Task PrepareArtworkForPreviewAsync() => RestoreWorkerArtworkAsync();
 
     private float SX => Width / (float)DesignWidth;
     private float SY => Height / (float)DesignHeight;
@@ -776,59 +809,42 @@ internal sealed class ContractsWorkspaceView : UserControl
         g.Restore(state);
     }
 
-    private static void PaintArena(Graphics g)
+    private void PaintArena(Graphics g)
     {
-        using (var background = new LinearGradientBrush(
-            new Rectangle(0, 0, DesignWidth, DesignHeight),
-            Color.FromArgb(0, 13, 27), Color.FromArgb(0, 28, 56), 90f))
-            g.FillRectangle(background, 0, 0, DesignWidth, DesignHeight);
-        // Very dark, intentionally out-of-focus ring and arena, below the
-        // active controls, retaining the reference image's visual hierarchy.
-        using var beam = new Pen(Color.FromArgb(18, 24, 124, 194), 8);
-        using var rope = new Pen(Color.FromArgb(33, 34, 136, 201), 4);
-        g.DrawBezier(beam, -40, 125, 300, 330, 950, 330, 1400, 110);
-        for (int i = 0; i < 3; i++)
+        var rect = new Rectangle(0, 0, DesignWidth, DesignHeight);
+        if (_workerArtwork is Image artwork)
+            g.DrawImageUnscaled(artwork, 0, 0);
+        else
         {
-            int y = 510 + i * 36;
-            g.DrawBezier(rope, 65, y - 35, 415, y + 54,
-                945, y + 50, 1300, y - 31);
+            using var background = new LinearGradientBrush(rect,
+                Color.FromArgb(9, 28, 49), Color.FromArgb(4, 15, 31), 90f);
+            g.FillRectangle(background, rect);
         }
-        using var post = new Pen(Color.FromArgb(22, 63, 145, 211), 13);
-        g.DrawLine(post, 220, 454, 220, 695);
-        g.DrawLine(post, 1080, 454, 1080, 695);
-        g.DrawLine(post, 515, 531, 515, 695);
-        g.DrawLine(post, 836, 531, 836, 695);
+        using var glass = new SolidBrush(Color.FromArgb(44, 5, 18, 34));
+        g.FillRectangle(glass, rect);
     }
 
     private static void PanelFrame(Graphics g, Rectangle rect)
     {
-        FillGradient(g, rect, Color.FromArgb(2, 39, 69),
-            Color.FromArgb(0, 12, 25), 12);
-        using var softGlow = new Pen(Color.FromArgb(44, Cyan), 6);
-        using var rounded = Round(rect, 12);
-        g.DrawPath(softGlow, rounded);
-        Stroke(g, rect, Cyan, 12, 1.5f);
+        // Match the Worker Editor's glass instead of obscuring its skin
+        // artwork with the old opaque, nearly black card rectangles.
+        FillGradient(g, rect, Color.FromArgb(164, 11, 40, 66),
+            Color.FromArgb(174, 4, 19, 39), 10);
+        using var rounded = Round(rect, 10);
+        using (var gleam = new Pen(Color.FromArgb(35, Cyan), 4f))
+            g.DrawPath(gleam, rounded);
+        Stroke(g, rect, Color.FromArgb(190, 41, 199, 230), 10, 1.25f);
     }
 
-    private static void SectionBand(Graphics g, Rectangle rect,
-        string name, string subtitle, string symbol)
+    private static void SectionBand(Graphics g, Rectangle rect, string name)
     {
-        FillGradient(g, rect, Color.FromArgb(3, 77, 126),
-            Color.FromArgb(1, 31, 57), 10);
-        using (var facet = new SolidBrush(Color.FromArgb(75, 24, 151, 214)))
-            g.FillPolygon(facet, [new Point(rect.Right - 75, rect.Top),
-                new Point(rect.Right - 1, rect.Top),
-                new Point(rect.Right - 35, rect.Bottom - 1),
-                new Point(rect.Right - 115, rect.Bottom - 1)]);
-        using var outline = new Pen(Cyan, 1.2f);
-        g.DrawLine(outline, rect.Left, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
-        Caption(g, symbol, rect.Left + 16, rect.Top + 5, 42, 44, 25, true);
-        float headingSize = name == "Terms, Perks & Bonuses" ? 13.7f : 15.4f;
-        Caption(g, name, rect.Left + 62, rect.Top + 5,
-            rect.Width - 73, 29, headingSize, true);
-        if (subtitle.Length > 0)
-            Caption(g, subtitle, rect.Left + 62, rect.Top + 28,
-                rect.Width - 71, 18, 8.05f, false, White, italic: true);
+        // Experienced players need section names, not pictograms or subtitles.
+        FillGradient(g, rect, Color.FromArgb(186, 19, 76, 118),
+            Color.FromArgb(166, 7, 37, 67), 8);
+        using var line = new Pen(Color.FromArgb(162, 37, 185, 221), 1.1f);
+        g.DrawLine(line, rect.Left, rect.Bottom, rect.Right, rect.Bottom);
+        Caption(g, name, rect.Left + 18, rect.Top + 2,
+            rect.Width - 32, rect.Height - 3, 16.1f, true);
     }
 
     private void PaintSelector(Graphics g)
@@ -840,19 +856,13 @@ internal sealed class ContractsWorkspaceView : UserControl
         using (var blade = new SolidBrush(Color.FromArgb(91, 14, 146, 219)))
             g.FillPolygon(blade, [new Point(615, 36), new Point(700, 36),
                 new Point(639, 108), new Point(565, 108)]);
-        using (var cyanRule = new Pen(Cyan, 2))
-        {
-            g.DrawLine(cyanRule, 166, 50, 166, 91);
+        using (var cyanRule = new Pen(Color.FromArgb(190, Cyan), 1.5f))
             g.DrawLine(cyanRule, 36, 108, 1330, 108);
-        }
-        Caption(g, "▤", 75, 39, 61, 64, 38, true);
-        Caption(g, "Worker Contracts", 195, 44, 600, 54, 28, true);
-        Caption(g, "Select a contract to edit or create a new one.",
-            67, 122, 710, 38, 18, false, White, italic: true);
+        Caption(g, "Worker Contracts", 81, 44, 600, 54, 27, true);
 
         var table = new Rectangle(50, 175, 1267, 417);
-        FillGradient(g, table, Color.FromArgb(0, 30, 58),
-            Color.FromArgb(0, 17, 36), 11);
+        FillGradient(g, table, Color.FromArgb(116, 8, 37, 64),
+            Color.FromArgb(143, 3, 16, 35), 11);
         Stroke(g, table, Cyan, 11);
         FillGradient(g, new Rectangle(51, 176, 1265, 44),
             Color.FromArgb(22, 79, 125), Color.FromArgb(6, 32, 61), 10);
@@ -901,22 +911,18 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Caption(g, initials, 85, y + 5, 94, 40, 21, true,
                     row.Status == "Expired" ? White : Cyan, italic: true);
             Caption(g, initials, 177, y + 4, 121, 41, 15, true);
-            Caption(g, row.ContractType == "Written" ? "▤" : "◇",
-                335, y + 4, 43, 41, 21, true);
-            Caption(g, row.ContractType, 389, y + 4, 155, 41, 15);
+            Caption(g, row.ContractType, 340, y + 4, 190, 41, 15);
             using (var dot = new SolidBrush(row.Status == "Active"
                 ? Color.FromArgb(33, 240, 54) : Color.FromArgb(236, 241, 245)))
                 g.FillEllipse(dot, 566, y + 18, 16, 16);
             Caption(g, row.Status, 595, y + 4, 112, 41, 15);
             Caption(g, row.Begins, 734, y + 4, 142, 41, 15);
             Caption(g, row.Expires, 903, y + 4, 135, 41, 15);
-            Caption(g, row.Role == "Wrestler" ? "♙" : "♧",
-                1070, y + 4, 42, 41, 20, true);
-            Caption(g, row.Role, 1110, y + 4, 201, 41, 14.5f);
+            Caption(g, row.Role, 1073, y + 4, 242, 41, 14.5f);
         }
         var footer = new Rectangle(50, 609, 1267, 65);
-        FillGradient(g, footer, Color.FromArgb(2, 56, 94),
-            Color.FromArgb(3, 24, 46), 10);
+        FillGradient(g, footer, Color.FromArgb(156, 9, 59, 98),
+            Color.FromArgb(177, 3, 27, 53), 10);
         Stroke(g, footer, Color.FromArgb(0, 171, 227), 10);
         using (var accent = new Pen(Cyan, 4))
             g.DrawLine(accent, 68, 626, 68, 655);
@@ -957,14 +963,9 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             var card = new Rectangle(xs[i], 155, widths[i], 426);
             PanelFrame(g, card);
-            SectionBand(g, new Rectangle(xs[i] + 1, 156, widths[i] - 2, 53),
+            SectionBand(g, new Rectangle(xs[i] + 1, 156, widths[i] - 2, 43),
                 new[] { "Basic Details", "Roster Details",
-                    "Terms, Perks & Bonuses", "Roles" }[i],
-                new[] { "Core contract information and basics.",
-                    "Roster placement, presentation and gimmick.",
-                    "Control, financial terms and bonus options.",
-                    "The worker's permitted in-game roles." }[i],
-                new[] { "▤", "♟", "▥", "⚑" }[i]);
+                    "Terms, Perks & Bonuses", "Roles" }[i]);
         }
 
         foreach (var label in _labels)
@@ -978,10 +979,8 @@ internal sealed class ContractsWorkspaceView : UserControl
         PanelFrame(g, new Rectangle(25, 596, 1316, 98));
         using (var pen = new Pen(Color.FromArgb(64, 114, 170), 1))
             g.DrawLine(pen, 35, 643, 934, 643);
-        Caption(g, "⇄", 50, 608, 36, 29, 22, true);
-        Caption(g, "Import Details From Alter Ego", 98, 606, 253, 29, 10.5f, true);
-        Caption(g, "▤", 51, 651, 34, 30, 21, true);
-        Caption(g, "Copy Terms From Another Contract", 98, 650, 253, 29, 10.3f, true);
+        Caption(g, "Import Details From Alter Ego", 52, 606, 299, 29, 10.9f, true);
+        Caption(g, "Copy Terms From Another Contract", 52, 650, 299, 29, 10.6f, true);
     }
 
     private static void DrawHeadPortrait(Graphics g, Rectangle rect)
