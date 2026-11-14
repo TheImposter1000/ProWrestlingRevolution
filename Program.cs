@@ -411,6 +411,24 @@ internal static class Program
                 !WorkerFieldRules.IsManual("HeadCondition", null))
                 throw new Exception("Worker field classifications diverged from design rules.");
 
+            var categorical = new System.Data.DataTable("tblWorker");
+            categorical.Columns.Add("CompetesVs", typeof(string));
+            categorical.Columns.Add("LanguageEnglish", typeof(string));
+            var categoricalRow = categorical.Rows.Add("", "");
+            var divisions = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "missing.mdb"), null,
+                categoricalRow, "CompetesVs");
+            var language = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "missing.mdb"), null,
+                categoricalRow, "LanguageEnglish");
+            if (divisions.Select(x => x.Label)
+                    .SequenceEqual(WorkerFieldRules.Divisions) == false ||
+                language.Select(x => x.Label)
+                    .SequenceEqual(WorkerFieldRules.LanguageLevels) == false ||
+                divisions.Count != 3 || language.Count != 4)
+                throw new Exception(
+                    "Competing divisions and language proficiency must have exact fixed choices.");
+
             var manualDates = new System.Data.DataTable("tblWorker");
             manualDates.Columns.Add("Born", typeof(DateTime));
             manualDates.Columns.Add("HeadCondition", typeof(int));
@@ -492,6 +510,29 @@ internal static class Program
                 if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 0 ||
                     workerEditor.Controls.Find("WorkerField_BiographyType", true).Length != 0)
                     throw new Exception("BiographyType must not be mislabeled as Picture Type.");
+                var expectedRoleLabels = new Dictionary<string, string>
+                {
+                    ["RoleWrestler"] = "Wrestler",
+                    ["RolePartTimeWrestler"] = "Part-Time Wrestler",
+                    ["RoleManager"] = "Manager",
+                    ["RoleOnScreenPersonality"] = "On Screen Personality",
+                    ["RolePlayByPlay"] = "Play by Play Commentator",
+                    ["RoleColour"] = "Colour Commentator",
+                    ["RoleReferee"] = "Referee",
+                    ["RoleProducer"] = "Producer"
+                };
+                foreach (var (field, label) in expectedRoleLabels)
+                    if (workerEditor.Controls.Find("WorkerField_" + field, true)
+                            .SingleOrDefault() is not CheckBox role ||
+                        role.Text != label)
+                        throw new Exception("Worker role label mismatch: " + field);
+                if (workerEditor.Controls.Find("WorkerField_CompetesVs", true)
+                        .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton ||
+                    workerEditor.Controls.Find("WorkerField_Born", true)
+                        .SingleOrDefault() is not TextBox ||
+                    workerEditor.Controls.Find("WorkerField_FaceGimmick", true)
+                        .SingleOrDefault() is not TextBox)
+                    throw new Exception("Competing division and manual worker input types are incorrect.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
