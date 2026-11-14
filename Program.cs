@@ -355,13 +355,13 @@ internal static class Program
                 if (topbar is null || topbar.Height != 56)
                     throw new Exception("All interior pages must use the same 56px PWR header.");
 
-                var header = topbar.Controls.OfType<PwrSharedHeader>().SingleOrDefault()
+                var sharedHeader = topbar.Controls.OfType<PwrSharedHeader>().SingleOrDefault()
                     ?? throw new Exception("Shared PWR title plaque is missing.");
                 if (topbar.Controls.OfType<PwrSharedHeader>().Count() != 1 ||
                     topbar.Controls.Find("WorkerSkillsTopChrome", false).Length != 0 ||
                     topbar.Controls.OfType<Label>().Any())
                     throw new Exception(
-                        "Legacy separate logo, version or Skills header is still attached.");
+                        "Legacy separate logo, version or Skills sharedHeader is still attached.");
 
                 var controls = topbar.Controls.OfType<TopUtilityButton>().ToList();
                 if (controls.Count != 4 || controls.Any(button =>
@@ -386,13 +386,13 @@ internal static class Program
                         button.Bottom != topbar.ClientSize.Height) ||
                     orderedChrome.Zip(orderedChrome.Skip(1),
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
-                    throw new Exception("PWR utility controls must occupy one aligned header.");
-                if (header.Left != 0 || header.Top != 0 ||
-                    header.Height != 56 || header.Right != orderedChrome[0].Left)
-                    throw new Exception("Shared PWR header must meet its utility cluster exactly.");
+                    throw new Exception("PWR utility controls must occupy one aligned sharedHeader.");
+                if (sharedHeader.Left != 0 || sharedHeader.Top != 0 ||
+                    sharedHeader.Height != 56 || sharedHeader.Right != orderedChrome[0].Left)
+                    throw new Exception("Shared PWR sharedHeader must meet its utility cluster exactly.");
 
                 // Capture a real visible launcher. Compare each section's
-                // composed header, not an isolated, transparent title control.
+                // composed sharedHeader, not an isolated, transparent title control.
                 launcher.Show();
                 topbar.Visible = true;
                 Application.DoEvents();
@@ -401,12 +401,12 @@ internal static class Program
 
                 foreach (var (section, expectedTitle, expectedDetail, previewName) in new[]
                 {
-                    ("General", "Worker Editor", "Edit Worker", "pwr-header-worker.png"),
-                    ("Skills", "Skills", "Worker Skill Editor", "pwr-header-skills.png"),
-                    ("Contracts", "Contracts", "Worker Contracts", "pwr-header-contracts.png"),
-                    ("Popularity", "Popularity", "Worker Popularity", "pwr-header-popularity.png"),
+                    ("General", "Worker Editor", "Edit Worker", "pwr-sharedHeader-worker.png"),
+                    ("Skills", "Skills", "Worker Skill Editor", "pwr-sharedHeader-skills.png"),
+                    ("Contracts", "Contracts", "Worker Contracts", "pwr-sharedHeader-contracts.png"),
+                    ("Popularity", "Popularity", "Worker Popularity", "pwr-sharedHeader-popularity.png"),
                     ("Business Skills", "Business Skills", "Worker Business Skills",
-                        "pwr-header-business-skills.png")
+                        "pwr-sharedHeader-business-skills.png")
                 })
                 {
                     launcher.SetWorkerSectionChrome(section);
@@ -415,14 +415,14 @@ internal static class Program
                     topbar.Update();
                     Application.DoEvents();
 
-                    if (header.PageTitle != expectedTitle ||
-                        header.PageDetail != expectedDetail ||
+                    if (sharedHeader.PageTitle != expectedTitle ||
+                        sharedHeader.PageDetail != expectedDetail ||
                         topbar.Height != 56 ||
-                        header.Right != orderedChrome[0].Left ||
+                        sharedHeader.Right != orderedChrome[0].Left ||
                         controls.Any(button => button.Height != 56) ||
                         launcher.SkillsImmersiveMode != (section == "Skills"))
                         throw new Exception(
-                            "Page header changes style or context unexpectedly: " + section);
+                            "Page sharedHeader changes style or context unexpectedly: " + section);
 
                     using var composed = new System.Drawing.Bitmap(
                         topbar.Width, topbar.Height);
@@ -442,7 +442,7 @@ internal static class Program
                     }
                     if (referenceBackdrop is not null &&
                         !referenceBackdrop.SequenceEqual(backdrop))
-                        throw new Exception("The header background changes between worker tabs.");
+                        throw new Exception("The sharedHeader background changes between worker tabs.");
                     referenceBackdrop ??= backdrop;
 
                     int boundary = orderedChrome[0].Left;
@@ -453,7 +453,7 @@ internal static class Program
                         Math.Abs(leftPixel.G - rightPixel.G) +
                         Math.Abs(leftPixel.B - rightPixel.B);
                     if (seamDifference > 72)
-                        throw new Exception("PWR header background has a utility seam.");
+                        throw new Exception("PWR sharedHeader background has a utility seam.");
 
                     int textPixels = 0;
                     for (int y = 9; y < Math.Min(46, composed.Height); y++)
@@ -465,7 +465,7 @@ internal static class Program
                         }
                     if (textPixels < 60)
                         throw new Exception(
-                            "The composed PWR header title is not visible: " + section);
+                            "The composed PWR sharedHeader title is not visible: " + section);
 
                     if (!string.IsNullOrWhiteSpace(workerPreview))
                     {
@@ -477,28 +477,28 @@ internal static class Program
                         {
                             composed.Save(Path.Combine(
                                 Path.GetDirectoryName(workerPreview)!,
-                                "worker-skills-header-preview.png"),
+                                "worker-skills-sharedHeader-preview.png"),
                                 System.Drawing.Imaging.ImageFormat.Png);
                             composed.Save(Path.Combine(
                                 Path.GetDirectoryName(workerPreview)!,
-                                "worker-skills-composed-header-preview.png"),
+                                "worker-skills-composed-sharedHeader-preview.png"),
                                 System.Drawing.Imaging.ImageFormat.Png);
                         }
-                        Console.WriteLine("PWR shared header preview: " + screenshot);
+                        Console.WriteLine("PWR shared sharedHeader preview: " + screenshot);
                     }
                 }
 
                 launcher.SetWorkerSectionChrome(null);
                 if (topbar.Height != 56 || launcher.SkillsImmersiveMode ||
                     controls.Any(button => button.Height != 56))
-                    throw new Exception("Leaving Skills must retain the same PWR header.");
+                    throw new Exception("Leaving Skills must retain the same PWR sharedHeader.");
                 // The editor is a full-width directory. The name of the MDB is
                 // the central heading and the mass-edit dropdown stays beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
                     System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
-                if (header.PageTitle != "Database Editor" ||
-                    header.PageDetail != "Database Management" ||
+                if (sharedHeader.PageTitle != "Database Editor" ||
+                    sharedHeader.PageDetail != "Database Management" ||
                     topbar.Height != 56 ||
                     topbar.Controls.OfType<PwrSharedHeader>().Count() != 1)
                     throw new Exception(
