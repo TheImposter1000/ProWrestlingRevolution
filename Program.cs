@@ -774,6 +774,29 @@ internal static class Program
                         Console.WriteLine("Worker VISIBLE tab + repaint: " + section +
                             " = " + paint.ElapsedMilliseconds + " ms");
                     }
+                    // Diagnostic A/B only: temporarily hide the already
+                    // decoded background to quantify repeated image paints.
+                    // Restore the original bitmap before closing the window;
+                    // this never changes a skin or universe on disk.
+                    var runtimePage = visibleWorker.Controls
+                        .Find("WorkerPage", true).Single() as TableLayoutPanel;
+                    if (runtimePage is not null)
+                    {
+                        Image? originalBackdrop = runtimePage.BackgroundImage;
+                        runtimePage.BackgroundImage = null;
+                        foreach (string section in new[] { "General", "Skills", "General" })
+                        {
+                            var noBackdropTime = System.Diagnostics.Stopwatch.StartNew();
+                            switchSection.Invoke(visibleWorker, [section]);
+                            visibleWorker.Invalidate(true);
+                            visibleWorker.Update();
+                            Application.DoEvents();
+                            Console.WriteLine(
+                                "Worker VISIBLE tab NO-BACKDROP: " + section +
+                                " = " + noBackdropTime.ElapsedMilliseconds + " ms");
+                        }
+                        runtimePage.BackgroundImage = originalBackdrop;
+                    }
                     visibleWindow.Hide();
                 }
 
