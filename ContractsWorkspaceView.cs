@@ -97,6 +97,8 @@ internal sealed class ContractsWorkspaceView : UserControl
         SetStyle(ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         BuildSelector();
+        _selected = _records.Rows.Cast<DataRow>().FirstOrDefault();
+        SetVisibleControls();
         Resize += (_, _) => PositionAll();
         Disposed += (_, _) =>
         {
@@ -509,29 +511,29 @@ internal sealed class ContractsWorkspaceView : UserControl
         Field("Appearances Left", "AppearanceLimit", 49, y += 29, 175, 167,
             "Unlimited Appearances", false, "Unlimited Appearances");
 
-        y = 216;
+        y = 211;
         Field("Alignment", "Alignment", 389, y, 504, 185, "Babyface",
             false, "Babyface", "Heel");
-        Field("Last Turn", "LastTurn", 389, y += 29, 504, 185, "Random",
+        Field("Last Turn", "LastTurn", 389, y += 28, 504, 185, "Random",
             false, "Random");
-        Field("Competes In", "CompetesIn", 389, y += 29, 504, 185, "Men's Division",
+        Field("Competes In", "CompetesIn", 389, y += 28, 504, 185, "Men's Division",
             false, "Men's Division", "Women's Division");
-        Field("Brand", "Brands", 389, y += 29, 504, 185, "None", false, "None");
-        Field("Division", "Divisions", 389, y += 29, 504, 185, "None", false, "None");
-        Field("Manager", "ManagerWorkerUID", 389, y += 29, 504, 185, "None", false, "None");
-        Field("Mask", "MaskRespect", 389, y += 29, 504, 185, "No Mask",
+        Field("Brand", "Brands", 389, y += 28, 504, 185, "None", false, "None");
+        Field("Division", "Divisions", 389, y += 28, 504, 185, "None", false, "None");
+        Field("Manager", "ManagerWorkerUID", 389, y += 28, 504, 185, "None", false, "None");
+        Field("Mask", "MaskRespect", 389, y += 28, 504, 185, "No Mask",
             false, "No Mask");
-        Field("Move Set", "MoveSet", 389, y += 29, 504, 185, _workerName,
+        Field("Move Set", "MoveSet", 389, y += 28, 504, 185, _workerName,
             false, _workerName);
-        Field("Momentum", "Momentum", 389, y += 29, 504, 185, "Neutral",
+        Field("Momentum", "Momentum", 389, y += 28, 504, 185, "Neutral",
             false, "Neutral");
-        Field("Gimmick", "GimmickName", 389, y += 29, 504, 185, "None",
+        Field("Gimmick", "GimmickName", 389, y += 28, 504, 185, "None",
             false, "None");
-        Field("Gimmick Basis", "GimmickBasis", 389, y += 29, 504, 185, "None",
+        Field("Gimmick Basis", "GimmickBasis", 389, y += 28, 504, 185, "None",
             false, "None");
-        Field("Gimmick Rating", "GimmickRating", 389, y += 29, 504, 185, "Random",
+        Field("Gimmick Rating", "GimmickRating", 389, y += 28, 504, 185, "Random",
             false, "Random");
-        Field("Gimmick Status", "GimmickStatus", 389, y += 29, 504, 185, "Random",
+        Field("Gimmick Status", "GimmickStatus", 389, y += 28, 504, 185, "Random",
             false, "Random");
 
         y = 216;
@@ -818,11 +820,13 @@ internal sealed class ContractsWorkspaceView : UserControl
                 new Point(rect.Right - 115, rect.Bottom - 1)]);
         using var outline = new Pen(Cyan, 1.2f);
         g.DrawLine(outline, rect.Left, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
-        Caption(g, symbol, rect.Left + 21, rect.Top + 5, 43, 44, 26, true);
-        Caption(g, name, rect.Left + 75, rect.Top + 6, rect.Width - 100, 31, 17, true);
+        Caption(g, symbol, rect.Left + 16, rect.Top + 5, 42, 44, 25, true);
+        float headingSize = name == "Terms, Perks & Bonuses" ? 13.7f : 15.4f;
+        Caption(g, name, rect.Left + 62, rect.Top + 5,
+            rect.Width - 73, 29, headingSize, true);
         if (subtitle.Length > 0)
-            Caption(g, subtitle, rect.Left + 75, rect.Top + 29,
-                rect.Width - 100, 19, 9.5f, false, White, italic: true);
+            Caption(g, subtitle, rect.Left + 62, rect.Top + 28,
+                rect.Width - 71, 18, 8.05f, false, White, italic: true);
     }
 
     private void PaintSelector(Graphics g)
@@ -929,11 +933,11 @@ internal sealed class ContractsWorkspaceView : UserControl
     private void PaintEditor(Graphics g)
     {
         PanelFrame(g, new Rectangle(25, 8, 1316, 133));
-        Caption(g, "Employee", 179, 23, 82, 25, 12, true);
-        Caption(g, "Employer", 471, 23, 77, 25, 12, true);
-        Caption(g, "Name", 179, 62, 80, 25, 12, true);
-        Caption(g, "Short Name", 179, 97, 85, 25, 12, true);
-        Caption(g, "Biography", 732, 23, 84, 25, 12, true);
+        Caption(g, "Employee", 179, 23, 87, 25, 10.4f, true);
+        Caption(g, "Employer", 471, 23, 81, 25, 10.4f, true);
+        Caption(g, "Name", 179, 62, 87, 25, 10.4f, true);
+        Caption(g, "Short Name", 179, 97, 87, 25, 10.4f, true);
+        Caption(g, "Biography", 732, 23, 84, 25, 10.4f, true);
         FillGradient(g, new Rectangle(46, 17, 113, 119),
             Color.FromArgb(22, 43, 61), Color.Black, 4);
         Stroke(g, new Rectangle(46, 17, 113, 119), Cyan, 4);
@@ -965,16 +969,16 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             if (label.Column.StartsWith("_", StringComparison.Ordinal)) continue;
             Caption(g, label.Label, label.LabelX, label.Y, label.InputX - label.LabelX - 5,
-                25, 11.3f, true, White);
+                25, 9.7f, true, White);
         }
 
         PanelFrame(g, new Rectangle(25, 596, 1316, 98));
         using (var pen = new Pen(Color.FromArgb(64, 114, 170), 1))
             g.DrawLine(pen, 35, 643, 934, 643);
         Caption(g, "⇄", 50, 608, 36, 29, 22, true);
-        Caption(g, "Import Details From Alter Ego", 98, 606, 248, 29, 12.5f, true);
+        Caption(g, "Import Details From Alter Ego", 98, 606, 253, 29, 10.5f, true);
         Caption(g, "▤", 51, 651, 34, 30, 21, true);
-        Caption(g, "Copy Terms From Another Contract", 98, 650, 249, 29, 12, true);
+        Caption(g, "Copy Terms From Another Contract", 98, 650, 253, 29, 10.3f, true);
     }
 
     private static void DrawHeadPortrait(Graphics g, Rectangle rect)
@@ -1145,12 +1149,53 @@ internal sealed class ContractsWorkspaceView : UserControl
                 g.DrawLines(pen, [new Point(7, 15), new Point(12, 20),
                     new Point(23, 8)]);
             }
-            Caption(g, Text, 46, 0, Math.Max(1, Width - 48), Height, 11.5f, true);
+            Caption(g, Text, 46, 0, Math.Max(1, Width - 48), Height, 10.1f, true);
         }
     }
 
     private sealed class PwrContractButton : Button
     {
+        private static void DrawButtonIcon(Graphics g, string kind, int x, int y)
+        {
+            using var pen = new Pen(White, 2.3f)
+            {
+                StartCap = LineCap.Round, EndCap = LineCap.Round,
+                LineJoin = LineJoin.Round
+            };
+            switch (kind)
+            {
+                case "Remove":
+                    g.DrawRectangle(pen, x + 4, y + 6, 16, 16);
+                    g.DrawLine(pen, x + 2, y + 4, x + 22, y + 4);
+                    g.DrawLine(pen, x + 9, y + 1, x + 15, y + 1);
+                    g.DrawLine(pen, x + 9, y + 10, x + 9, y + 18);
+                    g.DrawLine(pen, x + 15, y + 10, x + 15, y + 18);
+                    break;
+                case "Open":
+                    g.DrawLines(pen, [new Point(x + 13, y + 3),
+                        new Point(x + 22, y + 3), new Point(x + 22, y + 12)]);
+                    g.DrawLine(pen, x + 22, y + 3, x + 10, y + 15);
+                    g.DrawLines(pen, [new Point(x + 17, y + 16),
+                        new Point(x + 17, y + 22), new Point(x + 3, y + 22),
+                        new Point(x + 3, y + 8), new Point(x + 9, y + 8)]);
+                    break;
+                case "Add Contract":
+                    g.DrawLine(pen, x + 12, y + 1, x + 12, y + 23);
+                    g.DrawLine(pen, x + 1, y + 12, x + 23, y + 12);
+                    break;
+                case "Reset":
+                    g.DrawArc(pen, x + 3, y + 3, 19, 19, -105, 310);
+                    g.DrawLines(pen, [new Point(x + 2, y + 5),
+                        new Point(x + 2, y + 13), new Point(x + 10, y + 13)]);
+                    break;
+                case "Save":
+                    g.DrawRectangle(pen, x + 2, y + 2, 20, 20);
+                    g.DrawRectangle(pen, x + 7, y + 3, 11, 7);
+                    g.DrawRectangle(pen, x + 7, y + 14, 11, 8);
+                    break;
+            }
+        }
+
         private readonly bool _primary;
         private bool _hover;
         internal PwrContractButton(string title, bool primary)
@@ -1189,22 +1234,17 @@ internal sealed class ContractsWorkspaceView : UserControl
                 _primary ? Color.FromArgb(2, 170, 242) : Color.FromArgb(30, 73, 115),
                 _primary ? Color.FromArgb(0, 72, 150) : Color.FromArgb(6, 26, 46), 6);
             Stroke(g, rect, _primary ? Cyan : Color.FromArgb(178, 216, 247), 6, 1.7f);
-            string glyph = Text switch
+            if (Text is "Remove" or "Open" or "Add Contract" or "Reset" or "Save")
             {
-                "Remove" => "▤", "Open" => "↗", "Add Contract" => "+",
-                "Reset" => "↶", "Save" => "▣", _ => ""
-            };
-            if (glyph.Length > 0)
-            {
-                Caption(g, glyph, 9, 4, 37, Math.Max(1, Height - 8),
-                    22, true, White, alignment: ContentAlignment.MiddleCenter);
-                Caption(g, Text, 42, 3, Math.Max(1, Width - 50),
-                    Math.Max(1, Height - 6), 12.5f, true, White,
+                DrawButtonIcon(g, Text, 17, Height / 2 - 10);
+                Caption(g, Text, 46, 3, Math.Max(1, Width - 51),
+                    Math.Max(1, Height - 6), 11.1f, true,
+                    Enabled ? White : Dim,
                     alignment: ContentAlignment.MiddleCenter);
             }
             else
                 Caption(g, Text, 7, 3, Math.Max(1, Width - 14),
-                    Math.Max(1, Height - 6), 11, true,
+                    Math.Max(1, Height - 6), 10.4f, true,
                     Enabled ? White : Dim, alignment: ContentAlignment.MiddleCenter);
         }
     }
