@@ -694,6 +694,19 @@ internal static class Program
                             throw new Exception(
                                 "At game resolution, one or more Skills ratings are clipped or scroll.");
                     }
+                    var longestSkill = compactSkills.Controls
+                        .Find("SkillLabel_PotentialFundamentals", true)
+                        .SingleOrDefault() as Label
+                        ?? throw new Exception("The Potential Fundamentals label is missing.");
+                    int requiredWidth = TextRenderer.MeasureText(
+                        longestSkill.Text, longestSkill.Font,
+                        new System.Drawing.Size(1000, 50),
+                        TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
+                        TextFormatFlags.SingleLine).Width;
+                    if (requiredWidth > longestSkill.ClientSize.Width)
+                        throw new Exception(
+                            "The compact Skills workspace clips a full skill label.");
+
                     string? fullPreview =
                         Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
                     if (!string.IsNullOrWhiteSpace(fullPreview))
