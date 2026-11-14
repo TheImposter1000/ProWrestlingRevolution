@@ -41,7 +41,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.6 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.7 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor and Skills visual verification previews
         if: always()
@@ -59,6 +59,8 @@ jobs:
             pwr-header-popularity.png
             pwr-header-business-skills.png
             pwr-header-database.png
+            worker-contract-list-preview.png
+            worker-contract-editor-preview.png
           if-no-files-found: warn
 
       - name: Build a self-contained Windows x64 desktop executable
@@ -104,7 +106,7 @@ jobs:
           mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
           if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
 
-      - name: Assemble the Version 0.6.6 complete game ZIP
+      - name: Assemble the Version 0.6.7 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -128,7 +130,7 @@ jobs:
         run: |
           Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
           if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.6.0") {
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.7.0") {
             throw "Standalone EXE file version does not match this release"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -159,51 +161,51 @@ jobs:
       - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.6.6
-          name: Pro Wrestling Revolution 0.6.6 - Unified Application Header
+          tag_name: v0.6.7
+          name: Pro Wrestling Revolution 0.6.7 - Contracts and Automatic Updates
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            PWR v0.6.6 replaces the two incompatible interior title-bar
-            designs with one consistent PWR application header.
+            PWR v0.6.7 introduces the dedicated Worker Contracts selection
+            screen and Contract Editor based on the supplied PWR references.
 
-            ONE HEADER FOR ALL INTERIOR PAGES
-            Worker Editor, Skills, Contracts, Popularity, Attributes,
-            Business Skills, Job History, Business History, Legacy, Alter
-            Ego, Database Editor, New Game, Skins, Credits and Achievements
-            now use the same blue-metal title bar.
+            WORKER CONTRACTS
+            The new full-width Contracts page provides the six requested
+            columns, employer artwork, searchable and sortable records,
+            an active/expired filter, a highlighted selection, and
+            Remove, Open and Add Contract actions.
 
-            The approved PWR logo and two-line PRO WRESTLING REVOLUTION
-            wordmark, cyan vertical divider, page title and subtitle,
-            angular blue highlight and continuous cyan bottom rule
-            remain constant. Only page-specific title text changes.
-            The former red slash/version bar and separate Skills-only
-            plaque have been removed.
+            CONTRACT EDITOR
+            The contract page has the portrait and biography strip, four
+            Basic, Roster, Terms and Roles panels, alter ego import,
+            terms-copy actions, Reset and Save. Contract edits use native
+            tblContract and tblContractBio with transactional writes.
+            Fields missing from the native MDB remain visible and read-only
+            rather than appearing to save unsupported values.
+            The visual implementation is an ongoing iteration against
+            the supplied reference screenshots, not an exact art match.
 
-            UTILITY CONTROLS
-            The existing four real sound, help, minimize and close actions
-            remain functional and share the same height, alignment,
-            backgrounds, hover treatment and button geometry on every
-            interior page. The Help glyph remains vector drawn and
-            correctly centered.
+            AUTOMATIC RELEASE UPDATES
+            Starting with v0.6.7, installed games check the latest
+            stable GitHub Release on startup and automatically verify,
+            download and install a newer EXE while the title screen is
+            still active. The game restarts after the update. If the player
+            enters an editor during a download, the automatic install is
+            deferred to the next startup to avoid interrupting editing.
+            Check for Updates remains available for manual use.
+            Automatic installation can be turned off on the Skins screen.
+            Developer builds are not overwritten by the release updater.
 
-            SCOPE AND TESTING
-            The home/title screen artwork, navigation sidebar, Worker
-            General controls, Skills layout, game data, and gameplay are
-            unchanged. Windows CI verifies the shared header on Worker
-            General, Skills, Contracts, Popularity, Business Skills,
-            Database Editor, Skins, Achievements, Credits and New Game.
-            It compares all five Worker-section screenshots for identical
-            background and dimensions, checks utility alignment and
-            composited text visibility, and runs the compiled standalone EXE.
+            The installer backs up and replaces only
+            ProWrestlingRevolution.exe. Existing game universes, saved
+            careers, databases, skins, images and settings stay in place.
+            The complete Windows ZIP is also included for fresh installs.
 
-            CHECK FOR UPDATES
-            The updater replaces only ProWrestlingRevolution.exe.
-            Existing universes, saved games, databases, pictures, skins,
-            and settings remain in their current folders.
+            Windows build and smoke tests are required to pass before
+            the release is published.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
