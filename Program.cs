@@ -677,6 +677,30 @@ internal static class Program
                     preview.Save(previewPath,
                         System.Drawing.Imaging.ImageFormat.Png);
                     Console.WriteLine("Worker preview saved to " + previewPath);
+
+                    // Separate reference image for the dedicated 36-rating
+                    // Skills screen; no real player universe is opened.
+                    typeof(WorkerEditorForm).GetMethod("ShowSection",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)!
+                        .Invoke(workerEditor, ["Skills"]);
+                    Application.DoEvents();
+                    if (workerEditor.Controls.Find("WorkerSkillsEditor", true).Length != 1 ||
+                        workerEditor.Controls.Find("WorkerIdentityBiographyRow", true)
+                            .Single().Visible)
+                        throw new Exception("Skills must occupy the content area without identity/biography.");
+
+                    string skillPreview = Path.Combine(
+                        Path.GetDirectoryName(previewPath)!,
+                        "worker-skills-preview.png");
+                    using var skillImage = new System.Drawing.Bitmap(
+                        workerEditor.ClientSize.Width, workerEditor.ClientSize.Height);
+                    workerEditor.DrawToBitmap(skillImage,
+                        new System.Drawing.Rectangle(
+                            System.Drawing.Point.Empty, skillImage.Size));
+                    skillImage.Save(skillPreview,
+                        System.Drawing.Imaging.ImageFormat.Png);
+                    Console.WriteLine("Skills preview saved to " + skillPreview);
                 }
             }
 
