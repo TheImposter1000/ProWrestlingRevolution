@@ -254,7 +254,8 @@ internal sealed class WorkerSkillsEditor : UserControl
         words.Controls.Add(new Label
         {
             Dock = DockStyle.Fill, AutoEllipsis = true,
-            Text = group.Title, Font = new Font("Segoe UI", 12.4f, FontStyle.Bold),
+            Text = group.Title, UseMnemonic = false,
+            Font = new Font("Segoe UI", 12.4f, FontStyle.Bold),
             ForeColor = Color.White, TextAlign = ContentAlignment.BottomLeft
         }, 0, 0);
         words.Controls.Add(new Label
