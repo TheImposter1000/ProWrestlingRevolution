@@ -443,6 +443,14 @@ internal static class Program
                             "worker-skills-composed-header-preview.png");
                         composed.Save(composedPath,
                             System.Drawing.Imaging.ImageFormat.Png);
+                        // The old detached title-only preview had a blank
+                        // white background because its transparency requires
+                        // a parent. Replace it with the actual combined
+                        // header and its functional utilities.
+                        composed.Save(Path.Combine(
+                            Path.GetDirectoryName(workerPreview)!,
+                            "worker-skills-header-preview.png"),
+                            System.Drawing.Imaging.ImageFormat.Png);
                         Console.WriteLine("Composed Skills header saved to " +
                             composedPath);
                     }
@@ -1061,23 +1069,6 @@ internal static class Program
                         System.Drawing.Imaging.ImageFormat.Png);
                     Console.WriteLine("Skills preview saved to " + skillPreview);
 
-                    using (var skillBar = new WorkerSkillsTopChrome
-                    {
-                        Size = new System.Drawing.Size(1672, 56)
-                    })
-                    {
-                        skillBar.CreateControl();
-                        using var barImage = new System.Drawing.Bitmap(1672, 56);
-                        skillBar.DrawToBitmap(barImage,
-                            new System.Drawing.Rectangle(0, 0, 1672, 56));
-                        string headerPreview = Path.Combine(
-                            Path.GetDirectoryName(previewPath)!,
-                            "worker-skills-header-preview.png");
-                        barImage.Save(headerPreview,
-                            System.Drawing.Imaging.ImageFormat.Png);
-                        Console.WriteLine("Skills header preview saved to " +
-                            headerPreview);
-                    }
                 }
             }
 
