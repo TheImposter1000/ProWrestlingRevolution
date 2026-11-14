@@ -1662,6 +1662,18 @@ else
             ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
             return;
 
+        // Contract saves reload the current worker from the database. Never
+        // discard unrelated, not-yet-saved worker edits during that refresh.
+        if (section == "Contracts" && _active != "Contracts" &&
+            HasPendingChanges())
+        {
+            MessageBox.Show(FindForm(),
+                "Save or discard your pending worker changes before opening Contracts.",
+                "Unsaved Worker Changes", MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
         var timer = System.Diagnostics.Stopwatch.StartNew();
         bool existingPage = _sectionViews.TryGetValue(section, out var target) &&
             !target.IsDisposed;
