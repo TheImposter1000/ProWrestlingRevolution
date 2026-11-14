@@ -925,59 +925,8 @@ internal sealed class WorkerEditorForm : UserControl
         Bind(pictureType, worker, "BiographyType");
         card.Controls.Add(pictureTypeLabel);
         card.Controls.Add(pictureType);
-        string picture = Display(worker, "Picture");
-        string safeName = Path.GetFileName(picture);
-
-        if (string.IsNullOrWhiteSpace(safeName))
-        {
-            string workerName = Display(worker, "Name");
-
-            string workerFolder = Path.Combine(
-                _paths.Pictures, "Default", "Workers");
-
-            foreach (string extension in new[]
-            {
-        ".gif", ".jpg", ".jpeg", ".png", ".bmp"
-    })
-            {
-                string candidate = Path.Combine(
-                    workerFolder, workerName + extension);
-
-                if (File.Exists(candidate))
-                {
-                    safeName = Path.GetFileName(candidate);
-                    break;
-                }
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(safeName))
-        {
-            var paths = new[]
-            {
-                Path.Combine(_paths.Pictures, safeName),
-                Path.Combine(_paths.Pictures, "Default", "Workers", safeName),
-                Path.Combine(_paths.Pictures, "Workers", safeName),
-                Path.Combine(_paths.Pictures, "People", safeName),
-                Path.Combine(_paths.Pictures, "Worker", safeName)
-            };
-            var file = paths.FirstOrDefault(File.Exists);
-            if (file is not null)
-            {
-                try
-                {
-                    using var stream = File.OpenRead(file);
-                    using var image = Image.FromStream(stream);
-                    // Only one detached bitmap is needed for each portrait.
-                    portrait.Image = new Bitmap(image);
-                }
-                catch (Exception ex) when (
-                    ex is IOException or ArgumentException or OutOfMemoryException)
-                {
-                    // Missing or invalid worker photographs are optional.
-                }
-            }
-        }
+        portrait.Image = WorkerEditorTheme.LoadWorkerPortrait(_paths,
+            Display(worker, "Picture"), Display(worker, "Name"));
         if (portrait.Image is null)
         {
             portrait.Controls.Add(new Label
