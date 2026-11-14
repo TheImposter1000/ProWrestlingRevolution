@@ -940,8 +940,11 @@ internal sealed class WorkerEditorForm : UserControl
         _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
         long topTime = timer.ElapsedMilliseconds;
 
-        int generalY = skills ? 7 : 165;
-        int generalHeight = skills
+        // Contract screens occupy the exact viewport below the 56px shared header.
+        // Skills retains its existing 7px inset; General retains its original layout.
+        bool contracts = _active == "Contracts";
+        int generalY = contracts ? 0 : skills ? 7 : 165;
+        int generalHeight = contracts ? height : skills
             ? Math.Max(300, height - generalY - 7)
             : Math.Max(340, Math.Min(520, height - generalY - 12));
 
