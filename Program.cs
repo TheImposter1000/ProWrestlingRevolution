@@ -666,6 +666,36 @@ internal static class Program
                         throw new Exception("Skills Reset must restore original values.");
                 }
 
+                // The real game uses a 1366x768 window, leaving roughly
+                // 712 pixels below the Skills header. All 36 ratings must
+                // remain visible in that viewport without vertical scrolling.
+                using (var compactSkills = new WorkerSkillsEditor(
+                    profile, true, () => { })
+                { Size = new System.Drawing.Size(1366, 712) })
+                {
+                    compactSkills.CreateControl();
+                    compactSkills.PerformLayout();
+                    Application.DoEvents();
+                    var categoryPanels = compactSkills.Controls
+                        .Find("SkillsFourPanels", true)
+                        .Single() as TableLayoutPanel
+                        ?? throw new Exception("The compact Skills layout is missing.");
+                    foreach (var category in categoryPanels.Controls
+                        .Cast<Control>().OfType<SkillGlassPanel>())
+                    {
+                        var rows = category.Controls
+                            .OfType<TableLayoutPanel>()
+                            .SelectMany(panel => panel.Controls.OfType<FlowLayoutPanel>())
+                            .Single();
+                        rows.PerformLayout();
+                        if (rows.VerticalScroll.Visible ||
+                            rows.Controls.Cast<Control>().Last().Bottom >
+                            rows.ClientSize.Height - rows.Padding.Bottom + 2)
+                            throw new Exception(
+                                "At game resolution, one or more Skills ratings are clipped or scroll.");
+                    }
+                }
+
                 // The current Worker Editor has a single-column popup shell
                 // containing a two-column page: 158px section navigation and
                 // the main data body. Validate this layout instead of requiring
