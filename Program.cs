@@ -357,7 +357,7 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerLanguages", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerBiography", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerPopupLayout", true).Length != 1 ||
-                    workerEditor.Controls.Find("WorkerMainMenuRail", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerPage", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
@@ -373,9 +373,10 @@ internal static class Program
                         .OfType<ScrollableControl>().Any(control => control.AutoScroll))
                     throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
 
-                // Test the two-column popup geometry instead of only verifying
-                // that its controls exist. This catches the overlapping sidebars
-                // and invisible-field regression from the previous release.
+                // The current Worker Editor has a single-column popup shell
+                // containing a two-column page: 158px section navigation and
+                // the main data body. Validate this layout instead of requiring
+                // the legacy 61px icon rail, which this screen no longer uses.
                 workerEditor.PerformLayout();
                 var popupLayout = workerEditor.Controls.Find("WorkerPopupLayout", true)
                     .Single() as TableLayoutPanel;
@@ -383,22 +384,20 @@ internal static class Program
                 var workerBody = workerEditor.Controls.Find("WorkerEditorBody", true).Single();
                 var workerPage = workerEditor.Controls.Find("WorkerPage", true)
                     .SingleOrDefault() as TableLayoutPanel;
-                var mainRail = workerEditor.Controls.Find("WorkerMainMenuRail", true).Single();
-                if (popupLayout is null || popupLayout.ColumnCount != 2 ||
+                if (popupLayout is null || popupLayout.ColumnCount != 1 ||
                     workerPage is null || workerPage.ColumnCount != 2 ||
-                    mainRail.Width != 61 || tabColumn.Width != 158 ||
+                    tabColumn.Width != 158 ||
                     tabColumn.Right > workerBody.Left || workerBody.Width < 1000)
-                    throw new Exception("Worker editor icon rail, tabs and data area must not overlap. " +
-                        $"Form={workerEditor.Size}, rail={mainRail.Bounds}, tabs={tabColumn.Bounds}, " +
+                    throw new Exception("Worker editor navigation and data area must not overlap. " +
+                        $"Form={workerEditor.Size}, tabs={tabColumn.Bounds}, " +
                         $"body={workerBody.Bounds}, page={workerPage?.Bounds}, " +
                         $"popup={popupLayout?.Bounds}.");
                 var personal = workerEditor.Controls.Find("WorkerPersonalData", true).Single();
-                var personalHeading = workerEditor.Controls.Find("WorkerPersonalDataHeading", true).Single();
                 var personalFields = workerEditor.Controls.Find("WorkerPersonalDataFields", true).Single();
                 personal.PerformLayout();
-                if (personalFields.Top < personalHeading.Bottom ||
+                if (personalFields.Top < personal.Padding.Top ||
                     personalFields.Bottom > personal.ClientSize.Height)
-                    throw new Exception("Worker fields overlap their section header.");
+                    throw new Exception("Worker fields overlap their painted section header or card bounds.");
                 var picture = workerEditor.Controls.Find("WorkerPicture", true).Single();
                 var biography = workerEditor.Controls.Find("WorkerBiography", true).Single();
                 var identity = workerEditor.Controls.Find("WorkerIdentity", true).Single();
