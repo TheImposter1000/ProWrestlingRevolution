@@ -1,5 +1,11 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.8: Worker-consistent contract inputs and glass
+
+The Contracts selection and editor now reuse the current skin's **Backgrounds/Worker_Editor.jpg** (falling back to Obsidian) instead of painting a disconnected dark arena. All native contract fields, including Name, Short Name, Wage, Downside and Contract Begin, share one blue-glass input style that supports direct typing. Where choices exist, a small dropdown indicator also exposes values from the MDB. Numeric and date inputs are validated at Save. Fields absent from the current native contract schema remain read-only; values must never falsely appear saved.
+
+All decorative icons, explanatory subtitles, and black checkbox strips have been removed. Headers now display only the four section names. Reset, Apply, Save, and contract-list actions are restrained text-only buttons with consistent framing. The Worker Editor's structure and contract persistence are retained.
+
 ## Version 0.6.7: Worker Contracts and automatic release installation
 
 The Contracts tab now uses the supplied Worker Contracts selection and four-panel Contract Editor layout with actual native MDB records. It supports search, sorting, status filtering, Open, Add Contract, Remove, transactional contract and biography saves, role checkboxes, Reset, alter ego import and terms copy. Schema fields that do not yet exist in the native database remain visible but read-only. The two user-provided references remain the visual acceptance criteria, and the design continues to be refined against them. See CONTRACT_VISUAL_REFERENCE.md.
