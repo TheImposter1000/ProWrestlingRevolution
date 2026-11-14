@@ -118,6 +118,109 @@ internal static class PrwContractStore
         }
     }
 
+
+    /// <summary>
+    /// Persist the editor's supported fields and biography in one transaction.
+    /// Compare the changed fields against the values displayed at load time.
+    /// </summary>
+    internal static void Update(string file, string? password, object workerUid,
+        DataRow record, IReadOnlyDictionary<string, string> fields,
+        IReadOnlyDictionary<string, bool> roles, string biography)
+    {
+        if (File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly))
+            throw new IOException("The selected universe is read-only.");
+        using var db = AccessDatabase.Open(file, password);
+        if (!PrwSchema.Inspect(db, requireExpandedTables: false).IsValid)
+            throw new InvalidDataException("Contract editing requires a native PWR universe.");
+        var requested = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in fields)
+        {
+            var column = record.Table.Columns[item.Key];
+            if (column is null || column.ColumnName is "UID" or "WorkerUID")
+                continue;
+            if (item.Value.Length == 0 && column.AllowDBNull)
+                requested[item.Key] = DBNull.Value;
+            else if (item.Value.Length == 0 && column.DataType == typeof(string))
+                requested[item.Key] = "";
+            else if (item.Value.Length > 0)
+                requested[item.Key] = ConvertInput(item.Value, column);
+        }
+        foreach (var item in roles)
+        {
+            var column = record.Table.Columns[item.Key];
+            if (column is null) continue;
+            requested[item.Key] = column.DataType == typeof(bool) ? item.Value :
+                Convert.ChangeType(item.Value ? 1 : 0, column.DataType,
+                    CultureInfo.InvariantCulture);
+        }
+
+        using var transaction = db.BeginTransaction();
+        try
+        {
+            using (var verify = new OleDbCommand(
+                "SELECT * FROM [tblContract] WHERE [UID]=? AND [WorkerUID]=?",
+                db, transaction))
+            {
+                verify.Parameters.AddWithValue("uid", record["UID"]);
+                verify.Parameters.AddWithValue("worker", workerUid);
+                using var reader = verify.ExecuteReader();
+                if (reader?.Read() != true)
+                    throw new DBConcurrencyException("This worker's contract was removed.");
+                foreach (var item in requested)
+                {
+                    var before = record[item.Key, DataRowVersion.Original];
+                    var inDatabase = reader[item.Key];
+                    if (!Equals(before is DBNull ? null : before,
+                                inDatabase is DBNull ? null : inDatabase))
+                        throw new DBConcurrencyException(
+                            "The contract field " + item.Key +
+                            " was edited elsewhere. Reload before saving.");
+                }
+            }
+
+            var changed = requested.Where(item => !Equals(
+                record[item.Key] is DBNull ? null : record[item.Key],
+                item.Value is DBNull ? null : item.Value)).ToArray();
+            if (changed.Length != 0)
+            {
+                using var update = new OleDbCommand(
+                    "UPDATE [tblContract] SET " +
+                    string.Join(", ", changed.Select(c => Quote(c.Key) + "=?")) +
+                    " WHERE [UID]=? AND [WorkerUID]=?", db, transaction);
+                foreach (var item in changed)
+                    AddValue(update, item.Value, record.Table.Columns[item.Key]!);
+                update.Parameters.AddWithValue("uid", record["UID"]);
+                update.Parameters.AddWithValue("worker", workerUid);
+                if (update.ExecuteNonQuery() != 1)
+                    throw new DBConcurrencyException("Contract update affected no unique record.");
+            }
+
+            using (var existing = new OleDbCommand(
+                "SELECT COUNT(*) FROM [tblContractBio] WHERE [ContractUID]=?",
+                db, transaction))
+            {
+                existing.Parameters.AddWithValue("uid", record["UID"]);
+                bool hasBio = Convert.ToInt32(existing.ExecuteScalar(),
+                    CultureInfo.InvariantCulture) != 0;
+                using var bio = new OleDbCommand(hasBio
+                    ? "UPDATE [tblContractBio] SET [Biography]=? WHERE [ContractUID]=?"
+                    : "INSERT INTO [tblContractBio] ([Biography], [ContractUID]) VALUES (?, ?)",
+                    db, transaction);
+                bio.Parameters.Add("text", OleDbType.LongVarWChar).Value = biography;
+                bio.Parameters.AddWithValue("uid", record["UID"]);
+                bio.ExecuteNonQuery();
+            }
+            transaction.Commit();
+            foreach (var item in requested) record[item.Key] = item.Value;
+            record.AcceptChanges();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
     internal static void Remove(string file, string? password, object workerUid, object contractUid)
     {
         if (File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly))
