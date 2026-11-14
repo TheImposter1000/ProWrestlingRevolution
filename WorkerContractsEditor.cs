@@ -895,7 +895,7 @@ internal sealed class WorkerContractsEditor : UserControl
             ("Contract Begin", "StartDate", "date"),
             ("Expires In", "TermCode", "choice"),
             ("Contract Expires", "ExpirationDate", "date"),
-            ("Appearances Left", "AppearanceLimit", "number")
+            ("Appearance Limit", "AppearanceLimit", "number")
         }), 0, 0);
         cards.Controls.Add(Card("Roster Details", "ContractRosterDetails", row, new[]
         {
@@ -905,13 +905,13 @@ internal sealed class WorkerContractsEditor : UserControl
             ("Brand", "Brands", "choice"),
             ("Division", "Divisions", "choice"),
             ("Manager", "ManagerWorkerUID", "manager"),
-            ("Mask", "MaskRespect", "choice"),
+            ("Mask", "", "unsupported"),
             ("Move Set", "MoveSet", "choice"),
             ("Momentum", "Momentum", "choice"),
             ("Gimmick", "GimmickName", "text"),
             ("Gimmick Basis", "GimmickBasis", "choice"),
             ("Gimmick Rating", "GimmickRating", "number"),
-            ("Gimmick Status", "CompanyPush", "choice")
+            ("Gimmick Status", "", "unsupported")
         }), 1, 0);
         cards.Controls.Add(Card("Terms, Perks & Bonuses", "ContractTerms", row, new[]
         {
@@ -921,6 +921,8 @@ internal sealed class WorkerContractsEditor : UserControl
             ("Wage Matching", "", "unsupported"),
             ("Roster Usage", "RosterUsage", "choice"),
             ("Intended Role", "IntendedRole", "choice"),
+            ("Company Push", "CompanyPush", "choice"),
+            ("Mask Respect", "MaskRespect", "choice"),
             ("Shows Control", "", "unsupported"),
             ("Bonus Type", "", "unsupported"),
             ("Bonus Amount", "", "unsupported"),
