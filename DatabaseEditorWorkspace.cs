@@ -470,18 +470,22 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         Add(_section);
 
         var add = Button("Add New Item", false, "plus");
+        add.Name = "AddRecordButton";
         add.Click += (_, _) => Safe(AddRecord);
         Add(add);
 
         var delete = Button("Delete Item(s)", false, "delete");
+        delete.Name = "DeleteRecordsButton";
         delete.Click += (_, _) => Safe(DeleteRecords);
         Add(delete);
 
         var copy = Button("Copy Item(s)", false, "copy");
+        copy.Name = "CopyRecordsButton";
         copy.Click += (_, _) => Safe(CopyRecords);
         Add(copy);
 
         var import = Button("Import Items", false, "import");
+        import.Name = "ImportRecordsButton";
         import.Click += (_, _) => Safe(ImportRecords);
         Add(import);
 
