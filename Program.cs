@@ -672,7 +672,8 @@ internal static class Program
             // from real DataRows and routes to the four-card detail editor,
             // without opening a native MDB during the in-memory test.
             using (var contractsView = new WorkerContractsEditor(
-                paths, profile, null, null, _ => {}, () => {}))
+                paths, profile, Path.Combine(root, "contract-ui-test.mdb"),
+                null, _ => {}, () => {}))
             {
                 contractsView.Size = new System.Drawing.Size(
                     SkinArt.WindowWidth - 20, SkinArt.WindowHeight - 62);
