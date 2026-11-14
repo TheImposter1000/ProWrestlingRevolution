@@ -230,6 +230,40 @@ internal sealed class WorkerSkillsEditor : UserControl
         layout.Controls.Add(panels, 0, 0);
         layout.Controls.Add(CreateActions(), 0, 1);
         Controls.Add(layout);
+
+        void AdaptDensity()
+        {
+            // The 1672x885 reference remains pixel-proportioned. The real
+            // 1366x712 viewport uses smaller gutters rather than scrolling
+            // the eleven-row Potential group off-screen.
+            bool compact = ClientSize.Height < 790;
+            var padding = compact
+                ? new Padding(11, 6, 15, 10)
+                : new Padding(19, 16, 39, 47);
+            if (layout.Padding != padding) layout.Padding = padding;
+            int footerHeight = compact ? 68 : 81;
+            if (layout.RowStyles[1].Height != footerHeight)
+                layout.RowStyles[1].Height = footerHeight;
+            for (int i = 0; i < Groups.Count; i++)
+            {
+                var card = (SkillGlassPanel)panels.GetControlFromPosition(
+                    i % 2, i / 2)!;
+                var margin = compact
+                    ? new Padding(6, 5, 6, 5)
+                    : new Padding(10, i < 2 ? 10 : 6,
+                        10, i < 2 ? 10 : 28);
+                if (card.Margin != margin) card.Margin = margin;
+                var inner = card.Controls.OfType<TableLayoutPanel>().Single();
+                var ratings = inner.Controls.OfType<FlowLayoutPanel>().Single();
+                var rowPadding = compact
+                    ? new Padding(16, 2, 17, 2)
+                    : new Padding(31, 12, 32, 5);
+                if (ratings.Padding != rowPadding)
+                    ratings.Padding = rowPadding;
+            }
+        }
+        Resize += (_, _) => AdaptDensity();
+        AdaptDensity();
     }
 
     private Control CreateGroup(SkillGroup group, int groupIndex)
@@ -307,7 +341,7 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             int height = Math.Clamp(
                 (rows.ClientSize.Height - rows.Padding.Vertical) /
-                    group.Skills.Count, 22, 33);
+                    group.Skills.Count, Height < 790 ? 20 : 22, 33);
             int width = Math.Max(150, rows.ClientSize.Width -
                 rows.Padding.Horizontal -
                 (rows.VerticalScroll.Visible
@@ -323,7 +357,8 @@ internal sealed class WorkerSkillsEditor : UserControl
         panel.Controls.Add(inner);
         panel.Resize += (_, _) =>
         {
-            int desired = panel.ClientSize.Width >= 730 ? 61 : 57;
+            int desired = Height < 790
+                ? 48 : panel.ClientSize.Width >= 730 ? 61 : 57;
             if (inner.RowStyles[0].Height != desired)
                 inner.RowStyles[0].Height = desired;
             PlaceRows();
