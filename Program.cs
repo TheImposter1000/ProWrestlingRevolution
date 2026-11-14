@@ -668,6 +668,73 @@ internal static class Program
                     new PrwProfileSection("tblWorkerOver", popularityTable),
                     new PrwProfileSection("tblWorkerAttributes", attributesTable)
                 ]);
+            // Contract visual/function smoke: the new list is rendered
+            // from real DataRows and routes to the four-card detail editor,
+            // without opening a native MDB during the in-memory test.
+            using (var contractsView = new WorkerContractsEditor(
+                paths, profile, null, null, _ => {}, () => {}))
+            {
+                contractsView.Size = new System.Drawing.Size(
+                    SkinArt.WindowWidth - 20, SkinArt.WindowHeight - 62);
+                contractsView.CreateControl();
+                contractsView.PerformLayout();
+                Application.DoEvents();
+                var grid = contractsView.Controls.Find("WorkerContractGrid", true)
+                    .OfType<DataGridView>().SingleOrDefault();
+                if (grid is null || grid.Columns.Count != 6 || grid.Rows.Count != 1 ||
+                    grid.Rows[0].Cells[0].Value?.ToString() is not string employer ||
+                    !employer.Contains("Employer", StringComparison.Ordinal))
+                    throw new Exception(
+                        "Contract selector did not show the sample native MDB record.");
+                var search = contractsView.Controls.Find("ContractSearch", true)
+                    .OfType<TextBox>().Single();
+                search.Text = "Nonexistent employer";
+                if (grid.Rows.Count != 0)
+                    throw new Exception("Contracts search did not filter rows.");
+                search.Text = "";
+                if (grid.Rows.Count != 1)
+                    throw new Exception("Contracts search did not restore rows.");
+                var open = contractsView.Controls.Find("ContractOpen", true)
+                    .OfType<Button>().Single();
+                open.PerformClick();
+                if (!contractsView.IsEditing ||
+                    contractsView.Controls.Find("ContractFourCards", true).Length != 1 ||
+                    contractsView.Controls.Find("ContractRoles", true).Length != 1 ||
+                    contractsView.Controls.Find("ContractField_ContractType", true).Length != 1 ||
+                    contractsView.Controls.Find("ContractBiography", true).Length != 1 ||
+                    contractsView.Controls.Find("ContractSave", true).Length != 1)
+                    throw new Exception(
+                        "Open Contract did not navigate to the native four-card editor.");
+                if (!contractsView.ReturnToList() ||
+                    contractsView.Controls.Find("WorkerContractGrid", true).Length != 1)
+                    throw new Exception("Back did not return to contract selection.");
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW")))
+                {
+                    string rootPreview = Path.GetDirectoryName(
+                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW")!)!;
+                    using var listShot = new System.Drawing.Bitmap(
+                        contractsView.Width, contractsView.Height);
+                    contractsView.DrawToBitmap(listShot,
+                        new System.Drawing.Rectangle(0, 0,
+                            listShot.Width, listShot.Height));
+                    listShot.Save(Path.Combine(rootPreview, "worker-contract-list-preview.png"),
+                        System.Drawing.Imaging.ImageFormat.Png);
+                    open = contractsView.Controls.Find("ContractOpen", true)
+                        .OfType<Button>().Single();
+                    open.PerformClick();
+                    using var editorShot = new System.Drawing.Bitmap(
+                        contractsView.Width, contractsView.Height);
+                    contractsView.DrawToBitmap(editorShot,
+                        new System.Drawing.Rectangle(0, 0,
+                            editorShot.Width, editorShot.Height));
+                    editorShot.Save(Path.Combine(rootPreview, "worker-contract-editor-preview.png"),
+                        System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+            // Contract saves must never alter unrelated worker records.
+            if (PrwContractEditorService.HasPendingChanges(profile))
+                throw new Exception("Unedited contract fixtures are unexpectedly dirty.");
+
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             using (var workerHost = new Panel
             {
