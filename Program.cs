@@ -379,6 +379,14 @@ internal static class Program
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
                     throw new Exception("Top utility controls must be flush with the header.");
                 
+                // Earlier screenshots were taken from a hidden launcher.
+                // Transparent child controls do not composite into an
+                // offscreen parent bitmap reliably. Exercise the real
+                // visible Form so the branding and four utility controls
+                // must actually be painted together.
+                launcher.Show();
+                topbar.Visible = true;
+                Application.DoEvents();
                 // Skills alone receives the tall PWR-branded 56px plaque.
                 // The four utility buttons remain in their real launcher bar.
                 launcher.SetWorkerSectionChrome("Skills");
@@ -413,6 +421,19 @@ internal static class Program
                         throw new Exception(
                             "Skills header has a mismatched background at the utility boundary.");
 
+                    int paintedLetterPixels = 0;
+                    for (int y = 8; y < Math.Min(45, composed.Height); y++)
+                        for (int x = 435; x < Math.Min(570, composed.Width); x++)
+                        {
+                            var pixel = composed.GetPixel(x, y);
+                            if (pixel.R > 155 && pixel.G > 155 && pixel.B > 155)
+                                paintedLetterPixels++;
+                        }
+                    if (paintedLetterPixels < 80)
+                        throw new Exception(
+                            "The composed Skills screenshot has no visible heading. " +
+                            "The test must capture actual child painting, not a bare parent gradient.");
+
                     string? workerPreview =
                         Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
                     if (!string.IsNullOrWhiteSpace(workerPreview))
@@ -428,6 +449,8 @@ internal static class Program
                 }
 
                 launcher.SetWorkerSectionChrome(null);
+                topbar.Visible = false;
+                launcher.Hide();
                 if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
                     controls.Any(button => button.Height != 40))
                     throw new Exception(
