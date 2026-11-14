@@ -668,6 +668,57 @@ internal static class Program
                     new PrwProfileSection("tblWorkerOver", popularityTable),
                     new PrwProfileSection("tblWorkerAttributes", attributesTable)
                 ]);
+
+            // Capture both contract canvases as real controls for pixel-level
+            // comparison against the supplied 1672x941 reference images.
+            using (var contractView = new ContractsWorkspaceView(
+                paths, skin, profile, null, null, _ => { }, () => { }))
+            using (var contractHost = new Panel
+            {
+                Size = new System.Drawing.Size(1366, 712),
+                BackColor = System.Drawing.Color.Black
+            })
+            {
+                contractHost.Controls.Add(contractView);
+                contractView.Bounds = contractHost.ClientRectangle;
+                contractHost.CreateControl();
+                contractView.CreateControl();
+                contractView.Show();
+                Application.DoEvents();
+                if (contractView.Controls.Find("ContractSearch", true).Length != 1 ||
+                    contractView.Controls.Find("ContractStatusFilter", true).Length != 1 ||
+                    contractView.Controls.Find("ContractAction_AddContract", true).Length != 1)
+                    throw new Exception("Contract selection screen is missing exact controls.");
+                using (var snapshot = new System.Drawing.Bitmap(
+                    contractView.Width, contractView.Height))
+                {
+                    contractView.DrawToBitmap(snapshot,
+                        new System.Drawing.Rectangle(0, 0, snapshot.Width, snapshot.Height));
+                    snapshot.Save(Path.Combine(root, "worker-contract-list-preview.png"));
+                }
+
+                var editorMethod = typeof(ContractsWorkspaceView).GetMethod(
+                    "OpenEditor", System.Reflection.BindingFlags.Instance |
+                                  System.Reflection.BindingFlags.NonPublic)
+                    ?? throw new Exception("Contract editor open action is missing.");
+                editorMethod.Invoke(contractView, [contract]);
+                contractView.PerformLayout();
+                Application.DoEvents();
+                foreach (string name in new[] { "ContractBiography", "ContractEmployer",
+                             "ContractField_ContractType", "ContractRole_RoleWrestler",
+                             "ContractAction_Save", "ContractAlterEgoSelector",
+                             "ContractCopySource" })
+                    if (contractView.Controls.Find(name, true).Length != 1)
+                        throw new Exception("Contract editor layout is missing " + name);
+                using (var snapshot = new System.Drawing.Bitmap(
+                    contractView.Width, contractView.Height))
+                {
+                    contractView.DrawToBitmap(snapshot,
+                        new System.Drawing.Rectangle(0, 0, snapshot.Width, snapshot.Height));
+                    snapshot.Save(Path.Combine(root, "worker-contract-editor-preview.png"));
+                }
+            }
+
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             using (var workerHost = new Panel
             {
