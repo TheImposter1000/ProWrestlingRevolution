@@ -268,24 +268,39 @@ internal sealed class WorkerSkillsEditor : UserControl
         header.Controls.Add(icon);
         inner.Controls.Add(header, 0, 0);
 
-        var rows = new TableLayoutPanel
+        // A top-down stack fixes the TableLayoutPanel surplus-height issue
+        // that separated the last skill rating from the preceding rows.
+        var rows = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = group.Skills.Count,
-            Margin = Padding.Empty, Padding = new Padding(8, 3, 8, 3),
+            Name = "SkillRows_" + group.Title.Replace(" ", ""),
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            Padding = new Padding(8, 3, 8, 3), Margin = Padding.Empty,
             BackColor = Color.Transparent, AutoScroll = true
         };
-        rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int skillIndex = 0; skillIndex < group.Skills.Count; skillIndex++)
         {
             var skill = group.Skills[skillIndex];
-            rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 23));
             var rating = new SkillRatingRow(skill.Label, skill.Column,
                 InitialRating(skill.Column), _canEdit,
-                value => UpdateSkill(skill.Column, value));
-            rating.Dock = DockStyle.Fill;
-            rows.Controls.Add(rating, 0, skillIndex);
+                value => UpdateSkill(skill.Column, value))
+            {
+                Height = 23, Margin = Padding.Empty
+            };
+            rating.Width = Math.Max(200, rows.ClientSize.Width - 20);
+            rows.Controls.Add(rating);
             _rows.Add(skill.Column, rating);
         }
+        void ResizeRatingRows()
+        {
+            int width = Math.Max(200,
+                rows.ClientSize.Width - rows.Padding.Horizontal -
+                (rows.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 2);
+            foreach (Control rating in rows.Controls)
+                rating.Width = width;
+        }
+        rows.Resize += (_, _) => ResizeRatingRows();
+        ResizeRatingRows();
         inner.Controls.Add(rows, 0, 1);
         panel.Controls.Add(inner);
         return panel;
@@ -667,6 +682,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                      ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer, true);
             Cursor = Cursors.Hand;
+            BackColor = PanelInk;
             TabStop = true;
         }
 
@@ -727,7 +743,7 @@ internal sealed class WorkerSkillsEditor : UserControl
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
+            e.Graphics.Clear(PanelInk);
             if (Width < 22 || Height < 12) return;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             int x = 8, width = Width - 16, y = Height / 2;
