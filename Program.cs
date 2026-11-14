@@ -485,6 +485,39 @@ internal static class Program
             skillsTable.Rows.Add(sampleSkills);
             skillsTable.AcceptChanges();
 
+            // A 40-column native contract makes tab timing representative
+            // of the expensive case in the user's 19-second recording.
+            var contractTable = new System.Data.DataTable("tblContract");
+            foreach (string field in PrwSchema.Tables.Single(
+                         schema => schema.Name == "tblContract").Columns)
+                contractTable.Columns.Add(field,
+                    field is "UID" or "WorkerUID" ? typeof(int) : typeof(string));
+            var contract = contractTable.NewRow();
+            contract["UID"] = 500;
+            contract["WorkerUID"] = 1;
+            contract["Name"] = "Test Contract";
+            contractTable.Rows.Add(contract);
+            contractTable.AcceptChanges();
+
+            var popularityTable = new System.Data.DataTable("tblWorkerOver");
+            popularityTable.Columns.Add("WorkerUID", typeof(int));
+            popularityTable.Columns.Add("RegionCode", typeof(string));
+            popularityTable.Columns.Add("Popularity", typeof(int));
+            popularityTable.Rows.Add(1, "USA", 65);
+            popularityTable.AcceptChanges();
+
+            var attributesTable = new System.Data.DataTable("tblWorkerAttributes");
+            foreach (string field in PrwSchema.Tables.Single(
+                         schema => schema.Name == "tblWorkerAttributes").Columns)
+                attributesTable.Columns.Add(field,
+                    field is "UID" or "WorkerUID" ? typeof(int) : typeof(string));
+            var attribute = attributesTable.NewRow();
+            attribute["UID"] = 900;
+            attribute["WorkerUID"] = 1;
+            attribute["AttributeName"] = "Reliable";
+            attributesTable.Rows.Add(attribute);
+            attributesTable.AcceptChanges();
+
             var biographyTable = new System.Data.DataTable("tblWorkerBio");
             biographyTable.Columns.Add("Biography", typeof(string));
             biographyTable.Rows.Add("An example worker biography.");
@@ -493,7 +526,10 @@ internal static class Program
                 [
                     new PrwProfileSection("tblWorker", workerTable),
                     new PrwProfileSection("tblWorkerBio", biographyTable),
-                    new PrwProfileSection("tblWorkerSkills", skillsTable)
+                    new PrwProfileSection("tblWorkerSkills", skillsTable),
+                    new PrwProfileSection("tblContract", contractTable),
+                    new PrwProfileSection("tblWorkerOver", popularityTable),
+                    new PrwProfileSection("tblWorkerAttributes", attributesTable)
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             using (var workerHost = new Panel
