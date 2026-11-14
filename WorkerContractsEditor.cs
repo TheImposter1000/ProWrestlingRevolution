@@ -36,6 +36,8 @@ internal sealed class WorkerContractsEditor : UserControl
         new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PrwContractEditorService.Company> _companies = [];
     private readonly List<PrwContractEditorService.Template> _templates = [];
+    private readonly Dictionary<string, Bitmap> _logoCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _view = new() { Dock = DockStyle.Fill, BackColor = Color.Transparent };
     // Each view is disposed when navigating; controls must be recreated.
     private DataGridView _grid = new();
@@ -68,7 +70,12 @@ internal sealed class WorkerContractsEditor : UserControl
         BackColor = Color.Transparent;
         PrwContractEditorService.AssertFields(_contracts);
         Controls.Add(_view);
-        Disposed += (_, _) => _tips.Dispose();
+        Disposed += (_, _) =>
+        {
+            _tips.Dispose();
+            foreach (var logo in _logoCache.Values) logo.Dispose();
+            _logoCache.Clear();
+        };
         BuildList();
         if (_databaseFile is not null)
         {
@@ -208,6 +215,115 @@ internal sealed class WorkerContractsEditor : UserControl
                 : Value(row, "EmployerInitials");
     }
 
+    private Image? CompanyLogo(DataRow row)
+    {
+        var company = _companies.FirstOrDefault(c =>
+            Convert.ToString(c.Uid, CultureInfo.InvariantCulture) ==
+            Value(row, "FedUID"));
+        string safe = Path.GetFileName(company?.Logo ?? "");
+        if (string.IsNullOrWhiteSpace(safe)) return null;
+        if (_logoCache.TryGetValue(safe, out var cached)) return cached;
+        foreach (string path in new[]
+        {
+            Path.Combine(_paths.Pictures, "Default", "Logos", safe),
+            Path.Combine(_paths.Pictures, "Default", "Companies", safe),
+            Path.Combine(_paths.Pictures, "Logos", safe),
+            Path.Combine(_paths.Pictures, "Companies", safe),
+            Path.Combine(_paths.Pictures, safe)
+        })
+        {
+            if (!File.Exists(path)) continue;
+            try
+            {
+                using var loaded = Image.FromFile(path);
+                var logo = new Bitmap(loaded);
+                _logoCache[safe] = logo;
+                return logo;
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException
+                                       or OutOfMemoryException) { }
+        }
+        return null;
+    }
+
+    private void PaintEmployerCell(object? sender,
+        DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex != 0 ||
+            e.RowIndex >= _grid.Rows.Count) return;
+        if (_grid.Rows[e.RowIndex].Tag is not DataRow contract) return;
+        var graphics = e.Graphics;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        bool selected = (e.State & DataGridViewElementStates.Selected) != 0;
+        using var background = new SolidBrush(selected
+            ? Color.FromArgb(4, 129, 180)
+            : e.RowIndex % 2 == 0 ? Ink : Color.FromArgb(7, 31, 55));
+        graphics.FillRectangle(background, e.CellBounds);
+        int boxX = e.CellBounds.X + 13;
+        int boxY = e.CellBounds.Y + 6;
+        var image = CompanyLogo(contract);
+        if (image is not null)
+            graphics.DrawImage(image, new Rectangle(boxX, boxY, 77, 38));
+        else
+        {
+            using var tile = new LinearGradientBrush(
+                new Rectangle(boxX, boxY, 77, 38),
+                Color.FromArgb(30, 111, 168), Ink,
+                LinearGradientMode.Vertical);
+            graphics.FillRectangle(tile, new Rectangle(boxX, boxY, 77, 38));
+            using var border = new Pen(Color.FromArgb(99, Cyan));
+            graphics.DrawRectangle(border, boxX, boxY, 77, 38);
+            string initials = Value(contract, "EmployerInitials");
+            if (initials.Length == 0) initials = "PWR";
+            using var logoFont = new Font("Segoe UI", 12, FontStyle.Bold | FontStyle.Italic);
+            TextRenderer.DrawText(graphics, initials, logoFont,
+                new Rectangle(boxX + 2, boxY + 1, 73, 35),
+                White, TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+        using var font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        string employer = Employer(contract);
+        TextRenderer.DrawText(graphics, employer, font,
+            new Rectangle(boxX + 89, e.CellBounds.Y,
+                Math.Max(20, e.CellBounds.Width - 108), e.CellBounds.Height),
+            White, TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+        using var underline = new Pen(Color.FromArgb(29, 82, 116));
+        graphics.DrawLine(underline, e.CellBounds.Left,
+            e.CellBounds.Bottom - 1, e.CellBounds.Right, e.CellBounds.Bottom - 1);
+        e.Handled = true;
+    }
+
+    private static void HeaderIcon(Graphics g, int x, int y, string kind)
+    {
+        using var pen = new Pen(Color.FromArgb(225, 239, 252), 1.9f)
+        {
+            StartCap = LineCap.Round, EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round
+        };
+        if (kind == "Roles" || kind == "Roster Details")
+        {
+            g.DrawEllipse(pen, x + 9, y + 2, 10, 10);
+            g.DrawEllipse(pen, x + 2, y + 14, 24, 17);
+            g.DrawEllipse(pen, x + 1, y + 7, 7, 7);
+            g.DrawEllipse(pen, x + 22, y + 7, 7, 7);
+        }
+        else if (kind.StartsWith("Terms", StringComparison.Ordinal))
+        {
+            g.DrawEllipse(pen, x + 3, y + 2, 24, 9);
+            g.DrawArc(pen, x + 3, y + 7, 24, 9, 0, 180);
+            g.DrawArc(pen, x + 3, y + 13, 24, 9, 0, 180);
+            g.DrawArc(pen, x + 3, y + 19, 24, 9, 0, 180);
+        }
+        else
+        {
+            g.DrawRectangle(pen, x + 6, y + 1, 20, 30);
+            g.DrawLine(pen, x + 10, y + 10, x + 22, y + 10);
+            g.DrawLine(pen, x + 10, y + 16, x + 22, y + 16);
+            g.DrawLine(pen, x + 10, y + 22, x + 20, y + 22);
+        }
+    }
+
     private void ClearView()
     {
         _view.SuspendLayout();
@@ -343,11 +459,14 @@ internal sealed class WorkerContractsEditor : UserControl
                 Color.FromArgb(6, 32, 61), LinearGradientMode.Horizontal);
             e.Graphics.FillRectangle(brush, 4, 4,
                 Math.Max(1, header.Width - 9), 60);
+            HeaderIcon(e.Graphics, 25, 12, "Worker Contracts");
+            using var separator = new Pen(Cyan, 2.1f);
+            e.Graphics.DrawLine(separator, 92, 14, 92, 55);
             using var rule = new Pen(Cyan, 1f);
             e.Graphics.DrawLine(rule, 4, 66, header.Width - 4, 66);
         };
         var heading = Label("Worker Contracts", 21, true);
-        heading.Bounds = new Rectangle(29, 6, 565, 54);
+        heading.Bounds = new Rectangle(110, 6, 520, 54);
         var subtitle = Label("Select a contract to edit or create a new one.",
             12, false, White);
         subtitle.Font = new Font("Segoe UI", 12f, FontStyle.Italic);
@@ -440,6 +559,7 @@ internal sealed class WorkerContractsEditor : UserControl
                 FillWeight = weight, SortMode = DataGridViewColumnSortMode.Automatic
             });
         }
+        _grid.CellPainting += PaintEmployerCell;
         _grid.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0) OpenSelected();
@@ -838,10 +958,13 @@ internal sealed class WorkerContractsEditor : UserControl
             using var line = new Pen(Cyan, 1);
             e.Graphics.DrawLine(line, 0, header.Height - 1,
                 header.Width, header.Height - 1);
+            HeaderIcon(e.Graphics, 12, 10, heading);
+            using var separator = new Pen(Cyan, 1.8f);
+            e.Graphics.DrawLine(separator, 46, 10, 46, 42);
         };
         var title = Label(heading, 13.5f, true);
         title.Dock = DockStyle.Fill;
-        title.Padding = new Padding(12, 0, 0, 0);
+        title.Padding = new Padding(54, 0, 0, 0);
         header.Controls.Add(title);
         var body = new Panel
         {
@@ -1030,9 +1153,12 @@ internal sealed class WorkerContractsEditor : UserControl
             using var pen = new Pen(Cyan);
             e.Graphics.DrawLine(pen, 0, header.Height - 1,
                 header.Width, header.Height - 1);
+            HeaderIcon(e.Graphics, 12, 10, "Roles");
+            using var separator = new Pen(Cyan, 1.8f);
+            e.Graphics.DrawLine(separator, 46, 10, 46, 42);
         };
         var title = Label("Roles", 13.5f, true);
-        title.Padding = new Padding(12, 0, 0, 0);
+        title.Padding = new Padding(54, 0, 0, 0);
         title.Dock = DockStyle.Fill;
         header.Controls.Add(title);
         var body = new FlowLayoutPanel
