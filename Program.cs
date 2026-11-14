@@ -694,7 +694,7 @@ internal static class Program
                 {
                     contractView.DrawToBitmap(snapshot,
                         new System.Drawing.Rectangle(0, 0, snapshot.Width, snapshot.Height));
-                    snapshot.Save(Path.Combine(root, "worker-contract-list-preview.png"));
+                    snapshot.Save(Path.Combine(Environment.CurrentDirectory, "worker-contract-list-preview.png"));
                 }
 
                 var editorMethod = typeof(ContractsWorkspaceView).GetMethod(
@@ -715,7 +715,7 @@ internal static class Program
                 {
                     contractView.DrawToBitmap(snapshot,
                         new System.Drawing.Rectangle(0, 0, snapshot.Width, snapshot.Height));
-                    snapshot.Save(Path.Combine(root, "worker-contract-editor-preview.png"));
+                    snapshot.Save(Path.Combine(Environment.CurrentDirectory, "worker-contract-editor-preview.png"));
                 }
             }
 
