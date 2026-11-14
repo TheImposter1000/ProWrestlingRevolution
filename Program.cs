@@ -494,8 +494,6 @@ internal static class Program
                     throw new Exception("Leaving Skills must retain the same PWR header.");
                 // The editor is a full-width directory. The name of the MDB is
                 // the central heading and the mass-edit dropdown stays beneath its button.
- The name of the MDB is the
-                // central heading, and the mass-edit dropdown sits beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
                     System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
