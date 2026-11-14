@@ -177,7 +177,10 @@ internal sealed class WorkerSkillsEditor : UserControl
             Name = "SkillsWorkspaceLayout",
             Dock = DockStyle.Fill,
             ColumnCount = 1, RowCount = 2,
-            Padding = new Padding(10, 8, 10, 9),
+            // Reference screenshot measures 1672x941 with a 56px shell
+            // header. Its body cards start at (29,82), and the action
+            // strip begins at y=813. Insets reproduce those proportions.
+            Padding = new Padding(19, 16, 39, 47),
             Margin = Padding.Empty,
             BackColor = Color.Transparent
         };
@@ -194,8 +197,8 @@ internal sealed class WorkerSkillsEditor : UserControl
         };
         panels.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         panels.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 48));
-        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 52));
+        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 46.55f));
+        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 53.45f));
 
         for (int i = 0; i < Groups.Count; i++)
             panels.Controls.Add(CreateGroup(Groups[i], i), i % 2, i / 2);
@@ -212,7 +215,8 @@ internal sealed class WorkerSkillsEditor : UserControl
             Name = "SkillPanel_" + group.Title.Replace(" ", "")
                 .Replace("/", "").Replace(",", "").Replace("&", ""),
             Dock = DockStyle.Fill,
-            Margin = new Padding(5, 5, 6, 6),
+            Margin = new Padding(10, groupIndex < 2 ? 10 : 6,
+                10, groupIndex < 2 ? 10 : 28),
             Padding = new Padding(3),
         };
 
@@ -249,7 +253,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             Margin = Padding.Empty,
-            Padding = new Padding(13, 6, 12, 5),
+            Padding = new Padding(13, 12, 12, 5),
             BackColor = SkillChrome.Ink,
             AutoScroll = true
         };
@@ -301,7 +305,7 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             Name = "WorkerSkillsActions", Footer = true,
             Dock = DockStyle.Fill,
-            Margin = new Padding(5, 8, 6, 2),
+            Margin = new Padding(10, 0, 10, 0),
             Padding = Padding.Empty
         };
         var presetLabel = new Label
@@ -356,6 +360,7 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 100
         };
+        footer.Disposed += (_, _) => tips.Dispose();
         tips.SetToolTip(balance,
             "Normalize the average of populated ratings to 50, keeping " +
             "relative differences and leaving unset skills untouched. " +
