@@ -70,6 +70,13 @@ jobs:
             throw "Published replacement template is not the uploaded MDB"
           }
 
+      - name: Run real packaged Windows EXE smoke tests
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "publish/ProWrestlingRevolution.exe").Path
+          $verify = Start-Process -FilePath $exe -ArgumentList "--smoke" -PassThru -Wait
+          if ($verify.ExitCode -ne 0) { throw "Standalone Windows EXE failed smoke tests: $($verify.ExitCode)" }
+
       - name: Inspect native PRW field types and sample values
         shell: pwsh
         run: |
