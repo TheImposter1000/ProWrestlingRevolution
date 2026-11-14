@@ -68,9 +68,14 @@ internal static class PrwRecordOperations
     {
         EnsureCategory(table);
         if (identifiers.Count == 0) throw new ArgumentException("Select records to copy.");
-        using var source = AccessDatabase.Open(targetFile, password);
-        CheckSchema(source);
-        var graphs = identifiers.Select(id => Capture(source, table, id)).ToArray();
+        Snapshot[] graphs;
+        using (var source = AccessDatabase.Open(targetFile, password))
+        {
+            CheckSchema(source);
+            graphs = identifiers.Select(id => Capture(source, table, id)).ToArray();
+        }
+        // Close the source connection before backing up and writing to the
+        // same MDB file, avoiding competing Jet file handles.
         return InsertGraphs(targetFile, table, graphs, true, password);
     }
 
