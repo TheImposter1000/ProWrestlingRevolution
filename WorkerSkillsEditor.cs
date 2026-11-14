@@ -109,6 +109,30 @@ internal sealed class WorkerSkillsEditor : UserControl
         Build();
     }
 
+    // The reference screen has an atmospheric navy arena glow in the
+    // negative space between the cards, rather than a flat black canvas.
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        var rect = ClientRectangle;
+        if (rect.Width < 2 || rect.Height < 2) return;
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using var baseLayer = new LinearGradientBrush(rect,
+            Color.FromArgb(6, 27, 51), Color.FromArgb(3, 17, 35),
+            LinearGradientMode.Vertical);
+        g.FillRectangle(baseLayer, rect);
+        using var path = new GraphicsPath();
+        path.AddEllipse(new Rectangle(
+            rect.Width / 3, -rect.Height / 2,
+            Math.Max(5, rect.Width), Math.Max(5, rect.Height)));
+        using var glow = new PathGradientBrush(path)
+        {
+            CenterColor = Color.FromArgb(47, 9, 85, 146),
+            SurroundColors = [Color.FromArgb(0, 9, 85, 146)]
+        };
+        g.FillPath(glow, path);
+    }
+
     private object GetStoredValue(string column)
     {
         if (_currentRow is null || !_currentRow.Table.Columns.Contains(column) ||
