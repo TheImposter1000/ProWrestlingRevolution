@@ -14,9 +14,9 @@
     <!-- Prefer a portable project-relative icon. Retain the existing local
          custom icon when building from its original installation directory. -->
 	  <ApplicationIcon>System\ProWrestlingRevolution-Final-AppIcon.ico</ApplicationIcon>
-    <Version>0.5.24</Version>
-    <AssemblyVersion>0.5.24.0</AssemblyVersion>
-    <FileVersion>0.5.24.0</FileVersion>
+    <Version>0.5.25</Version>
+    <AssemblyVersion>0.5.25.0</AssemblyVersion>
+    <FileVersion>0.5.25.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- The separate metadata MDB is generated before release/CI builds.
