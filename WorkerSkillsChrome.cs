@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
@@ -137,6 +138,7 @@ internal static class SkillChrome
 /// <summary>Deep, illuminated navy card with softened corners and cyan edges.</summary>
 internal sealed class SkillGlassPanel : Panel
 {
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal bool Footer { get; init; }
 
     internal SkillGlassPanel()
@@ -295,6 +297,7 @@ internal sealed class SkillGlassHeader : Control
 internal sealed class SkillGlowSlider : Control
 {
     internal event EventHandler? RatingChanged;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal int? Rating { get; private set; }
     private bool _dragging;
     private bool _hover;
@@ -606,7 +609,9 @@ internal sealed class SkillNumberSpinner : UserControl
 /// <summary>Bright, bevelled and icon-bearing controls for the footer.</summary>
 internal sealed class SkillChromeButton : Button
 {
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal string IconKind { get; }
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal bool Primary { get; }
     private bool _hover;
     private bool _pressed;
@@ -688,6 +693,7 @@ internal sealed class SkillChromeButton : Button
 internal sealed class SkillChromePreset : Control
 {
     internal event Action<string>? Selected;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal string Selection { get; private set; } = "None";
     private readonly ContextMenuStrip _menu = new();
     private readonly string[] _items;
