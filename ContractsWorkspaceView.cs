@@ -996,11 +996,15 @@ internal sealed class ContractsWorkspaceView : UserControl
     private sealed class ContractText : UserControl
     {
         internal TextBox Input { get; }
+        private readonly Label? _hint;
+        private readonly bool _searchIcon;
+
         internal ContractText(bool multiline, string placeholder)
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
             BackColor = Color.FromArgb(0, 21, 37);
+            _searchIcon = !multiline && placeholder.Length > 0;
             Input = new TextBox
             {
                 BorderStyle = BorderStyle.None,
@@ -1008,16 +1012,46 @@ internal sealed class ContractsWorkspaceView : UserControl
                 ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None,
                 Font = new Font("Segoe UI", multiline ? 10 : 11, FontStyle.Regular),
                 ForeColor = White, BackColor = Color.FromArgb(4, 27, 48),
-                PlaceholderText = placeholder
+                PlaceholderText = ""
             };
             Controls.Add(Input);
+            if (_searchIcon)
+            {
+                _hint = new Label
+                {
+                    Text = placeholder,
+                    Font = new Font("Segoe UI", 10.4f, FontStyle.Italic),
+                    ForeColor = Color.FromArgb(211, 223, 234),
+                    BackColor = Input.BackColor,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Cursor = Cursors.IBeam
+                };
+                Controls.Add(_hint);
+                _hint.BringToFront();
+                _hint.Click += (_, _) => Input.Focus();
+                Input.GotFocus += (_, _) => RefreshHint();
+                Input.LostFocus += (_, _) => RefreshHint();
+                Input.TextChanged += (_, _) => RefreshHint();
+            }
             Resize += (_, _) =>
             {
-                Input.Bounds = new Rectangle(10, multiline ? 7 : 4,
-                    Math.Max(1, Width - 20), Math.Max(1, Height - (multiline ? 11 : 7)));
+                int start = _searchIcon ? 45 : 10;
+                Input.Bounds = new Rectangle(start, multiline ? 7 : 4,
+                    Math.Max(1, Width - start - 10),
+                    Math.Max(1, Height - (multiline ? 11 : 7)));
+                if (_hint is not null)
+                    _hint.Bounds = new Rectangle(start, 4,
+                        Math.Max(1, Width - start - 11), Math.Max(1, Height - 8));
             };
             Input.TextChanged += (_, _) => Invalidate();
         }
+
+        private void RefreshHint()
+        {
+            if (_hint is not null)
+                _hint.Visible = Input.TextLength == 0 && !Input.Focused;
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var r = new Rectangle(1, 1, Math.Max(2, Width - 3),
@@ -1025,6 +1059,17 @@ internal sealed class ContractsWorkspaceView : UserControl
             FillGradient(e.Graphics, r, Color.FromArgb(18, 52, 83),
                 Color.FromArgb(1, 21, 40), 5);
             Stroke(e.Graphics, r, Color.FromArgb(139, 185, 225), 5, 1.2f);
+            if (_searchIcon)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var searchPen = new Pen(White, 2.2f)
+                {
+                    StartCap = LineCap.Round, EndCap = LineCap.Round
+                };
+                e.Graphics.DrawEllipse(searchPen, 16, Height / 2 - 10, 17, 17);
+                e.Graphics.DrawLine(searchPen, 29, Height / 2 + 4,
+                    36, Height / 2 + 11);
+            }
         }
     }
 
