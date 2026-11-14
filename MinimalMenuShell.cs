@@ -121,12 +121,23 @@ public sealed partial class LauncherForm
         var close = new TopUtilityButton("close", _skin);
         var utility = new[] { sound, help, minimize, close };
 
-        for (int i = 0; i < utility.Length; i++)
+        // Position the utility cluster against the actual header bounds,
+        // not the design-resolution width. This keeps the controls flush
+        // with the right edge after DPI/layout changes on interior pages.
+        void AlignHeaderUtilities()
         {
-            utility[i].Location = new Point(
-                SkinArt.WindowWidth - (utility.Length - i) * utility[i].Width, 0);
-            _topbar.Controls.Add(utility[i]);
+            int x = _topbar.ClientSize.Width;
+            for (int i = utility.Length - 1; i >= 0; i--)
+            {
+                utility[i].Height = _topbar.ClientSize.Height;
+                x -= utility[i].Width;
+                utility[i].Location = new Point(x, 0);
+            }
         }
+        foreach (var button in utility)
+            _topbar.Controls.Add(button);
+        _topbar.SizeChanged += (_, _) => AlignHeaderUtilities();
+        AlignHeaderUtilities();
 
         sound.SetSoundEnabled(_soundEnabled);
         sound.Click += (_, _) =>
