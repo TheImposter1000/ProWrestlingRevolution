@@ -5,6 +5,8 @@ import com.healthmarketscience.jackcess.Row;
 import com.healthmarketscience.jackcess.Table;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -16,7 +18,15 @@ public final class PrwDefaultInspector {
     public static void main(String[] args) throws Exception {
         if (args.length != 1)
             throw new IllegalArgumentException("Pass a path to PRWDefault.mdb.");
-        try (Database db = DatabaseBuilder.open(new File(args[0]))) {
+        Path input = Path.of(args[0]);
+        if (!Files.exists(input))
+        {
+            String root = System.getenv("GITHUB_WORKSPACE");
+            if (root != null) input = Path.of(root).resolve(args[0]);
+        }
+        if (!Files.exists(input))
+            throw new IllegalArgumentException("Native MDB not found: " + input);
+        try (Database db = DatabaseBuilder.open(input.toFile())) {
             check(db, "tblWorker", new String[] {
                 "Born", "SetToDebut", "DeathDate", "HeightInches",
                 "WeightPounds", "FaceGimmick", "HeelGimmick",
