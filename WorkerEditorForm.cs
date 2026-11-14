@@ -65,6 +65,8 @@ internal sealed class WorkerEditorForm : UserControl
     internal ContextMenuStrip? FieldMenuForSmoke => _fieldMenu;
 
     internal string? RequestedNavigation { get; private set; }
+    internal string ActiveSection => _active;
+    internal event Action<string>? SectionChanged;
     internal event EventHandler? CloseRequested;
 
     internal void Close()
