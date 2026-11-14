@@ -659,7 +659,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                 Name = "SkillLabel_" + field,
                 Text = label, UseMnemonic = false,
                 Dock = DockStyle.Fill, AutoEllipsis = true,
-                Font = new Font("Segoe UI", 11.75f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12.7f, FontStyle.Bold),
                 ForeColor = SkillChrome.White,
                 BackColor = Color.Transparent,
                 Margin = Padding.Empty,
