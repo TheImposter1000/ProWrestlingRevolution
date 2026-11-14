@@ -229,7 +229,7 @@ internal static class Program
                 newWorker["Name"] = "Regression Worker";
                 newWorker["ShortName"] = "Regression";
                 newWorker["Born"] = new DateTime(1997, 5, 12);
-                newWorker["CompetesVs"] = WorkerFieldRules.DivisionStorage[2];
+                newWorker["CompetesVs"] = "Both Divisions";
                 newWorker["LanguageEnglish"] = 3;
                 var draftSkills = draft.Sections.Single(section =>
                     section.Table == "tblWorkerSkills").Records.Rows[0];
@@ -262,7 +262,7 @@ internal static class Program
                     !Equals(savedSkills["Brawling"], 82) ||
                     !Equals(savedSkills["Charisma"], 76) ||
                     Convert.ToString(savedWorker["CompetesVs"]) !=
-                        WorkerFieldRules.DivisionStorage[2] ||
+                        "Both Divisions" ||
                     Convert.ToInt32(savedWorker["LanguageEnglish"]) != 3 ||
                     Convert.ToDateTime(savedWorker["Born"]).Date !=
                         new DateTime(1997, 5, 12))
@@ -440,49 +440,9 @@ internal static class Program
             }
 
             WorkerSkillsEditor.AssertSchemaMapping();
-            if (WorkerFieldRules.LanguageLevels.Length != 4 ||
-                WorkerFieldRules.Divisions.Length != 3 ||
-                WorkerFieldRules.IsManual("LanguageFrench", null) ||
-                !WorkerFieldRules.IsManual("Born", null) ||
-                !WorkerFieldRules.IsManual("FaceGimmick", null) ||
-                !WorkerFieldRules.IsManual("WeightPounds", null) ||
-                !WorkerFieldRules.IsManual("HeadCondition", null))
-                throw new Exception("Worker field classifications diverged from design rules.");
-
-            var categorical = new System.Data.DataTable("tblWorker");
-            categorical.Columns.Add("CompetesVs", typeof(string));
-            categorical.Columns.Add("LanguageEnglish", typeof(string));
-            var categoricalRow = categorical.Rows.Add("", "");
-            var divisions = PrwWorkerFieldOptions.Get(paths,
-                Path.Combine(root, "missing.mdb"), null,
-                categoricalRow, "CompetesVs");
-            var language = PrwWorkerFieldOptions.Get(paths,
-                Path.Combine(root, "missing.mdb"), null,
-                categoricalRow, "LanguageEnglish");
-            if (divisions.Select(x => x.Label)
-                    .SequenceEqual(WorkerFieldRules.Divisions) == false ||
-                divisions.Select(x => Convert.ToString(x.Value))
-                    .SequenceEqual(WorkerFieldRules.DivisionStorage) == false ||
-                language.Select(x => x.Label)
-                    .SequenceEqual(WorkerFieldRules.LanguageLevels) == false ||
-                divisions.Count != 3 || language.Count != 4)
-                throw new Exception(
-                    "Competing divisions and language proficiency must have exact fixed choices.");
-
-            var manualDates = new System.Data.DataTable("tblWorker");
-            manualDates.Columns.Add("Born", typeof(DateTime));
-            manualDates.Columns.Add("HeadCondition", typeof(int));
-            var datesRow = manualDates.Rows.Add(DBNull.Value, DBNull.Value);
-            if (!WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-11-14",
-                    out var parsedDate, out _) || parsedDate is not DateTime ||
-                WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-22-14",
-                    out _, out _) ||
-                WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "145",
-                    out _, out _) ||
-                !WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "72",
-                    out var parsedCondition, out _) || !Equals(parsedCondition, 72))
-                throw new Exception("Manual date/physical numeric validation failed.");
-
+            // v0.6.4 intentionally restores the complete v0.6.2 Worker
+            // General editor. The separate Skills screen is retained, but
+            // field types, labels and company lookups follow v0.6.2.
             // Verify the Worker Editor's fixed layout using in-memory worker data.
             // UI checks do not need a database provider.
             var workerTable = new System.Data.DataTable("tblWorker");
@@ -562,19 +522,19 @@ internal static class Program
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
                     throw new Exception("Worker Editor must not add an extra Back to Database button.");
-                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 0 ||
-                    workerEditor.Controls.Find("WorkerField_BiographyType", true).Length != 0)
-                    throw new Exception("BiographyType must not be mislabeled as Picture Type.");
+                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 1 ||
+                    workerEditor.Controls.Find("WorkerField_BiographyType", true).Length != 1)
+                    throw new Exception("Worker identity was not restored to v0.6.2.");
                 var expectedRoleLabels = new Dictionary<string, string>
                 {
                     ["RoleWrestler"] = "Wrestler",
-                    ["RolePartTimeWrestler"] = "Part-Time Wrestler",
+                    ["RolePartTimeWrestler"] = "Occasional Wrestler",
                     ["RoleManager"] = "Manager",
-                    ["RoleOnScreenPersonality"] = "On Screen Personality",
-                    ["RolePlayByPlay"] = "Play by Play Commentator",
+                    ["RoleOnScreenPersonality"] = "On-Screen Personality",
+                    ["RolePlayByPlay"] = "Play By Play",
                     ["RoleColour"] = "Colour Commentator",
                     ["RoleReferee"] = "Referee",
-                    ["RoleProducer"] = "Producer"
+                    ["RoleProducer"] = "Road Agent"
                 };
                 foreach (var (field, label) in expectedRoleLabels)
                     if (workerEditor.Controls.Find("WorkerField_" + field, true)
@@ -584,10 +544,10 @@ internal static class Program
                 if (workerEditor.Controls.Find("WorkerField_CompetesVs", true)
                         .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton ||
                     workerEditor.Controls.Find("WorkerField_Born", true)
-                        .SingleOrDefault() is not TextBox ||
+                        .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton ||
                     workerEditor.Controls.Find("WorkerField_FaceGimmick", true)
-                        .SingleOrDefault() is not TextBox)
-                    throw new Exception("Competing division and manual worker input types are incorrect.");
+                        .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton)
+                    throw new Exception("v0.6.2 Worker input controls were not restored.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
@@ -636,6 +596,57 @@ internal static class Program
                         again.BackColor == SystemColors.Control)
                         throw new Exception("Worker dropdown theme/lifetime regression.");
                 }
+
+                // Performance investigation: the old editor rebuilt and
+                // disposed each section every time the player clicked a tab.
+                // A profile now keeps each tab view once, even across dozens
+                // of navigation clicks. The cache belongs to one worker.
+                var switchSection = typeof(WorkerEditorForm).GetMethod(
+                    "ShowSection", System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)
+                    ?? throw new Exception("Missing Worker tab switch handler.");
+                var sectionsToProfile = new[]
+                {
+                    "Contracts", "Skills", "Popularity", "Attributes",
+                    "Business Skills", "Job History", "Business History",
+                    "Legacy", "Alter Ego", "General"
+                };
+                foreach (string section in sectionsToProfile)
+                {
+                    var started = System.Diagnostics.Stopwatch.StartNew();
+                    switchSection.Invoke(workerEditor, [section]);
+                    workerEditor.PerformLayout();
+                    Application.DoEvents();
+                    Console.WriteLine("Worker tab first visit: " + section + " = " +
+                        started.ElapsedMilliseconds + " ms");
+                }
+                int builtViews = workerEditor.SectionViewBuildCount;
+                if (workerEditor.CachedSectionCount != sectionsToProfile.Length)
+                    throw new Exception("Not every Worker tab was cached.");
+
+                foreach (string section in sectionsToProfile.Reverse())
+                {
+                    var started = System.Diagnostics.Stopwatch.StartNew();
+                    switchSection.Invoke(workerEditor, [section]);
+                    workerEditor.PerformLayout();
+                    Application.DoEvents();
+                    Console.WriteLine("Worker tab cached visit: " + section + " = " +
+                        started.ElapsedMilliseconds + " ms");
+                    if (started.ElapsedMilliseconds > 1500)
+                        throw new Exception(
+                            "Revisiting " + section + " still blocks the UI for over 1.5 seconds.");
+                }
+                if (workerEditor.SectionViewBuildCount != builtViews ||
+                    workerEditor.CachedSectionCount != sectionsToProfile.Length)
+                    throw new Exception("Worker tabs are still rebuilt on repeat navigation.");
+
+                // Cached views must be thrown away when the profile changes,
+                // or edits could affect the previous worker's DataRows.
+                workerEditor.LoadProfile(profile);
+                if (workerEditor.CachedSectionCount != 1 ||
+                    workerEditor.ActiveSection != "General")
+                    throw new Exception("Switching worker did not invalidate its cached tab views.");
+                Console.WriteLine("Worker tab cache lifecycle and performance passed.");
 
                 // Verify the new dedicated, database-bound Skills workspace
                 // without duplicating identity, biography or global navigation.
