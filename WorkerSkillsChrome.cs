@@ -150,6 +150,20 @@ internal sealed class SkillGlassPanel : Panel
         BackColor = SkillChrome.Ink;
     }
 
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        if (ClientSize.Width < 12 || ClientSize.Height < 12) return;
+        // The reference has genuinely rounded corners, not a square child
+        // header painted on top of an ornamental rounded border.
+        using var outline = SkillChrome.Rounded(
+            new RectangleF(1, 1, ClientSize.Width - 2, ClientSize.Height - 2),
+            Footer ? 9 : 10);
+        var previous = Region;
+        Region = new Region(outline);
+        previous?.Dispose();
+    }
+
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         var rect = ClientRectangle;
