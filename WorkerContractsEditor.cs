@@ -35,6 +35,7 @@ internal sealed class WorkerContractsEditor : UserControl
     private readonly HashSet<string> _invalidFields =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PrwContractEditorService.Company> _companies = [];
+    private readonly List<PrwContractEditorService.WorkerChoice> _workers = [];
     private readonly List<PrwContractEditorService.Template> _templates = [];
     private readonly Dictionary<string, Bitmap> _logoCache =
         new(StringComparer.OrdinalIgnoreCase);
@@ -113,12 +114,14 @@ internal sealed class WorkerContractsEditor : UserControl
             var lookup = await Task.Run(() =>
             {
                 var companies = PrwContractEditorService.LoadCompanies(file, _password);
+                var people = PrwContractEditorService.LoadWorkers(file, _password);
                 var templates = PrwContractEditorService.LoadTemplates(
                     file, _password, _profile.Identity.Uid);
-                return (companies, templates);
+                return (companies, people, templates);
             });
             if (IsDisposed || Disposing) return;
             _companies.AddRange(lookup.companies);
+            _workers.AddRange(lookup.people);
             _templates.AddRange(lookup.templates);
             // Populate each dropdown with distinct values from the active
             // MDB, not an unverified list of Total Extreme Wrestling codes.
@@ -785,7 +788,7 @@ internal sealed class WorkerContractsEditor : UserControl
             ("Competes In", "CompetesIn", "choice"),
             ("Brand", "Brands", "choice"),
             ("Division", "Divisions", "choice"),
-            ("Manager", "ManagerWorkerUID", "number"),
+            ("Manager", "ManagerWorkerUID", "manager"),
             ("Mask", "MaskRespect", "choice"),
             ("Move Set", "MoveSet", "choice"),
             ("Momentum", "Momentum", "choice"),
@@ -1041,6 +1044,34 @@ internal sealed class WorkerContractsEditor : UserControl
             return date;
         }
 
+        if (kind == "manager")
+        {
+            var select = new ComboBox
+            {
+                Name = "ContractField_" + field,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Medium, ForeColor = White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.3f),
+                Enabled = _databaseFile is not null
+            };
+            select.Items.Add("(None)");
+            foreach (var worker in _workers) select.Items.Add(worker);
+            int index = _workers.FindIndex(worker =>
+                Convert.ToString(worker.Uid, CultureInfo.InvariantCulture) ==
+                Value(row, field));
+            select.SelectedIndex = index < 0 ? 0 : index + 1;
+            select.SelectedIndexChanged += (_, _) =>
+            {
+                object value = select.SelectedItem is PrwContractEditorService.WorkerChoice person
+                    ? person.Uid
+                    : column.AllowDBNull ? DBNull.Value
+                    : Convert.ChangeType(0, column.DataType, CultureInfo.InvariantCulture);
+                Set(row, field, value);
+            };
+            return select;
+        }
+
         if (kind == "choice")
         {
             var combo = new ComboBox
@@ -1102,6 +1133,14 @@ internal sealed class WorkerContractsEditor : UserControl
             else if (column.DataType == typeof(DateTime))
             {
                 candidate = DateTime.Parse(text, CultureInfo.InvariantCulture);
+            }
+            else if (column.DataType == typeof(string) &&
+                     (field == "StartDate" || field == "ExpirationDate"))
+            {
+                if (!DateTime.TryParse(text, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsed))
+                    throw new FormatException("Enter a valid yyyy-MM-dd date.");
+                candidate = parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             }
             else if (column.DataType == typeof(string)) candidate = text;
             else candidate = Convert.ChangeType(text, column.DataType,
