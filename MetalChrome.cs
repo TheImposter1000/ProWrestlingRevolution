@@ -32,6 +32,15 @@ internal static class MetalColors
 internal sealed class MetalTopBar : Panel
 {
     private SkinPalette _palette;
+    private bool _skillsChrome;
+    internal bool SkillsChrome => _skillsChrome;
+
+    internal void SetSkillsChrome(bool enabled)
+    {
+        if (_skillsChrome == enabled) return;
+        _skillsChrome = enabled;
+        Invalidate(true);
+    }
 
     internal MetalTopBar(SkinPalette palette)
     {
@@ -51,6 +60,11 @@ internal sealed class MetalTopBar : Panel
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         if (Width < 1 || Height < 1) return;
+        if (_skillsChrome)
+        {
+            WorkerSkillsTopChrome.PaintBackdrop(e.Graphics, ClientRectangle);
+            return;
+        }
         using var metal = new LinearGradientBrush(ClientRectangle,
             MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 18, 34), 0.75),
             MetalColors.TopRight(_palette), LinearGradientMode.Horizontal);
@@ -70,6 +84,7 @@ internal sealed class MetalTopBar : Panel
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
+        if (_skillsChrome) return;  // No red logo or 40px divider beneath Skills plaque.
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -153,6 +168,15 @@ internal sealed class TopUtilityButton : Control
     private SkinPalette _palette;
     private bool _hovered;
     private bool _soundEnabled = true;
+    private bool _skillsChrome;
+
+    internal void SetSkillsChrome(bool enabled)
+    {
+        if (_skillsChrome == enabled) return;
+        _skillsChrome = enabled;
+        BackColor = enabled ? Color.Transparent : _palette.Surface;
+        Invalidate();
+    }
 
     internal TopUtilityButton(string kind, SkinPalette palette)
     {
@@ -171,7 +195,8 @@ internal sealed class TopUtilityButton : Control
             _ => kind
         };
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
-            ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable |
+            ControlStyles.SupportsTransparentBackColor, true);
     }
 
     internal void UpdatePalette(SkinPalette palette)
@@ -217,11 +242,16 @@ internal sealed class TopUtilityButton : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        using (var back = new LinearGradientBrush(ClientRectangle,
-            MetalColors.TopRight(_palette),
-            MetalColors.Mix(MetalColors.TopRight(_palette), Color.Black, 0.14),
-            LinearGradientMode.Vertical))
+        // Skills utility cells share the actual parent's backdrop rather
+        // than drawing four darker rectangular gradient tiles.
+        if (!_skillsChrome)
+        {
+            using var back = new LinearGradientBrush(ClientRectangle,
+                MetalColors.TopRight(_palette),
+                MetalColors.Mix(MetalColors.TopRight(_palette), Color.Black, 0.14),
+                LinearGradientMode.Vertical);
             g.FillRectangle(back, ClientRectangle);
+        }
 
         if (_hovered)
         {
@@ -232,7 +262,7 @@ internal sealed class TopUtilityButton : Control
         using var divider = new Pen(Color.FromArgb(75, 159, 179, 198));
         using var bottom = new Pen(Color.FromArgb(145, _palette.AccentSecondary));
         g.DrawLine(divider, 0, 7, 0, Height - 7);
-        g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
+        if (!_skillsChrome) g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
 
         // Utility glyphs are designed on a 40px artboard. The Skills
         // title is 56px high, so center the same glyphs without stretching
