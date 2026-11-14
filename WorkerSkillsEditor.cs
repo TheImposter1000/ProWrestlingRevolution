@@ -253,7 +253,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             Margin = Padding.Empty,
-            Padding = new Padding(13, 12, 12, 5),
+            Padding = new Padding(31, 12, 39, 5),
             BackColor = SkillChrome.Ink,
             AutoScroll = true
         };
@@ -325,6 +325,8 @@ internal sealed class WorkerSkillsEditor : UserControl
         { Enabled = _canEdit };
         _preset.Selected += ApplyPreset;
 
+        // A Dock=Fill status label would sit over the Preset controls.
+        _status.Dock = DockStyle.None;
         _status.AutoEllipsis = true;
         _status.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
         _status.ForeColor = Color.FromArgb(255, 179, 181);
