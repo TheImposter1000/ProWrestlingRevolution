@@ -11,80 +11,70 @@ public sealed partial class LauncherForm
 {
     private readonly Dictionary<string, SidebarMenuRow> _menuRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly Label _menuHeader = new();
-    private readonly Label _titleText = new();
-    private readonly Label _editorPageTitle = new();
-    private WorkerSkillsTopChrome? _skillsTopChrome;
-    private int _normalTopbarHeight;
+    private readonly PwrSharedHeader _pageHeader = new();
     internal bool SkillsImmersiveMode { get; private set; }
-    private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
     private readonly Font _navFontActive = new("Segoe UI", 10.5f, FontStyle.Bold);
 
     /// <summary>
-    /// Temporarily uses the dedicated PWR Skills title plaque while the worker
-    /// Skills view is active. The normal utility buttons remain untouched.
-    /// Restoring the worker profile or database restores the standard header.
+    /// There is one header for every interior page. Skills changes only the
+    /// contextual title and whether the launcher icon rail is hidden; the
+    /// logo, height, gradient, borders and utility buttons never change.
+    /// This public entry point is also used by the cached Worker overlay.
     /// </summary>
     internal void SetWorkerSectionChrome(string? section)
     {
-        bool skills = string.Equals(section, "Skills",
+        bool isWorker = !string.IsNullOrEmpty(section);
+        bool isSkills = string.Equals(section, "Skills",
             StringComparison.OrdinalIgnoreCase);
-        SkillsImmersiveMode = skills;
-        // Switch every title-bar surface together. Otherwise the Skills
-        // plaque and the utility cells are painted with different gradients
-        // and their bottom accents form a conspicuous break.
-        _topbar.SuspendLayout();
-        _topbar.SetSkillsChrome(skills);
-        foreach (var utility in _topbar.Controls.OfType<TopUtilityButton>())
-            utility.SetSkillsChrome(skills);
-        _topbar.ResumeLayout(true);
-        // Skills is a standalone full-width workspace in the approved design.
-        // The global launcher icon rail must not be visible behind the editor.
-        // Normal sections and the database directory restore it immediately.
-        _sidebar.Visible = !skills;
-        _titleText.Visible = !skills;
-        _versionText.Visible = !skills;
-        _editorPageTitle.Visible = false;
-
-        if (!skills)
+        SkillsImmersiveMode = isSkills;
+        _sidebar.Visible = _currentPage != "HOME" && !isSkills;
+        if (isWorker)
         {
-            if (_skillsTopChrome is not null && !_skillsTopChrome.IsDisposed)
-                _skillsTopChrome.Visible = false;
-            if (_normalTopbarHeight > 0 && _topbar.Height != _normalTopbarHeight)
-                _topbar.Height = _normalTopbarHeight;
-            return;
-        }
-
-        if (_normalTopbarHeight == 0)
-            _normalTopbarHeight = _topbar.Height;
-        if (_topbar.Height != 56)
-            _topbar.Height = 56;
-
-        if (_skillsTopChrome is null || _skillsTopChrome.IsDisposed)
-        {
-            _skillsTopChrome = new WorkerSkillsTopChrome
+            var title = section == "General" ? "Worker Editor" : section!;
+            var detail = section switch
             {
-                Margin = Padding.Empty, Visible = false, TabStop = false
+                "General" => "Edit Worker",
+                "Skills" => "Worker Skill Editor",
+                "Contracts" => "Worker Contracts",
+                "Popularity" => "Worker Popularity",
+                "Attributes" => "Worker Attributes",
+                "Business Skills" => "Worker Business Skills",
+                "Job History" => "Worker Job History",
+                "Business History" => "Worker Business History",
+                "Legacy" => "Worker Legacy",
+                "Alter Ego" => "Worker Alter Ego",
+                _ => "Worker Editor"
             };
-            _skillsTopChrome.MouseDown += DragWindow;
-            _topbar.Controls.Add(_skillsTopChrome);
-            _topbar.SizeChanged += (_, _) => PositionSkillChrome();
+            _pageHeader.SetPage(title, detail);
         }
-        PositionSkillChrome();
-        _skillsTopChrome.Visible = true;
-        _skillsTopChrome.BringToFront();
-        foreach (var utility in _topbar.Controls.OfType<TopUtilityButton>())
-            utility.BringToFront();
+        else UpdatePageHeader();
     }
 
-    private void PositionSkillChrome()
+    private void UpdatePageHeader()
     {
-        if (_skillsTopChrome is null || _skillsTopChrome.IsDisposed) return;
+        var (title, detail) = _currentPage switch
+        {
+            "DATABASE EDITOR" => ("Database Editor", "Database Management"),
+            "DATABASE SELECTOR" => ("Database Selector", "Select Universe"),
+            "NEW GAME" => ("New Game", "Create Career"),
+            "LOAD GAME" => ("Load Game", "Continue Career"),
+            "SKINS" => ("Skins", "Customize Appearance"),
+            "ACHIEVEMENTS" => ("Achievements", "Career Milestones"),
+            "CREDITS" => ("Credits", "About PWR"),
+            _ => ("Pro Wrestling Revolution", "")
+        };
+        _pageHeader.SetPage(title, detail);
+    }
+
+    private void PositionPageHeader()
+    {
+        if (_pageHeader.IsDisposed) return;
         int edge = _topbar.Controls.OfType<TopUtilityButton>()
-            .Select(button => button.Left).DefaultIfEmpty(
-                _topbar.ClientSize.Width - 200).Min();
-        _skillsTopChrome.Bounds = new Rectangle(0, 0,
+            .Select(button => button.Left)
+            .DefaultIfEmpty(_topbar.ClientSize.Width - 200).Min();
+        _pageHeader.Bounds = new Rectangle(0, 0,
             Math.Max(0, edge), _topbar.ClientSize.Height);
     }
 
@@ -151,39 +141,12 @@ public sealed partial class LauncherForm
         navTooltips.SetToolTip(_updateButton, "Check for Updates");
         _updateButton.BringToFront();
 
-        // Brushed-metal chrome replaces the separate raster button strip.
-        // Every utility button is clickable, keyboard-accessible and has a tooltip name.
-        _titleText.Text = "PRO WRESTLING REVOLUTION";
-        _titleText.Location = new Point(56, 0);
-        _titleText.Size = new Size(250, _topbar.Height - 1);
-        _titleText.TextAlign = ContentAlignment.MiddleLeft;
-        _titleText.BackColor = Color.Transparent;
-        _titleText.ForeColor = _skin.Foreground;
-        _titleText.Font = new Font("Segoe UI", 11.5f, FontStyle.Bold);
-
-        _versionText.Text = "v" + GameUpdate.DisplayVersion;
-        _versionText.Location = new Point(326, 0);
-        _versionText.Size = new Size(75, _topbar.Height - 1);
-        _versionText.TextAlign = ContentAlignment.MiddleLeft;
-        _versionText.BackColor = Color.Transparent;
-        _versionText.ForeColor = _skin.Muted;
-        _versionText.Font = new Font("Segoe UI", 9.5f);
-
-        _editorPageTitle.Text = "DATABASE EDITOR";
-        _editorPageTitle.Location = new Point(452, 0);
-        _editorPageTitle.Size = new Size(275, _topbar.Height - 1);
-        _editorPageTitle.TextAlign = ContentAlignment.MiddleLeft;
-        _editorPageTitle.BackColor = Color.Transparent;
-        _editorPageTitle.ForeColor = _skin.Foreground;
-        _editorPageTitle.Font = new Font("Segoe UI", 13, FontStyle.Bold | FontStyle.Italic);
-        _editorPageTitle.Visible = false;
-
-        _topbar.Controls.Add(_titleText);
-        _topbar.Controls.Add(_versionText);
-        _topbar.Controls.Add(_editorPageTitle);
+        // One persistent reference-style header; unlike the former Skills
+        // special case, this is reused by every interior page.
+        _topbar.Controls.Add(_pageHeader);
         _topbar.MouseDown += DragWindow;
-        _titleText.MouseDown += DragWindow;
-        _versionText.MouseDown += DragWindow;
+        _pageHeader.MouseDown += DragWindow;
+        UpdatePageHeader();
 
         var sound = new TopUtilityButton("sound", _skin);
         var help = new TopUtilityButton("help", _skin);
@@ -206,8 +169,15 @@ public sealed partial class LauncherForm
         }
         foreach (var button in utility)
             _topbar.Controls.Add(button);
-        _topbar.SizeChanged += (_, _) => AlignHeaderUtilities();
+        _topbar.SizeChanged += (_, _) =>
+        {
+            AlignHeaderUtilities();
+            PositionPageHeader();
+        };
         AlignHeaderUtilities();
+        PositionPageHeader();
+        _pageHeader.BringToFront();
+        foreach (var utilityButton in utility) utilityButton.BringToFront();
 
         sound.SetSoundEnabled(_soundEnabled);
         sound.Click += (_, _) =>
@@ -311,8 +281,8 @@ public sealed partial class LauncherForm
 
     private void ShowHome()
     {
-        SetWorkerSectionChrome(null);
         _currentPage = "HOME";
+        SetWorkerSectionChrome(null);
         _hoverIcon = null;
         RenderSidebar();
 
@@ -321,7 +291,6 @@ public sealed partial class LauncherForm
         SuspendLayout();
         _sidebar.Visible = false;
         _topbar.Visible = false;
-        _editorPageTitle.Visible = false;
         ClearPageContent();
 
         var title = new TitleScreenView
@@ -423,9 +392,6 @@ public sealed partial class LauncherForm
         foreach (var button in _topbar.Controls.OfType<TopUtilityButton>())
             button.UpdatePalette(_skin);
         _page.BackColor = _skin.Background;
-        _titleText.ForeColor = _skin.Foreground;
-        _editorPageTitle.ForeColor = _skin.Foreground;
-        _versionText.ForeColor = _skin.Muted;
         RenderSidebar();
     }
 }
