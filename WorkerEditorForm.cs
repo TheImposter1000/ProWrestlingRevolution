@@ -738,6 +738,13 @@ internal sealed class WorkerEditorForm : UserControl
         // navigating between worker profiles.
         page.HandleCreated += (_, _) =>
             _ = RestoreBackgroundAsync(page, backgroundPath);
+        page.SizeChanged += (_, _) =>
+        {
+            if (page.IsHandleCreated && page.ClientSize.Width > 10 &&
+                page.ClientSize.Height > 10 &&
+                page.BackgroundImage?.Size != page.ClientSize)
+                _ = RestoreBackgroundAsync(page, backgroundPath);
+        };
 
         _workerPage = page;
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
@@ -2082,11 +2089,16 @@ else
             string fallback = Path.Combine(_paths.SkinsRoot,
                 "Obsidian", "Backgrounds", "Worker_Editor.jpg");
             string source = File.Exists(preferredFile) ? preferredFile : fallback;
-            Bitmap? art = await WorkerBackgroundCache.GetAsync(source);
+            Size target = page.ClientSize;
+            if (target.Width < 10 || target.Height < 10) return;
+            Bitmap? art = await WorkerBackgroundCache.GetPreparedAsync(source, target);
             if (IsDisposed || Disposing || page.IsDisposed || !page.IsHandleCreated ||
-                art is null)
+                art is null || page.ClientSize != target)
                 return;
-            page.BackgroundImageLayout = ImageLayout.Stretch;
+            // The prepared bitmap is already exactly the page size.
+            // Tile does a 1:1 copy instead of repeatedly stretching JPG
+            // artwork through every nested transparent WinForms control.
+            page.BackgroundImageLayout = ImageLayout.Tile;
             page.BackgroundImage = art;
             page.Invalidate(true);
             PwrPerformanceLog.Record("Paint.PrepareBackdrop", stopwatch);
