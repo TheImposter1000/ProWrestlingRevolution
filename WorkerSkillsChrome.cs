@@ -171,18 +171,22 @@ internal sealed class SkillGlassPanel : Panel
         };
         e.Graphics.FillPath(background, path);
 
-        // A subtle sheen that does not compete with the field labels.
+        // Reference: metallic navy with a soft reflected cyan highlight.
+        // Keep the glow restrained at the field level and vivid at the rim.
         var shine = new Rectangle(3, 3, rect.Width - 6,
-            Math.Max(3, rect.Height / (Footer ? 3 : 5)));
-        using var gleam = new LinearGradientBrush(shine,
-            Color.FromArgb(34, 44, 120, 178),
-            Color.FromArgb(0, 44, 120, 178), LinearGradientMode.Vertical);
-        e.Graphics.FillRectangle(gleam, shine);
+            Math.Max(3, rect.Height / (Footer ? 3 : 4)));
+        using (var gleam = new LinearGradientBrush(shine,
+            Color.FromArgb(55, 37, 120, 186),
+            Color.FromArgb(0, 18, 63, 116), LinearGradientMode.Vertical))
+            e.Graphics.FillRectangle(gleam, shine);
 
-        using var glow = new Pen(Color.FromArgb(37, 0, 214, 255), 4f);
-        using var edge = new Pen(SkillChrome.Edge, 1.25f);
-        e.Graphics.DrawPath(glow, path);
-        e.Graphics.DrawPath(edge, path);
+        using (var highlight = new Pen(Color.FromArgb(65, 0, 220, 255), 5f))
+            e.Graphics.DrawPath(highlight, path);
+        using (var edge = new Pen(SkillChrome.Edge, 1.65f))
+            e.Graphics.DrawPath(edge, path);
+        // A very fine inner bevel keeps the panel border dimensional.
+        using (var innerLine = new Pen(Color.FromArgb(68, 150, 225, 255), 1f))
+            e.Graphics.DrawLine(innerLine, 12, 4, rect.Right - 12, 4);
         if (Footer)
         {
             using var topLine = new Pen(Color.FromArgb(130, 85, 229, 255), 1f);
@@ -219,8 +223,15 @@ internal sealed class SkillGlassHeader : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         SkillChrome.FillGradient(g, rect,
-            Color.FromArgb(31, 106, 165), Color.FromArgb(7, 35, 67));
-        using (var facet = new SolidBrush(Color.FromArgb(72, 20, 76, 134)))
+            Color.FromArgb(36, 118, 185), Color.FromArgb(5, 33, 67));
+        // Top-half brushed-blue specular reflection, followed by a sharper
+        // diagonal steel facet as shown in the approved mockup.
+        using (var glint = new LinearGradientBrush(
+            new Rectangle(0, 0, rect.Width, Math.Max(2, rect.Height / 2)),
+            Color.FromArgb(70, 51, 151, 218),
+            Color.FromArgb(0, 18, 61, 122), LinearGradientMode.Vertical))
+            g.FillRectangle(glint, 0, 0, rect.Width, rect.Height / 2);
+        using (var facet = new SolidBrush(Color.FromArgb(92, 20, 76, 134)))
         {
             g.FillPolygon(facet, [new Point(rect.Width * 63 / 100, 0),
                 new Point(rect.Width * 86 / 100, 0),
@@ -244,49 +255,71 @@ internal sealed class SkillGlassHeader : Control
         int iconSize = Math.Clamp(rect.Height - 10, 35, 53);
         SkillChrome.DrawIcon(g, _icon,
             new Rectangle(23, (rect.Height - iconSize) / 2, iconSize, iconSize),
-            Color.FromArgb(232, 244, 255));
-        int left = iconSize + 54;
-        bool crowded = _heading.Length > 27 && rect.Width < 750;
-        float titleSize = crowded ? 13.0f :
-            rect.Width >= 750 ? 18.0f : 15.2f;
-        using var titleFont = new Font("Segoe UI", titleSize, FontStyle.Bold);
-        using var subtitleFont = new Font("Segoe UI",
-            rect.Width >= 750 ? 10.7f : 8.9f, FontStyle.Italic);
-        Size titleSizePx = TextRenderer.MeasureText(g, _heading, titleFont,
-            new Size(2000, 100), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-        int titleWidth = Math.Min(rect.Width - left - 14, titleSizePx.Width + 5);
-        int dividerX = left + titleWidth + 12;
-        int subtitleLeft = dividerX + 19;
-        int remaining = rect.Width - subtitleLeft - 12;
+            Color.FromArgb(239, 249, 255));
 
-        if (remaining >= 135 && !crowded)
+        // The target has a deliberate gap between the heading and cyan
+        // divider, rather than letting Windows measure the gap implicitly.
+        // Each of the four headings has a different visual width.
+        int left = iconSize + 45;
+        bool longHeading = _icon == "clipboard";
+        float headingSize = longHeading
+            ? (rect.Width >= 730 ? 15.5f : 13.4f)
+            : rect.Width >= 720 ? 18.7f : 15.7f;
+        using var titleFont = new Font(
+            longHeading ? "Arial Narrow" : "Segoe UI",
+            headingSize, FontStyle.Bold);
+        using var subtitleFont = new Font("Segoe UI",
+            rect.Width >= 730 ? 10.9f : 9f, FontStyle.Italic);
+        Size measured = TextRenderer.MeasureText(g, _heading, titleFont,
+            new Size(1800, rect.Height), TextFormatFlags.NoPadding |
+            TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        int preferredGap = _icon switch
         {
-            var titleBox = new Rectangle(left, 1, titleWidth, rect.Height - 2);
-            TextRenderer.DrawText(g, _heading, titleFont, titleBox,
+            "ring" => 30,
+            "microphone" => 31,
+            "physical" => 48,
+            _ => 10
+        };
+        int maximumTitleWidth = rect.Width - left -
+            (longHeading ? 215 : 135);
+        bool fits = measured.Width <= maximumTitleWidth;
+        int titleWidth = Math.Min(measured.Width + 4,
+            Math.Max(50, maximumTitleWidth));
+        int dividerX = left + titleWidth + preferredGap;
+        int subtitleLeft = dividerX + 22;
+        int subtitleWidth = rect.Width - subtitleLeft - 13;
+        bool sideBySide = fits && subtitleWidth >=
+            (longHeading ? 155 : 120);
+
+        if (sideBySide)
+        {
+            TextRenderer.DrawText(g, _heading, titleFont,
+                new Rectangle(left, 1, titleWidth, rect.Height - 2),
                 SkillChrome.White, TextFormatFlags.VerticalCenter |
                 TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
             using var split = new Pen(SkillChrome.Cyan, 2f);
             g.DrawLine(split, dividerX, rect.Height / 4,
                 dividerX, rect.Height * 3 / 4);
-            var descBox = new Rectangle(subtitleLeft, 1,
-                Math.Max(10, remaining), rect.Height - 2);
-            TextRenderer.DrawText(g, _description, subtitleFont, descBox,
+            TextRenderer.DrawText(g, _description, subtitleFont,
+                new Rectangle(subtitleLeft, 1, subtitleWidth, rect.Height - 2),
                 SkillChrome.Muted, TextFormatFlags.VerticalCenter |
                 TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
         }
         else
         {
-            var titleBox = new Rectangle(left, 2, rect.Width - left - 8,
-                Math.Max(17, rect.Height / 2));
-            TextRenderer.DrawText(g, _heading, titleFont, titleBox,
+            // Narrow windows keep the complete heading and description,
+            // rather than drawing a divider through a clipped title.
+            TextRenderer.DrawText(g, _heading, titleFont,
+                new Rectangle(left, 2, rect.Width - left - 8,
+                    Math.Max(17, rect.Height / 2)),
                 SkillChrome.White, TextFormatFlags.VerticalCenter |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             using var split = new Pen(SkillChrome.Cyan, 1.6f);
-            g.DrawLine(split, left, rect.Height / 2 + 4,
-                left + 15, rect.Height / 2 + 4);
-            var descBox = new Rectangle(left + 23, rect.Height / 2 - 1,
-                rect.Width - left - 30, rect.Height / 2);
-            TextRenderer.DrawText(g, _description, subtitleFont, descBox,
+            g.DrawLine(split, left, rect.Height / 2 + 3,
+                left + 15, rect.Height / 2 + 3);
+            TextRenderer.DrawText(g, _description, subtitleFont,
+                new Rectangle(left + 23, rect.Height / 2 - 1,
+                    rect.Width - left - 30, rect.Height / 2),
                 SkillChrome.Muted, TextFormatFlags.VerticalCenter |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
@@ -401,9 +434,9 @@ internal sealed class SkillGlowSlider : Control
         int cy = Height / 2;
         float left = 12f;
         float width = Width - 24f;
-        var track = new RectangleF(left, cy - 3.5f, width, 7f);
+        var track = new RectangleF(left, cy - 4f, width, 8f);
         using (var shadow = SkillChrome.Rounded(
-            new RectangleF(left - 1, cy - 5, width + 2, 10), 4))
+            new RectangleF(left - 1, cy - 6, width + 2, 12), 5))
         using (var shadowBrush = new SolidBrush(Color.FromArgb(42, 0, 118, 196)))
             g.FillPath(shadowBrush, shadow);
 
@@ -422,7 +455,7 @@ internal sealed class SkillGlowSlider : Control
         if (Rating.HasValue && Rating.Value > 0)
         {
             float length = Math.Max(1, thumbX - left);
-            var fill = new RectangleF(left, cy - 3.2f, length, 6.4f);
+            var fill = new RectangleF(left, cy - 3.7f, length, 7.4f);
             using var aura = new Pen(Color.FromArgb(55, 0, 217, 255), 13f)
             { StartCap = LineCap.Round, EndCap = LineCap.Round };
             g.DrawLine(aura, left + 3, cy, thumbX, cy);
@@ -438,7 +471,7 @@ internal sealed class SkillGlowSlider : Control
             g.DrawLine(highlight, left + 3, cy - 2, thumbX, cy - 2);
         }
 
-        float radius = Rating.HasValue ? _hover || Focused ? 9.5f : 8f : 6.4f;
+        float radius = Rating.HasValue ? _hover || Focused ? 10f : 8.7f : 7f;
         var glowRect = new RectangleF(thumbX - radius - 3, cy - radius - 3,
             (radius + 3) * 2, (radius + 3) * 2);
         using (var glow = new SolidBrush(Color.FromArgb(68, 0, 217, 255)))
@@ -480,7 +513,7 @@ internal sealed class SkillNumberSpinner : UserControl
             TextAlign = HorizontalAlignment.Center,
             ForeColor = Color.White,
             BackColor = Color.FromArgb(12, 34, 59),
-            Font = new Font("Segoe UI", 11.8f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 12.1f, FontStyle.Bold),
             TabStop = canEdit, ReadOnly = !canEdit
         };
         Controls.Add(_editor);
