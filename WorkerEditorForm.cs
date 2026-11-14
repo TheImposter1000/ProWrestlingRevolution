@@ -1977,9 +1977,26 @@ else
     private void SetWorkerValue(string field, string text)
     {
         var row = First("tblWorker");
-        if (row is null) return;
-        row[field] = text;
-        foreach (var control in Controls.Find("WorkerField_" + field, true).OfType<WorkerValue>())
+        if (row is null || !row.Table.Columns.Contains(field)) return;
+        var column = row.Table.Columns[field]!;
+        try
+        {
+            object value = column.DataType == typeof(string)
+                ? text
+                : Convert.ChangeType(text, column.DataType, CultureInfo.InvariantCulture);
+            row[field] = value;
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException
+                                   or InvalidCastException or ArgumentException)
+        {
+            MessageBox.Show(FindForm(),
+                "The field " + field + " expects a value of type " +
+                column.DataType.Name + ". No changes were made.",
+                "Invalid Worker Field", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        foreach (var control in Controls.Find("WorkerField_" + field, true)
+                     .OfType<WorkerValue>())
         {
             control.Text = Display(row, field);
             control.Invalidate();
