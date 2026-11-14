@@ -31,7 +31,9 @@ internal static class Program
             ApplicationConfiguration.Initialize();
             var paths = new AppPaths(FindGameRoot());
             paths.EnsureLayout();
-            Application.Run(new LauncherForm(paths));
+            var launcher = new LauncherForm(paths);
+            launcher.EnableAutomaticReleaseUpdates();
+            Application.Run(launcher);
             return 0;
         }
         catch (Exception e)
