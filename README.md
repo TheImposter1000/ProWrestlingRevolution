@@ -1,5 +1,15 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.2: Worker Editor stability and visual update
+
+The Worker Editor dropdown crash caused by disposing a WinForms `ContextMenuStrip` during its `Closed` event has been fixed. Field menus now reuse a live popup with the PWR dark-navy, cyan-outlined theme, and selected choices are applied after the popup interaction finishes. No worker data or existing database field choices have been replaced.
+
+The Worker Editor background has been restored with asynchronous, cached decoding so opening additional worker profiles does not reread or rescale the same image. Built-in skins generate an original `Backgrounds/Worker_Editor.jpg` only if it does not already exist. Custom skins may supply their own artwork at the same path; otherwise PWR falls back to the bundled Obsidian Worker Editor background.
+
+The Picture Type field is now grouped with the portrait, related labels align more closely with the visual reference, and an unused portrait bitmap copy has been removed. Generic startup exceptions no longer report an unrelated protected-folder warning; actual filesystem and permission errors still show it.
+
+Automated Windows checks verify background generation and caching, themed menu reuse, layout structure, and the existing editor smoke tests. As before, transaction-based worker saving still requires manual validation against a real Access MDB when Microsoft ACE OLE DB is available.
+
 ## Version 0.6.1: streamlined Worker Editor workflow
 
 When **Workers** is selected in the Database Editor, **Add New Item** opens the same full-screen Worker Editor used for existing profiles. The profile is initially unsaved and creates a worker and its standard one-to-one detail rows only when Save succeeds.

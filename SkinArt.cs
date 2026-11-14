@@ -73,6 +73,10 @@ public static class SkinArt
             g => DrawMain(g, name, palette));
         Generate(PathFor("Backgrounds"), "General.jpg", MainWidth, MainHeight,
             g => DrawBackdrop(g, MainWidth, MainHeight, "PRO WRESTLING REVOLUTION", palette));
+        // Original PWR Worker Editor artwork. Created only when missing, so
+        // user-supplied backgrounds in custom skins remain untouched.
+        Generate(PathFor("Backgrounds"), "Worker_Editor.jpg", WindowWidth, WindowHeight,
+            g => DrawWorkerEditorBackdrop(g, WindowWidth, WindowHeight, palette));
         Generate(PathFor("SideBars"), "Title_Screen.jpg", SidebarWidth, SidebarHeight,
             g => DrawSidebar(g, palette, false, null));
         Generate(PathFor("SideBars"), "Title_Screen_Alt.jpg", SidebarWidth, SidebarHeight,
@@ -174,6 +178,81 @@ public static class SkinArt
         using var brush = new SolidBrush(c.AccentLight);
         using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         g.DrawString(caption, font, brush, new RectangleF(10, 0, width - 20, height), sf);
+    }
+
+    /// <summary>
+    /// Quiet arena-inspired blue steel backdrop for the Worker Editor. All
+    /// imagery is original vector geometry; no screenshot files are copied.
+    /// The highest contrast stays in the chrome, while data areas remain legible.
+    /// </summary>
+    private static void DrawWorkerEditorBackdrop(Graphics g, int width, int height, Colors c)
+    {
+        var frame = new Rectangle(0, 0, width, height);
+        using (var background = new LinearGradientBrush(frame,
+            Color.FromArgb(6, 16, 32), Color.FromArgb(15, 36, 62),
+            LinearGradientMode.ForwardDiagonal))
+        {
+            background.InterpolationColors = new ColorBlend
+            {
+                Colors =
+                [
+                    Color.FromArgb(6, 16, 32),
+                    Color.FromArgb(13, 31, 54),
+                    Color.FromArgb(7, 17, 32)
+                ],
+                Positions = [0f, 0.53f, 1f]
+            };
+            g.FillRectangle(background, frame);
+        }
+
+        // Subtle pools of cyan arena light, well below field contrast.
+        foreach (var (x, y, w, h, alpha) in new[]
+        {
+            (width / 2, -height / 2, width, height, 45),
+            (-width / 3, height / 4, width, height, 28),
+            (width / 2, height / 3, width, height, 27)
+        })
+        {
+            using var shape = new GraphicsPath();
+            shape.AddEllipse(x, y, w, h);
+            using var glow = new PathGradientBrush(shape)
+            {
+                CenterColor = Color.FromArgb(alpha, c.Accent),
+                SurroundColors = [Color.FromArgb(0, c.Accent)]
+            };
+            g.FillPath(glow, shape);
+        }
+
+        using (var facet = new SolidBrush(Color.FromArgb(19, c.Accent)))
+        {
+            g.FillPolygon(facet,
+            [
+                new Point(width * 3 / 5, 0),
+                new Point(width, 0),
+                new Point(width * 2 / 3, height)
+            ]);
+        }
+        using (var inset = new SolidBrush(Color.FromArgb(30, 3, 11, 24)))
+        {
+            g.FillPolygon(inset,
+            [
+                new Point(0, height * 2 / 3),
+                new Point(width * 3 / 5, height),
+                new Point(0, height)
+            ]);
+        }
+
+        using var edge = new Pen(Color.FromArgb(34, c.AccentLight), 1.5f);
+        using var dark = new Pen(Color.FromArgb(21, 92, 125, 153), 1f);
+        for (int i = 0; i < 7; i++)
+        {
+            int offset = i * 38;
+            g.DrawLine(i % 2 == 0 ? edge : dark,
+                width - 350 + offset, 0, width - 800 + offset, height);
+        }
+        using var horizon = new Pen(Color.FromArgb(32, c.Accent), 1);
+        for (int y = height / 2; y < height; y += 78)
+            g.DrawLine(horizon, 0, y, width, y - 45);
     }
 
     private static void Generate(string folder, string name, int width, int height, Action<Graphics> action)

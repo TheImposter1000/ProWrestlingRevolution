@@ -51,6 +51,8 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly Panel _mainArea = new() { Name = "WorkerGeneralCanvas", BackColor = Color.Transparent };
     private readonly Panel _actionArea = new() { Name = "WorkerActionArea", BackColor = Color.Transparent };
     private TableLayoutPanel? _identityBiography;
+    private ContextMenuStrip? _fieldMenu;
+    internal ContextMenuStrip? FieldMenuForSmoke => _fieldMenu;
 
     internal string? RequestedNavigation { get; private set; }
     internal event EventHandler? CloseRequested;
@@ -118,6 +120,7 @@ internal sealed class WorkerEditorForm : UserControl
             $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
         Disposed += (_, _) =>
         {
+            _fieldMenu?.Dispose();
             _tips.Dispose();
             _railNormal.Dispose();
             _railActive.Dispose();
@@ -687,9 +690,11 @@ internal sealed class WorkerEditorForm : UserControl
             BackColor = Ink
         };
         string backgroundPath = _palette.Asset(
-    Path.Combine("Backgrounds", "Worker_Editor.jpg"));
-
-        // Background image temporarily disabled for performance testing.
+            Path.Combine("Backgrounds", "Worker_Editor.jpg"));
+        // Decompress once off the UI thread, then reuse a scaled bitmap when
+        // navigating between worker profiles.
+        page.HandleCreated += (_, _) =>
+            _ = RestoreBackgroundAsync(page, backgroundPath);
 
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -818,7 +823,6 @@ internal sealed class WorkerEditorForm : UserControl
         _mainArea.Controls.Add(_content);
         _mainArea.Paint += (_, e) =>
         {
-            if (page.BackgroundImage != null) return;
             if (page.BackgroundImage is not Image artwork ||
             page.ClientSize.Width <= 0 ||
                 page.ClientSize.Height <= 0 ||
@@ -979,6 +983,26 @@ internal sealed class WorkerEditorForm : UserControl
             SizeMode = PictureBoxSizeMode.Zoom
         };
         card.Controls.Add(portrait);
+
+        // Picture Type belongs alongside the portrait, not in the
+        // biography panel. This matches the reference editor grouping.
+        var pictureTypeLabel = new Label
+        {
+            Name = "WorkerPictureTypeLabel",
+            Text = "Picture Type",
+            Location = new Point(205, 62),
+            Size = new Size(138, 20),
+            ForeColor = Color.White, BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 8.8f, FontStyle.Bold)
+        };
+        var pictureType = ValueBox(Display(worker, "BiographyType"),
+            "WorkerField_BiographyType", true);
+        pictureType.Dock = DockStyle.None;
+        pictureType.Location = new Point(205, 85);
+        pictureType.Size = new Size(132, 23);
+        Bind(pictureType, worker, "BiographyType");
+        card.Controls.Add(pictureTypeLabel);
+        card.Controls.Add(pictureType);
         string picture = Display(worker, "Picture");
         string safeName = Path.GetFileName(picture);
 
@@ -1022,7 +1046,7 @@ internal sealed class WorkerEditorForm : UserControl
                 {
                     using var stream = File.OpenRead(file);
                     using var image = Image.FromStream(stream);
-                    using var fullImage = new Bitmap(image);
+                    // Only one detached bitmap is needed for each portrait.
                     portrait.Image = new Bitmap(image);
                 }
                 catch (Exception ex) when (
@@ -1051,7 +1075,8 @@ internal sealed class WorkerEditorForm : UserControl
             int valueWidth = Math.Max(100, card.ClientSize.Width - 107);
             first.Width = valueWidth;
             second.Width = valueWidth;
-
+            pictureType.Width = Math.Max(80,
+                card.ClientSize.Width - pictureType.Left - 7);
         };
     }
 
@@ -1175,16 +1200,6 @@ internal sealed class WorkerEditorForm : UserControl
         };
 
 
-        var biographyType = ValueBox(
-    Display(First("tblWorker"), "BiographyType"),
-    "WorkerField_BiographyType", true);
-
-        biographyType.Dock = DockStyle.None;
-        biographyType.Location = new Point(5, 36);
-        biographyType.Size = new Size(79, 22);
-        Bind(biographyType, First("tblWorker"), "BiographyType");
-
-        card.Controls.Add(biographyType);
         card.Resize += (_, _) =>
         {
             bioFrame.Width = Math.Max(100, card.ClientSize.Width - bioFrame.Left - 6);
@@ -1523,9 +1538,9 @@ else
         MakeRows(settings, [
             ("Move Set", "DefaultMoveSet"),
             ("Face Gimmick", "FaceGimmick"),
-            ("Face Basis", "FaceGimmickBasis"),
+            ("...And Basis", "FaceGimmickBasis"),
             ("Heel Gimmick", "HeelGimmick"),
-            ("Heel Basis", "HeelGimmickBasis"),
+            ("...And Basis", "HeelGimmickBasis"),
             ("Mask", "Mask"),
             ("Hair", "Hair"),
             ("Maturity Age", "MaturityAge"),
@@ -1904,6 +1919,72 @@ else
         }
     }
 
+    private async Task RestoreBackgroundAsync(TableLayoutPanel page, string preferredFile)
+    {
+        try
+        {
+            // Prefer current skin; use PWR's generated Obsidian background
+            // when a custom skin does not yet supply Worker_Editor.jpg.
+            string fallback = Path.Combine(_paths.SkinsRoot,
+                "Obsidian", "Backgrounds", "Worker_Editor.jpg");
+            string source = File.Exists(preferredFile) ? preferredFile : fallback;
+            Bitmap? art = await WorkerBackgroundCache.GetAsync(source);
+            if (IsDisposed || Disposing || page.IsDisposed || !page.IsHandleCreated ||
+                art is null)
+                return;
+            page.BackgroundImageLayout = ImageLayout.Stretch;
+            page.BackgroundImage = art;
+            page.Invalidate(true);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                "Worker background was unavailable: " + ex.Message);
+        }
+    }
+
+    private ContextMenuStrip GetFieldMenu()
+    {
+        if (_fieldMenu is { IsDisposed: false } existing)
+        {
+            if (existing.Visible) existing.Close();
+            foreach (ToolStripItem previous in existing.Items.Cast<ToolStripItem>().ToArray())
+            {
+                existing.Items.Remove(previous);
+                previous.Dispose();
+            }
+            return existing;
+        }
+
+        _fieldMenu = new ContextMenuStrip
+        {
+            Name = "WorkerFieldChoices",
+            ShowImageMargin = false,
+            ShowCheckMargin = true,
+            Renderer = new ToolStripProfessionalRenderer(new WorkerMenuColorTable(_palette)),
+            BackColor = Color.FromArgb(10, 24, 42),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
+            MaximumSize = new Size(380, 390),
+            DropShadowEnabled = true,
+            Padding = new Padding(2, 4, 2, 4)
+        };
+        // Never dispose a ContextMenuStrip while handling Closed. The native
+        // WinForms message loop may still reference it after that callback.
+        return _fieldMenu;
+    }
+
+    private void AfterMenuInteraction(Control control, Action change)
+    {
+        if (IsDisposed || Disposing || control.IsDisposed || !IsHandleCreated)
+            return;
+        BeginInvoke((Action)(() =>
+        {
+            if (!IsDisposed && !Disposing && !control.IsDisposed)
+                change();
+        }));
+    }
+
     private void OpenFieldChoices(WorkerValue control, WorkerFieldBinding binding)
     {
         if (_databaseFile is null) return;
@@ -1923,45 +2004,63 @@ else
 
         var choices = PrwWorkerFieldOptions.Get(
             _paths, _databaseFile, _password, row, field);
-        var menu = new ContextMenuStrip
-        {
-            ShowImageMargin = false,
-            MaximumSize = new Size(380, 390),
-            Font = new Font("Segoe UI", 9f)
-        };
-        menu.Closed += (_, _) => menu.Dispose();
+        var menu = GetFieldMenu();
         foreach (var choice in choices)
         {
+            var selectedValue = choice.Value;
             var item = new ToolStripMenuItem(choice.Label)
             {
-                Checked = Equals(row[field], choice.Value),
-                AutoSize = true
+                Checked = Equals(row[field], selectedValue),
+                AutoSize = true,
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(14, 34, 57),
+                Padding = new Padding(8, 4, 8, 4)
             };
-            item.Click += (_, _) => ApplyValue(control, row, field, choice.Value);
+            item.Click += (_, _) =>
+                AfterMenuInteraction(control, () =>
+                    ApplyValue(control, row, field, selectedValue));
             menu.Items.Add(item);
         }
         if (choices.Count > 0) menu.Items.Add(new ToolStripSeparator());
         var column = row.Table.Columns[field]!;
         if (column.AllowDBNull)
         {
-            var clear = new ToolStripMenuItem("(Clear)");
-            clear.Click += (_, _) => ApplyValue(control, row, field, DBNull.Value);
+            var clear = new ToolStripMenuItem("(Clear)")
+            {
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(14, 34, 57)
+            };
+            clear.Click += (_, _) =>
+                AfterMenuInteraction(control, () =>
+                    ApplyValue(control, row, field, DBNull.Value));
             menu.Items.Add(clear);
         }
         if (field != "LoyaltyWorkerUID")
         {
-            var manual = new ToolStripMenuItem("Enter a custom value...");
-            manual.Click += (_, _) => EditField(control,
-                new WorkerFieldBinding(row, field, row.Table.TableName));
+            var manual = new ToolStripMenuItem("Enter a custom value...")
+            {
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(14, 34, 57)
+            };
+            manual.Click += (_, _) =>
+                AfterMenuInteraction(control, () =>
+                    EditField(control,
+                        new WorkerFieldBinding(row, field, row.Table.TableName)));
             menu.Items.Add(manual);
         }
         if (menu.Items.Count == 0)
         {
             _saveStatus.Text = "No selectable values are available for " + field + ".";
-            menu.Dispose();
             return;
         }
-        menu.Show(control, new Point(0, control.Height));
+        try
+        {
+            menu.Show(control, new Point(0, control.Height));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _saveStatus.Text = "Could not open " + field + ": " + ex.Message;
+        }
     }
 
     private void EditField(WorkerValue control, WorkerFieldBinding binding)
@@ -2299,7 +2398,7 @@ else
             button.Enabled = _databaseFile is not null;
             _tips.SetToolTip(button, _databaseFile is null
                 ? "Open a native PWR universe to edit workers."
-                : "Changes are staged until Save; a backup is created before writing.");
+                : "Changes are staged until Save; writes use a database transaction.");
             var holder = new Panel
             {
                 Dock = DockStyle.Fill,

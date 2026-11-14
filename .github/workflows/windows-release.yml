@@ -41,7 +41,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.1 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.2 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor visual verification screenshot
         if: always()
@@ -81,7 +81,7 @@ jobs:
             throw "Bundled default template checksum did not match PRWDefault.mdb"
           }
 
-      - name: Assemble the Version 0.6.1 complete game ZIP
+      - name: Assemble the Version 0.6.2 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -105,7 +105,7 @@ jobs:
         run: |
           Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
           if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.1.0") {
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.2.0") {
             throw "Standalone EXE file version does not match this release"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -136,41 +136,39 @@ jobs:
       - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.6.1
-          name: Pro Wrestling Revolution 0.6.1 - Worker Editor Workflow Corrections
+          tag_name: v0.6.2
+          name: Pro Wrestling Revolution 0.6.2 - Worker Dropdown and Visual Stability
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            Version 0.6.1 corrects the Worker Editor workflow.
+            Version 0.6.2 fixes the Worker Editor dropdown crash and restores
+            the original PWR skin backdrop without profile-opening delays.
 
-            Add New Item in the Workers category opens the normal in-game
-            Worker Editor with an unsaved blank profile. Nothing is inserted
-            into the MDB until the user presses Save.
+            Worker field menus no longer dispose themselves during WinForms'
+            Closed event. They use a single safe, reusable popup and apply
+            selected values after popup interactions finish. The dropdown
+            colors, hover selection, outlines and separators use PWR's
+            navy/cyan skin styling rather than the native white menu.
 
-            Save commits changed worker fields, including new worker details,
-            in one transaction and returns directly to the Database Editor.
-            It no longer displays a successful-save popup. If saving fails,
-            an inline message leaves the unsaved profile on screen.
+            The Worker Editor background is decoded and scaled on a worker
+            thread, then reused for every profile within the same skin.
+            A new original arena-inspired Backgrounds/Worker_Editor.jpg is
+            generated only when missing, never overwriting player artwork.
+            Custom skins can supply their own Worker_Editor.jpg.
 
-            The extra Back to Database button has been removed. The original
-            Back navigation still returns to the Database Editor.
+            Picture Type has been repositioned beside the worker portrait;
+            related gimmick basis labels now match the editor reference.
+            Portrait decoding no longer creates an unused bitmap copy.
 
-            Worker dropdowns obtain their selectable values from the
-            installed System/PRWDefault.mdb and the selected universe MDB.
-            Boolean fields expose Yes and No; worker loyalty references are
-            selected from workers present in the active universe. Custom
-            field entry remains available when appropriate.
+            The generic "protected folder" startup warning is now displayed
+            only for file permission or IO errors, not UI programming faults.
 
-            Worker saves, record operations and mass edits no longer generate
-            repeated MDB backup files. They still use transactions and
-            validation. Existing career recovery files are not changed.
-
-            Existing players should use Check for Updates or download only
-            ProWrestlingRevolution.exe. Do not extract the complete ZIP
-            over a customized installation.
+            This is a standalone Windows x64 EXE update. Check for Updates
+            replaces only ProWrestlingRevolution.exe. MDB universes, saves,
+            pictures, skins and settings are not overwritten.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
