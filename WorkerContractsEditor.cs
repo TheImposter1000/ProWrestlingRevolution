@@ -479,6 +479,7 @@ internal sealed class WorkerContractsEditor : UserControl
             _listStatus.Bounds = new Rectangle(19, 13,
                 Math.Max(200, remove.Left - 31), 42);
         };
+        layout.Controls.Add(footer, 0, 2);
         RefreshRows();
     }
 
