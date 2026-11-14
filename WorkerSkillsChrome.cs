@@ -501,6 +501,10 @@ internal sealed class SkillGlowSlider : Control
 /// <summary>Metallic numeric entry with real up/down spinners and nullable ratings.</summary>
 internal sealed class SkillNumberSpinner : UserControl
 {
+    private static readonly Font WideNumberFont =
+        new("Segoe UI", 11.2f, FontStyle.Bold);
+    private static readonly Font CompactNumberFont =
+        new("Segoe UI", 8.8f, FontStyle.Bold);
     internal event Action<int?>? RatingChanged;
     private readonly TextBox _editor;
     private int? _rating;
@@ -519,10 +523,11 @@ internal sealed class SkillNumberSpinner : UserControl
         {
             Name = "SkillNumber_" + field,
             BorderStyle = BorderStyle.None,
+            AutoSize = false,
             TextAlign = HorizontalAlignment.Center,
             ForeColor = Color.White,
             BackColor = Color.FromArgb(12, 34, 59),
-            Font = new Font("Segoe UI", 12.1f, FontStyle.Bold),
+            Font = WideNumberFont,
             TabStop = canEdit, ReadOnly = !canEdit
         };
         Controls.Add(_editor);
@@ -569,10 +574,16 @@ internal sealed class SkillNumberSpinner : UserControl
 
     private void PlaceEditor()
     {
+        // A fixed textbox minimum caused vertical overflow when skill rows
+        // compressed. The control now always stays inside its drawn border.
+        var desiredFont = Height < 23 ? CompactNumberFont : WideNumberFont;
+        if (!ReferenceEquals(_editor.Font, desiredFont))
+            _editor.Font = desiredFont;
+
         int width = Math.Max(1, Width - 27);
-        _editor.Bounds = new Rectangle(5,
-            Math.Max(2, (Height - _editor.PreferredHeight) / 2),
-            width, Math.Max(17, _editor.PreferredHeight));
+        int height = Math.Max(1, Math.Min(_editor.PreferredHeight, Height - 4));
+        int top = Math.Max(1, (Height - height) / 2);
+        _editor.Bounds = new Rectangle(5, top, width, height);
     }
 
     internal void SetRating(int? value)
@@ -639,12 +650,14 @@ internal sealed class SkillNumberSpinner : UserControl
         g.DrawPath(edge, path2);
         int x = Width - 11;
         using var arrow = new SolidBrush(_hover ? SkillChrome.Cyan : Color.White);
-        g.FillPolygon(arrow, [new Point(x - 4, Height / 2 - 3),
-            new Point(x + 4, Height / 2 - 3),
-            new Point(x, Height / 2 - 8)]);
-        g.FillPolygon(arrow, [new Point(x - 4, Height / 2 + 3),
-            new Point(x + 4, Height / 2 + 3),
-            new Point(x, Height / 2 + 8)]);
+        int halfArrow = Height < 22 ? 3 : 4;
+        int offset = Math.Clamp(Height / 4, 3, 6);
+        g.FillPolygon(arrow, [new Point(x - halfArrow, Height / 2 - 2),
+            new Point(x + halfArrow, Height / 2 - 2),
+            new Point(x, Height / 2 - offset - 2)]);
+        g.FillPolygon(arrow, [new Point(x - halfArrow, Height / 2 + 2),
+            new Point(x + halfArrow, Height / 2 + 2),
+            new Point(x, Height / 2 + offset + 2)]);
     }
 }
 
