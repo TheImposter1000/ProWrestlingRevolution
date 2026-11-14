@@ -12,7 +12,7 @@ namespace ProWrestlingRevolution;
 /// </summary>
 internal static class PrwRecordOperations
 {
-    internal sealed record Result(int Count, string Backup);
+    internal sealed record Result(int Count);
 
     internal static bool Supports(string table) =>
         table is "tblWorker" or "tblFed" or "tblMatch";
@@ -22,7 +22,6 @@ internal static class PrwRecordOperations
         EnsureCategory(table);
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Enter a record name.");
-        string backup = Backup(targetFile);
         using var target = AccessDatabase.Open(targetFile, password);
         CheckSchema(target);
         using var tx = target.BeginTransaction();
@@ -54,7 +53,7 @@ internal static class PrwRecordOperations
             if (table == "tblWorker")
                 CreateWorkerDetails(target, tx, fields["UID"]!);
             tx.Commit();
-            return new Result(1, backup);
+            return new Result(1);
         }
         catch
         {
@@ -74,8 +73,7 @@ internal static class PrwRecordOperations
             CheckSchema(source);
             graphs = identifiers.Select(id => Capture(source, table, id)).ToArray();
         }
-        // Close the source connection before backing up and writing to the
-        // same MDB file, avoiding competing Jet file handles.
+        // Close the source connection before writing to the same MDB file.
         return InsertGraphs(targetFile, table, graphs, true, password);
     }
 
@@ -117,7 +115,6 @@ internal static class PrwRecordOperations
     {
         EnsureCategory(table);
         if (identifiers.Count == 0) throw new ArgumentException("Select records to delete.");
-        string backup = Backup(targetFile);
         using var connection = AccessDatabase.Open(targetFile, password);
         CheckSchema(connection);
         using var tx = connection.BeginTransaction();
@@ -131,7 +128,7 @@ internal static class PrwRecordOperations
                 DeleteGraph(connection, tx, table, rows.Rows[0]);
             }
             tx.Commit();
-            return new Result(identifiers.Count, backup);
+            return new Result(identifiers.Count);
         }
         catch
         {
@@ -170,7 +167,6 @@ internal static class PrwRecordOperations
     private static Result InsertGraphs(string targetFile, string table,
         IReadOnlyList<Snapshot> graphs, bool rename, string? password)
     {
-        string backup = Backup(targetFile);
         using var target = AccessDatabase.Open(targetFile, password);
         CheckSchema(target);
         using var tx = target.BeginTransaction();
@@ -179,7 +175,7 @@ internal static class PrwRecordOperations
             foreach (var graph in graphs)
                 InsertGraph(target, tx, graph, null, null, rename, !rename);
             tx.Commit();
-            return new Result(graphs.Count, backup);
+            return new Result(graphs.Count);
         }
         catch
         {
@@ -367,18 +363,6 @@ internal static class PrwRecordOperations
         }
     }
 
-    private static string Backup(string file)
-    {
-        if (File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly))
-            throw new IOException("The selected universe database is read-only.");
-        string folder = Path.Combine(Path.GetDirectoryName(file)!, "Backups");
-        Directory.CreateDirectory(folder);
-        string backup = Path.Combine(folder, "records-" +
-            DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" +
-            Guid.NewGuid().ToString("N")[..8] + ".mdb");
-        File.Copy(file, backup);
-        return backup;
-    }
 
     private static void AddValue(OleDbCommand command, object? value)
     {
