@@ -967,7 +967,8 @@ internal sealed class ContractsWorkspaceView : UserControl
 
         foreach (var label in _labels)
         {
-            if (label.Column.StartsWith("_", StringComparison.Ordinal)) continue;
+            if (label.Column.StartsWith("_", StringComparison.Ordinal) ||
+                label.Column is "Name" or "ShortName") continue;
             Caption(g, label.Label, label.LabelX, label.Y, label.InputX - label.LabelX - 5,
                 25, 9.7f, true, White);
         }
@@ -1049,7 +1050,7 @@ internal sealed class ContractsWorkspaceView : UserControl
         private void RefreshHint()
         {
             if (_hint is not null)
-                _hint.Visible = Input.TextLength == 0 && !Input.Focused;
+                _hint.Visible = Input.TextLength == 0;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -1143,8 +1144,9 @@ internal sealed class ContractsWorkspaceView : UserControl
             FillGradient(e.Graphics, r, Color.FromArgb(27, 68, 101),
                 Color.FromArgb(4, 23, 42), 5);
             Stroke(e.Graphics, r, Color.FromArgb(161, 207, 239), 5);
+            float size = Value.Length >= 19 ? 8f : Value.Length >= 15 ? 9f : 10.5f;
             Caption(e.Graphics, Value, 9, 1, Math.Max(1, Width - 35),
-                Math.Max(1, Height - 2), 10.5f, true, Enabled ? White : Dim);
+                Math.Max(1, Height - 2), size, true, Enabled ? White : Dim);
             using var pen = new Pen(White, 1.5f);
             int x = Width - 19, cy = Height / 2;
             e.Graphics.FillPolygon(Brushes.White, [new Point(x - 6, cy - 3),
