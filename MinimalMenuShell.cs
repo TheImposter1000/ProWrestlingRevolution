@@ -31,6 +31,14 @@ public sealed partial class LauncherForm
         bool skills = string.Equals(section, "Skills",
             StringComparison.OrdinalIgnoreCase);
         SkillsImmersiveMode = skills;
+        // Switch every title-bar surface together. Otherwise the Skills
+        // plaque and the utility cells are painted with different gradients
+        // and their bottom accents form a conspicuous break.
+        _topbar.SuspendLayout();
+        _topbar.SetSkillsChrome(skills);
+        foreach (var utility in _topbar.Controls.OfType<TopUtilityButton>())
+            utility.SetSkillsChrome(skills);
+        _topbar.ResumeLayout(true);
         // Skills is a standalone full-width workspace in the approved design.
         // The global launcher icon rail must not be visible behind the editor.
         // Normal sections and the database directory restore it immediately.
