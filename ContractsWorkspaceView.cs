@@ -938,7 +938,7 @@ internal sealed class ContractsWorkspaceView : UserControl
         Caption(g, "Employee", 179, 23, 87, 25, 10.4f, true);
         Caption(g, "Employer", 471, 23, 81, 25, 10.4f, true);
         Caption(g, "Name", 179, 62, 87, 25, 10.4f, true);
-        Caption(g, "Short Name", 179, 97, 87, 25, 10.4f, true);
+        Caption(g, "Short Name", 179, 97, 87, 25, 9.1f, true);
         Caption(g, "Biography", 732, 23, 84, 25, 10.4f, true);
         FillGradient(g, new Rectangle(46, 17, 113, 119),
             Color.FromArgb(22, 43, 61), Color.Black, 4);
@@ -999,8 +999,8 @@ internal sealed class ContractsWorkspaceView : UserControl
     private sealed class ContractText : UserControl
     {
         internal TextBox Input { get; }
-        private readonly Label? _hint;
         private readonly bool _searchIcon;
+        private readonly string _placeholder;
 
         internal ContractText(bool multiline, string placeholder)
         {
@@ -1008,6 +1008,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 ControlStyles.OptimizedDoubleBuffer, true);
             BackColor = Color.FromArgb(0, 21, 37);
             _searchIcon = !multiline && placeholder.Length > 0;
+            _placeholder = placeholder;
+            Cursor = _searchIcon ? Cursors.IBeam : Cursors.Default;
             Input = new TextBox
             {
                 BorderStyle = BorderStyle.None,
@@ -1015,26 +1017,26 @@ internal sealed class ContractsWorkspaceView : UserControl
                 ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None,
                 Font = new Font("Segoe UI", multiline ? 10 : 11, FontStyle.Regular),
                 ForeColor = White, BackColor = Color.FromArgb(4, 27, 48),
-                PlaceholderText = ""
+                PlaceholderText = placeholder,
+                Visible = !_searchIcon
             };
             Controls.Add(Input);
             if (_searchIcon)
             {
-                _hint = new Label
+                Click += (_, _) =>
                 {
-                    Text = placeholder,
-                    Font = new Font("Segoe UI", 10.4f, FontStyle.Italic),
-                    ForeColor = Color.FromArgb(211, 223, 234),
-                    BackColor = Input.BackColor,
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    Cursor = Cursors.IBeam
+                    Input.Visible = true;
+                    Input.Focus();
+                    Invalidate();
                 };
-                Controls.Add(_hint);
-                _hint.BringToFront();
-                _hint.Click += (_, _) => Input.Focus();
-                Input.GotFocus += (_, _) => RefreshHint();
-                Input.LostFocus += (_, _) => RefreshHint();
-                Input.TextChanged += (_, _) => RefreshHint();
+                Input.LostFocus += (_, _) =>
+                {
+                    if (Input.TextLength == 0)
+                    {
+                        Input.Visible = false;
+                        Invalidate();
+                    }
+                };
             }
             Resize += (_, _) =>
             {
@@ -1042,17 +1044,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Input.Bounds = new Rectangle(start, multiline ? 7 : 4,
                     Math.Max(1, Width - start - 10),
                     Math.Max(1, Height - (multiline ? 11 : 7)));
-                if (_hint is not null)
-                    _hint.Bounds = new Rectangle(start, 4,
-                        Math.Max(1, Width - start - 11), Math.Max(1, Height - 8));
             };
             Input.TextChanged += (_, _) => Invalidate();
-        }
-
-        private void RefreshHint()
-        {
-            if (_hint is not null)
-                _hint.Visible = Input.TextLength == 0;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -1072,6 +1065,9 @@ internal sealed class ContractsWorkspaceView : UserControl
                 e.Graphics.DrawEllipse(searchPen, 16, Height / 2 - 10, 17, 17);
                 e.Graphics.DrawLine(searchPen, 29, Height / 2 + 4,
                     36, Height / 2 + 11);
+                if (!Input.Visible && Input.TextLength == 0)
+                    Caption(e.Graphics, _placeholder, 45, 3, Math.Max(1, Width - 52),
+                        Math.Max(1, Height - 7), 10.4f, false, Dim, italic: true);
             }
         }
     }
