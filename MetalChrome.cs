@@ -298,12 +298,17 @@ internal sealed class TopUtilityButton : Control
                 break;
 
             case "help":
+                // TextRenderer uses Win32 GDI and ignores Graphics.TranslateTransform:
+                // in the tall Skills header the old '?' floated above its circle.
+                // Draw a vector question mark so it follows the same transform
+                // as the circle and the three other utility glyphs.
                 g.DrawEllipse(pen, 13, 8, 19, 19);
-                using (var font = new Font("Segoe UI", 11, FontStyle.Bold))
-                    TextRenderer.DrawText(g, "?", font,
-                        new Rectangle(15, 8, 16, 20), color,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-                        TextFormatFlags.NoPadding);
+                g.DrawBezier(pen, new Point(18, 15), new Point(19, 10),
+                    new Point(28, 10), new Point(27, 16));
+                g.DrawBezier(pen, new Point(27, 16), new Point(26, 19),
+                    new Point(22, 18), new Point(22, 21));
+                using (var dot = new SolidBrush(color))
+                    g.FillEllipse(dot, 21, 23, 3, 3);
                 break;
 
             case "minimize":
