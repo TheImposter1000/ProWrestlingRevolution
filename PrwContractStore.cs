@@ -265,8 +265,16 @@ internal static class PrwContractStore
         var type = column.DataType;
         if (type == typeof(string)) return input;
         if (type == typeof(bool))
-            return input.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
-                input.Equals("True", StringComparison.OrdinalIgnoreCase) || input == "1";
+        {
+            if (input.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
+                input.Equals("True", StringComparison.OrdinalIgnoreCase) || input == "1")
+                return true;
+            if (input.Equals("No", StringComparison.OrdinalIgnoreCase) ||
+                input.Equals("False", StringComparison.OrdinalIgnoreCase) || input == "0")
+                return false;
+            throw new FormatException(
+                column.ColumnName + " must be Yes, No, True, False, 1 or 0.");
+        }
         if (type == typeof(DateTime))
             return DateTime.ParseExact(input, "yyyy-MM-dd", CultureInfo.InvariantCulture);
         return Convert.ChangeType(input.Replace("$", "").Replace(",", ""),

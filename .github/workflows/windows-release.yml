@@ -71,7 +71,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.7 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.8 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor and Skills visual verification previews
         if: always()
@@ -136,7 +136,7 @@ jobs:
           mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
           if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
 
-      - name: Assemble the Version 0.6.7 complete game ZIP
+      - name: Assemble the Version 0.6.8 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -193,44 +193,46 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: Pro Wrestling Revolution ${{ steps.release.outputs.version }} - Contracts and Automatic Updates
+          name: Pro Wrestling Revolution ${{ steps.release.outputs.version }} - Contract Editor Glass and Unified Inputs
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: false
           fail_on_unmatched_files: true
           body: |
-            PWR v0.6.7 introduces the dedicated Worker Contracts selection
-            screen and four-panel Contract Editor based on the supplied layout.
+            PWR v0.6.8 corrects the Contracts layout to match the rest
+            of the Worker Editor instead of using a separate opaque UI.
 
-            CONTRACT LIST
-            View and search native worker contracts in six columns, filter
-            Active or Expired records, sort, select, Open, Remove, or Add.
-            Company artwork comes from the selected picture pack when present.
+            MATCHING WORKER EDITOR BACKGROUND
+            Contracts now uses the selected skin's Worker_Editor.jpg with
+            the same Obsidian fallback and cached artwork behavior.
+            Contract frames use restrained translucent navy glass, rather
+            than painting their own opaque dark arena over that image.
 
-            CONTRACT EDITOR
-            The identity and biography strip, Basic Details, Roster Details,
-            Terms, Perks & Bonuses, Roles, alter ego import, copy terms,
-            Reset and Save follow the supplied information hierarchy.
-            Native tblContract and tblContractBio updates are transactional.
-            Fields missing from the current MDB schema are displayed but
-            disabled until that schema can support them. The reference
-            artwork is still being refined, not declared pixel-identical.
+            UNIFIED EDITABLE FIELDS
+            Name, Short Name, Wage, Downside, Contract Begin and every
+            schema-backed contract field use the same polished editor
+            control. Players can type directly, including in fields
+            offering a dropdown of database-provided options. Date and
+            numeric values are validated before saving.
 
-            AUTOMATIC UPDATES
-            Starting in v0.6.7, installed games check for newer stable
-            GitHub releases on startup. Updates are verified against GitHub
-            SHA-256 metadata, replace only the executable using a helper,
-            back up the previous EXE, and restart the game. Auto-install
-            skips sessions where the player has left the title screen.
-            The Skins page contains an on/off preference; Check for Updates
-            remains available manually. Developer builds are excluded.
+            SIMPLER INTERFACE
+            The section headers show only their titles. Decorative
+            section descriptions and icons are removed. Buttons are
+            subtle, text-only and consistently sized, including Reset,
+            Apply and Save. Role checkboxes no longer sit over opaque
+            black row backgrounds. Contract data, navigation, and
+            layout groups are preserved.
 
-            Saved games, databases, universes, pictures, custom skins,
-            and settings are preserved. The complete ZIP is provided for
-            new installs. Only the standalone EXE is used during updates.
+            The underlying tblContract and tblContractBio transactional
+            save paths are retained. Native schema fields that do not
+            exist remain read-only instead of pretending to save.
+            Automatic stable release installation remains available
+            from v0.6.7, with a manual updater fallback and opt-out.
 
-            Publish only after Windows build, smoke and package checks pass.
+            The updater replaces only ProWrestlingRevolution.exe.
+            Databases, saves, skins, custom pictures and settings are
+            left untouched. A full Windows ZIP is also provided.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip

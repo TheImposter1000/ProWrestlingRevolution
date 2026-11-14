@@ -686,6 +686,16 @@ internal static class Program
                 contractHost.CreateControl();
                 contractView.CreateControl();
                 contractView.Show();
+                // Worker art uses the normal async cache. Pump the UI
+                // message loop while preparing it, rather than blocking a
+                // captured WinForms synchronization context.
+                var artworkTask = contractView.PrepareArtworkForPreviewAsync();
+                while (!artworkTask.IsCompleted)
+                {
+                    Application.DoEvents();
+                    Thread.Sleep(10);
+                }
+                artworkTask.GetAwaiter().GetResult();
                 Application.DoEvents();
                 if (contractView.Controls.Find("ContractSearch", true).Length != 1 ||
                     contractView.Controls.Find("ContractStatusFilter", true).Length != 1 ||
@@ -712,6 +722,33 @@ internal static class Program
                              "ContractCopySource" })
                     if (contractView.Controls.Find(name, true).Length != 1)
                         throw new Exception("Contract editor layout is missing " + name);
+                // Every editable entry, including numeric/date, must expose the
+                // exact same styled input surface as list-backed contract fields.
+                var fieldsToCheck = new[] { "Name", "ShortName", "Wage",
+                    "Downside", "StartDate", "ContractType", "Alignment" };
+                Type? sharedType = null;
+                foreach (string field in fieldsToCheck)
+                {
+                    var control = contractView.Controls.Find("ContractField_" + field, true)
+                        .SingleOrDefault() ?? throw new Exception(
+                            "Missing contract input: " + field);
+                    sharedType ??= control.GetType();
+                    if (control.GetType() != sharedType ||
+                        control.Controls.Find("EditableValue", true)
+                            .SingleOrDefault() is not TextBox edit ||
+                        !edit.Enabled || edit.ReadOnly)
+                        throw new Exception(
+                            "Contract value is not consistently typeable: " + field);
+                }
+                var wage = contractView.Controls.Find("ContractField_Wage", true)
+                    .Single().Controls.Find("EditableValue", true)
+                    .OfType<TextBox>().Single();
+                string originalWage = wage.Text;
+                wage.Text = "2750";
+                if (wage.Text != "2750")
+                    throw new Exception("Direct contract wage typing failed.");
+                wage.Text = originalWage;
+
                 using (var snapshot = new System.Drawing.Bitmap(
                     contractView.Width, contractView.Height))
                 {
