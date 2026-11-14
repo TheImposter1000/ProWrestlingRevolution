@@ -705,8 +705,6 @@ internal static class Program
                         skillsEditor.Controls.Find("SkillNumber_", true).Length != 0 ||
                         skillsEditor.Controls.Find("SkillsPreset", true)
                             .SingleOrDefault() is not SkillChromePreset ||
-                        skillsEditor.Controls.Find("SkillsAutoBalance", true)
-                            .SingleOrDefault() is not SkillChromeButton ||
                         skillsEditor.Controls.Find("SkillsReset", true)
                             .SingleOrDefault() is not SkillChromeButton ||
                         skillsEditor.Controls.Find("SkillsSave", true)
@@ -716,6 +714,8 @@ internal static class Program
                         throw new Exception(
                             "The illustrated four-panel Skills layout or real footer controls are incomplete.");
 
+                    if (skillsEditor.Controls.Find("SkillsAutoBalance", true).Length != 0)
+                        throw new Exception("Auto Balance should not appear on the Skills page.");
                     if (groups.Controls.Cast<Control>().OfType<SkillGlassPanel>().Count() != 4 ||
                         skillsEditor.Controls.Find("SkillsHeader_0", true).Length != 1 ||
                         skillsEditor.Controls.Find("SkillsHeader_3", true).Length != 1)
