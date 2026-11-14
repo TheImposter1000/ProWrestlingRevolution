@@ -1005,7 +1005,7 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
-            BackColor = Color.FromArgb(0, 21, 37);
+            BackColor = WorkerEditorTheme.FieldInk;
             _searchIcon = !multiline && placeholder.Length > 0;
             _placeholder = placeholder;
             Cursor = _searchIcon ? Cursors.IBeam : Cursors.Default;
@@ -1015,7 +1015,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Multiline = multiline,
                 ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None,
                 Font = new Font("Segoe UI", multiline ? 10 : 11, FontStyle.Regular),
-                ForeColor = White, BackColor = Color.FromArgb(4, 27, 48),
+                ForeColor = WorkerEditorTheme.FieldText,
+                BackColor = WorkerEditorTheme.FieldInk,
                 PlaceholderText = placeholder,
                 Visible = !_searchIcon
             };
@@ -1051,13 +1052,11 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             var r = new Rectangle(1, 1, Math.Max(2, Width - 3),
                 Math.Max(2, Height - 3));
-            FillGradient(e.Graphics, r, Color.FromArgb(18, 52, 83),
-                Color.FromArgb(1, 21, 40), 5);
-            Stroke(e.Graphics, r, Color.FromArgb(139, 185, 225), 5, 1.2f);
+            WorkerEditorTheme.PaintField(e.Graphics, ClientRectangle, Enabled);
             if (_searchIcon)
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using var searchPen = new Pen(White, 2.2f)
+                using var searchPen = new Pen(WorkerEditorTheme.FieldText, 1.9f)
                 {
                     StartCap = LineCap.Round, EndCap = LineCap.Round
                 };
@@ -1066,7 +1065,7 @@ internal sealed class ContractsWorkspaceView : UserControl
                     36, Height / 2 + 11);
                 if (!Input.Visible && Input.TextLength == 0)
                     Caption(e.Graphics, _placeholder, 45, 3, Math.Max(1, Width - 52),
-                        Math.Max(1, Height - 7), 10.4f, false, Dim, italic: true);
+                        Math.Max(1, Height - 7), 10.4f, false, WorkerEditorTheme.FieldText, italic: true);
             }
         }
     }
@@ -1094,9 +1093,9 @@ internal sealed class ContractsWorkspaceView : UserControl
             SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.ResizeRedraw, true);
-            BackColor = Color.FromArgb(18, 49, 78);
-            ForeColor = White;
-            Font = new Font("Segoe UI", 9.6f, FontStyle.Bold);
+            BackColor = WorkerEditorTheme.FieldInk;
+            ForeColor = WorkerEditorTheme.FieldText;
+            Font = new Font("Segoe UI", 9.15f, FontStyle.Bold);
             TabStop = false;
             Cursor = Cursors.IBeam;
             _input = new TextBox
@@ -1104,8 +1103,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Name = "EditableValue",
                 BorderStyle = BorderStyle.None,
                 Multiline = false,
-                ForeColor = White,
-                BackColor = Color.FromArgb(19, 51, 80),
+                ForeColor = WorkerEditorTheme.FieldText,
+                BackColor = WorkerEditorTheme.FieldInk,
                 Font = Font,
                 TabStop = true,
                 ShortcutsEnabled = true
@@ -1116,7 +1115,8 @@ internal sealed class ContractsWorkspaceView : UserControl
             EnabledChanged += (_, _) =>
             {
                 _input.ReadOnly = !Enabled;
-                _input.ForeColor = Enabled ? White : Dim;
+                _input.ForeColor = Enabled
+                    ? WorkerEditorTheme.FieldText : Color.FromArgb(112, 128, 140);
                 Invalidate();
             };
             Disposed += (_, _) =>
@@ -1199,21 +1199,14 @@ internal sealed class ContractsWorkspaceView : UserControl
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            var rect = new Rectangle(1, 1, Math.Max(2, Width - 3),
-                Math.Max(2, Height - 3));
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            FillGradient(e.Graphics, rect, Color.FromArgb(34, 81, 115),
-                Color.FromArgb(16, 48, 80), 5);
-            Stroke(e.Graphics, rect,
-                Enabled ? Color.FromArgb(151, 194, 222) :
-                    Color.FromArgb(83, 125, 151), 5, 1.1f);
+            WorkerEditorTheme.PaintField(e.Graphics, ClientRectangle, Enabled);
             if (_choices.Length == 0) return;
-            int x = Width - 15, y = Height / 2;
-            using var chevron = new SolidBrush(
-                Enabled ? Color.FromArgb(232, 241, 250) : Dim);
-            e.Graphics.FillPolygon(chevron,
-                [new Point(x - 5, y - 2), new Point(x + 5, y - 2),
-                 new Point(x, y + 3)]);
+            int x = Width - 14, y = Height / 2 + 1;
+            using var arrow = new SolidBrush(WorkerEditorTheme.FieldText);
+            e.Graphics.FillPolygon(arrow,
+                [new Point(x - 4, y - 3),
+                 new Point(x + 4, y - 3),
+                 new Point(x, y + 2)]);
         }
     }
 
