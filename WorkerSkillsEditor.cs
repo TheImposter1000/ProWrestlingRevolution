@@ -253,15 +253,24 @@ internal sealed class WorkerSkillsEditor : UserControl
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             Margin = Padding.Empty,
-            Padding = new Padding(31, 12, 39, 5),
+            Padding = new Padding(31, 12, 32, 5),
             BackColor = SkillChrome.Ink,
             AutoScroll = true
         };
         foreach (var skill in group.Skills)
         {
+            float labelPercent = groupIndex switch
+            {
+                0 => 33.8f, 1 => 34.7f, 2 => 34.1f, _ => 37.6f
+            };
+            int railGap = groupIndex switch
+            {
+                0 => 29, 1 => 18, 2 => 27, _ => 8
+            };
             var rating = new SkillRatingRow(skill.Label, skill.Column,
                 InitialRating(skill.Column), _canEdit,
-                value => UpdateSkill(skill.Column, value))
+                value => UpdateSkill(skill.Column, value),
+                labelPercent, railGap)
             {
                 Height = group.Skills.Count > 9 ? 24 : 28,
                 Margin = Padding.Empty
@@ -312,7 +321,7 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             Name = "SkillsPresetLabel",
             Text = "Preset:",
-            Font = new Font("Segoe UI", 12.3f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 13.5f, FontStyle.Bold),
             ForeColor = SkillChrome.White,
             TextAlign = ContentAlignment.MiddleLeft,
             BackColor = Color.Transparent,
@@ -386,11 +395,11 @@ internal sealed class WorkerSkillsEditor : UserControl
             if (w < 450 || h < 20) return;
             int buttonH = Math.Min(53, h - 12);
             int top = (h - buttonH) / 2;
-            int gap = Math.Clamp(w / 120, 8, 13);
-            int saveWidth = Math.Clamp((int)(w * .125), 120, 200);
-            int resetWidth = Math.Clamp((int)(w * .117), 105, 187);
+            int gap = w >= 1400 ? 18 : Math.Clamp(w / 120, 8, 13);
+            int saveWidth = Math.Clamp((int)(w * .128), 120, 205);
+            int resetWidth = Math.Clamp((int)(w * .120), 105, 192);
             int balanceWidth = Math.Clamp((int)(w * .138), 135, 219);
-            int right = w - 11;
+            int right = w - 14;
 
             save.Bounds = new Rectangle(right - saveWidth, top,
                 saveWidth, buttonH);
@@ -402,7 +411,8 @@ internal sealed class WorkerSkillsEditor : UserControl
                 balanceWidth, buttonH);
 
             int labelWidth = Math.Clamp((int)(w * .06), 64, 95);
-            presetLabel.Bounds = new Rectangle(17, top, labelWidth, buttonH);
+            presetLabel.Bounds = new Rectangle(33, top,
+                Math.Max(54, labelWidth - 8), buttonH);
             int presetX = presetLabel.Right + 5;
             int presetWidth = Math.Clamp((int)(w * .156), 145, 250);
             _preset.Bounds = new Rectangle(presetX, top + 5,
@@ -597,7 +607,8 @@ internal sealed class WorkerSkillsEditor : UserControl
         internal int? CurrentRating => _slider.Rating;
 
         internal SkillRatingRow(string label, string field,
-            int? rating, bool enabled, Action<int?> changed)
+            int? rating, bool enabled, Action<int?> changed,
+            float labelPercent, int railGap)
         {
             _changed = changed;
             Name = "Skill_" + field;
@@ -614,9 +625,9 @@ internal sealed class WorkerSkillsEditor : UserControl
             };
             // The screenshot's rhythm is label / wide illuminated rail /
             // metal number spinner, with a real 15px gap before the spinner.
-            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
-            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));
-            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelPercent));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f - labelPercent));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
             columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
             var title = new Label
@@ -624,7 +635,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                 Name = "SkillLabel_" + field,
                 Text = label, UseMnemonic = false,
                 Dock = DockStyle.Fill, AutoEllipsis = true,
-                Font = new Font("Segoe UI", 10.65f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11.75f, FontStyle.Bold),
                 ForeColor = SkillChrome.White,
                 BackColor = Color.Transparent,
                 Margin = Padding.Empty,
@@ -635,7 +646,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                 Name = "SkillSlider_" + field,
                 Dock = DockStyle.Fill,
                 AccessibleName = label + " slider",
-                Margin = new Padding(0, 0, 13, 0)
+                Margin = new Padding(0, 0, railGap, 0)
             };
             _slider.SetValue(rating);
             _spinner = new SkillNumberSpinner(field, rating, enabled)
