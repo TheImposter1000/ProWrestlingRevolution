@@ -32,21 +32,12 @@ internal static class MetalColors
 internal sealed class MetalTopBar : Panel
 {
     private SkinPalette _palette;
-    private bool _skillsChrome;
-    internal bool SkillsChrome => _skillsChrome;
-
-    internal void SetSkillsChrome(bool enabled)
-    {
-        if (_skillsChrome == enabled) return;
-        _skillsChrome = enabled;
-        Invalidate(true);
-    }
 
     internal MetalTopBar(SkinPalette palette)
     {
         _palette = palette;
         Dock = DockStyle.Top;
-        Height = 40;
+        Height = 56;
         DoubleBuffered = true;
         ResizeRedraw = true;
     }
@@ -59,52 +50,16 @@ internal sealed class MetalTopBar : Panel
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        if (Width < 1 || Height < 1) return;
-        if (_skillsChrome)
-        {
-            WorkerSkillsTopChrome.PaintBackdrop(e.Graphics, ClientRectangle);
-            return;
-        }
-        using var metal = new LinearGradientBrush(ClientRectangle,
-            MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 18, 34), 0.75),
-            MetalColors.TopRight(_palette), LinearGradientMode.Horizontal);
-        metal.InterpolationColors = new ColorBlend
-        {
-            Colors =
-            [
-                MetalColors.Mix(_palette.Surface, Color.FromArgb(6, 16, 29), 0.80),
-                MetalColors.Mix(_palette.Surface, Color.FromArgb(12, 38, 63), 0.77),
-                MetalColors.TopRight(_palette)
-            ],
-            Positions = [0f, 0.49f, 1f]
-        };
-        e.Graphics.FillRectangle(metal, ClientRectangle);
+        // Every interior page uses exactly the same full-width chrome,
+        // including the real sound/help/minimize/close button area.
+        PwrSharedHeader.PaintBackdrop(e.Graphics, ClientRectangle);
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        if (_skillsChrome) return;  // No red logo or 40px divider beneath Skills plaque.
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-
-        using var upperReflection = new Pen(Color.FromArgb(90, 172, 199, 225), 1);
-        using var accentLine = new Pen(Color.FromArgb(145, _palette.AccentSecondary), 1);
-        g.DrawLine(upperReflection, 0, 0, Width - 1, 0);
-        g.DrawLine(accentLine, 0, Height - 1, Width - 1, Height - 1);
-
-        // Only the small chrome emblem is drawn here; the main JPG is untouched.
-        using var red = new SolidBrush(Color.FromArgb(239, 36, 65));
-        using var gleam = new Pen(Color.FromArgb(245, 144, 155), 1);
-        g.FillPolygon(red,
-        [
-            new Point(34, 12), new Point(43, 12),
-            new Point(36, 29), new Point(27, 29)
-        ]);
-        g.DrawLine(gleam, 34, 12, 43, 12);
-
-        using var divider = new Pen(Color.FromArgb(165, 173, 196, 217), 1);
-        g.DrawLine(divider, 310, 11, 310, 29);
+        // PWR branding and page context are painted by PwrSharedHeader.
+        // The red legacy emblem and independent divider no longer exist.
     }
 }
 
@@ -168,21 +123,12 @@ internal sealed class TopUtilityButton : Control
     private SkinPalette _palette;
     private bool _hovered;
     private bool _soundEnabled = true;
-    private bool _skillsChrome;
-
-    internal void SetSkillsChrome(bool enabled)
-    {
-        if (_skillsChrome == enabled) return;
-        _skillsChrome = enabled;
-        BackColor = enabled ? Color.Transparent : _palette.Surface;
-        Invalidate();
-    }
-
     internal TopUtilityButton(string kind, SkinPalette palette)
     {
         _kind = kind;
         _palette = palette;
-        Size = new Size(50, 40);
+        Size = new Size(50, 56);
+        BackColor = Color.Transparent;
         Cursor = Cursors.Hand;
         TabStop = true;
         AccessibleRole = AccessibleRole.PushButton;
@@ -242,17 +188,8 @@ internal sealed class TopUtilityButton : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        // Skills utility cells share the actual parent's backdrop rather
-        // than drawing four darker rectangular gradient tiles.
-        if (!_skillsChrome)
-        {
-            using var back = new LinearGradientBrush(ClientRectangle,
-                MetalColors.TopRight(_palette),
-                MetalColors.Mix(MetalColors.TopRight(_palette), Color.Black, 0.14),
-                LinearGradientMode.Vertical);
-            g.FillRectangle(back, ClientRectangle);
-        }
-
+        // Transparent controls inherit the single MetalTopBar background.
+        // No independent tile fill or bottom border is drawn.
         if (_hovered)
         {
             using var hover = new SolidBrush(Color.FromArgb(36, _palette.AccentSecondary));
@@ -260,16 +197,14 @@ internal sealed class TopUtilityButton : Control
         }
 
         using var divider = new Pen(Color.FromArgb(75, 159, 179, 198));
-        using var bottom = new Pen(Color.FromArgb(145, _palette.AccentSecondary));
         g.DrawLine(divider, 0, 7, 0, Height - 7);
-        if (!_skillsChrome) g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
+        // The cyan baseline is painted once by the parent across all cells.
 
-        // Utility glyphs are designed on a 40px artboard. The Skills
-        // title is 56px high, so center the same glyphs without stretching
-        // or changing their size. Normal 40px pages remain pixel-identical.
+        // All page headers are 56px. Center the common 40px glyph artboard.
         g.TranslateTransform(3, 2 + (Height - 40) / 2f);
-        var color = _kind == "close" ? Color.FromArgb(248, 62, 78)
-            : _hovered ? _palette.AccentSecondary : Color.FromArgb(235, 240, 247);
+        var color = _kind == "close" && _hovered
+            ? Color.FromArgb(248, 93, 103)
+            : _hovered ? _palette.AccentSecondary : Color.FromArgb(235, 244, 252);
         using var pen = new Pen(color, 1.9f)
         {
             StartCap = LineCap.Round, EndCap = LineCap.Round,
