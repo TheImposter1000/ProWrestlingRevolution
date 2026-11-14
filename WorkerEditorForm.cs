@@ -1467,15 +1467,29 @@ internal sealed class WorkerEditorForm : UserControl
 
         var loyalty = Card("", "WorkerLoyalty");
         MakeRows(loyalty, [
-            ("Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
+            ("Company Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
             ("Freelance", "Freelance"), ("User Character", "UserCharacter")
         ], worker, labelShare: 48f);
+        if (_databaseFile is not null && worker is not null)
+        {
+            var loyaltyControl = loyalty.Controls.Find(
+                "WorkerField_LoyaltyWorkerUID", true)
+                .OfType<WorkerValue>().FirstOrDefault();
+            if (loyaltyControl is not null)
+            {
+                var selected = PrwWorkerFieldOptions.Get(
+                    _paths, _databaseFile, _password, worker, "LoyaltyWorkerUID")
+                    .FirstOrDefault(choice => Equals(choice.Value, worker["LoyaltyWorkerUID"]));
+                if (selected is not null)
+                    loyaltyControl.Text = selected.Label;
+            }
+        }
         var roles = Card("Roles", "WorkerRoles");
         var roleChecks = MakeChecks(roles, [
-            ("Wrestler", "RoleWrestler"), ("Occasional Wrestler", "RolePartTimeWrestler"),
-            ("Manager", "RoleManager"), ("On-Screen Personality", "RoleOnScreenPersonality"),
-            ("Play By Play", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
-            ("Referee", "RoleReferee"), ("Road Agent", "RoleProducer")
+            ("Wrestler", "RoleWrestler"), ("Part-Time Wrestler", "RolePartTimeWrestler"),
+            ("Manager", "RoleManager"), ("On Screen Personality", "RoleOnScreenPersonality"),
+            ("Play by Play Commentator", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
+            ("Referee", "RoleReferee"), ("Producer", "RoleProducer")
         ], worker, rowHeight: 20);
         var roleBoxes = roleChecks.Controls
     .OfType<CheckBox>()
@@ -1505,13 +1519,13 @@ internal sealed class WorkerEditorForm : UserControl
             Padding = new Padding(3, 3, 4, 2)
         };
 
-        var competitorLabel = TextLabel("Competes Vs.");
+        var competitorLabel = TextLabel("Division");
         competitorLabel.Dock = DockStyle.None;
         competitorLabel.Location = new Point(-3,32);
         competitorLabel.Size = new Size(90, 22);
 
         var competitorValue = ValueBox(
-            Display(worker, "CompetesVs"),
+            worker is null ? "" : WorkerFieldRules.Display(worker, "CompetesVs"),
             "WorkerField_CompetesVs");
 
         competitorValue.Dock = DockStyle.None;
@@ -1599,6 +1613,8 @@ internal sealed class WorkerEditorForm : UserControl
 
     private void ShowSection(string section)
     {
+        if (_manualEditors.Count > 0 && !ValidateManualEditors())
+            return;
         _active = section;
         _recordIndex = 0;
         foreach (var (name, button) in _tabs)
@@ -1615,8 +1631,6 @@ internal sealed class WorkerEditorForm : UserControl
                 tab.Invalidate();
             }
         }
-        if (_manualEditors.Count > 0 && !ValidateManualEditors())
-            return;
         _manualEditors.Clear();
         _invalidManualEditors.Clear();
         _content.SuspendLayout();
@@ -1932,13 +1946,13 @@ internal sealed class WorkerEditorForm : UserControl
     }
 
     private void ApplyValue(WorkerValue control, DataRow row,
-        string field, object? candidate)
+        string field, object? candidate, string? visibleLabel = null)
     {
         if (Equals(row[field], candidate)) return;
         try
         {
             row[field] = candidate ?? DBNull.Value;
-            control.Text = Display(row, field);
+            control.Text = visibleLabel ?? WorkerFieldRules.Display(row, field);
             control.Invalidate();
             _saveStatus.Text = "";
         }
@@ -2048,7 +2062,7 @@ internal sealed class WorkerEditorForm : UserControl
             };
             item.Click += (_, _) =>
                 AfterMenuInteraction(control, () =>
-                    ApplyValue(control, row, field, selectedValue));
+                    ApplyValue(control, row, field, selectedValue, choice.Label));
             menu.Items.Add(item);
         }
         if (choices.Count > 0) menu.Items.Add(new ToolStripSeparator());
@@ -2065,7 +2079,8 @@ internal sealed class WorkerEditorForm : UserControl
                     ApplyValue(control, row, field, DBNull.Value));
             menu.Items.Add(clear);
         }
-        if (field != "LoyaltyWorkerUID")
+        if (field != "LoyaltyWorkerUID" && field != "CompetesVs" &&
+            !WorkerFieldRules.IsLanguage(field))
         {
             var manual = new ToolStripMenuItem("Enter a custom value...")
             {
