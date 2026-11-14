@@ -867,6 +867,7 @@ internal sealed class WorkerEditorForm : UserControl
         _mainArea.Controls.Add(_content);
         _mainArea.Paint += (_, e) =>
         {
+            var paintTime = System.Diagnostics.Stopwatch.StartNew();
             if (page.BackgroundImage is not Image artwork ||
             page.ClientSize.Width <= 0 ||
                 page.ClientSize.Height <= 0 ||
@@ -901,6 +902,7 @@ internal sealed class WorkerEditorForm : UserControl
             e.Graphics.FillRectangle(
                 glassTint,
                 _mainArea.ClientRectangle);
+            PwrPerformanceLog.Record("Paint.WorkerCanvas", paintTime);
         };
         _body.Controls.Add(top);
         _body.Controls.Add(_mainArea);
@@ -1645,6 +1647,8 @@ else
             return;
 
         var timer = System.Diagnostics.Stopwatch.StartNew();
+        bool existingPage = _sectionViews.TryGetValue(section, out var target) &&
+            !target.IsDisposed;
         _sectionRecordIndices[_active] = _recordIndex;
         _active = section;
         _recordIndex = _sectionRecordIndices.GetValueOrDefault(section, 0);
@@ -1703,6 +1707,8 @@ else
             $"Worker tab '{section}': {LastSectionSwitchMilliseconds} ms; " +
             $"cached={_sectionViews.Count}, builds={SectionViewBuildCount}");
         SectionChanged?.Invoke(section);
+        PwrPerformanceLog.Record("Tab." + section, timer,
+            existingPage ? "cached=true" : "cached=false");
     }
 
     private void RestoreCachedActions(Control view, string section)
@@ -2068,6 +2074,7 @@ else
 
     private async Task RestoreBackgroundAsync(TableLayoutPanel page, string preferredFile)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             // Prefer current skin; use PWR's generated Obsidian background
@@ -2082,6 +2089,7 @@ else
             page.BackgroundImageLayout = ImageLayout.Stretch;
             page.BackgroundImage = art;
             page.Invalidate(true);
+            PwrPerformanceLog.Record("Paint.PrepareBackdrop", stopwatch);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
