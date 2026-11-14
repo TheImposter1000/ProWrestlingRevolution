@@ -228,6 +228,13 @@ internal static class Program
                     section.Table == "tblWorker").Records.Rows[0];
                 newWorker["Name"] = "Regression Worker";
                 newWorker["ShortName"] = "Regression";
+                newWorker["Born"] = new DateTime(1997, 5, 12);
+                newWorker["CompetesVs"] = WorkerFieldRules.DivisionStorage[2];
+                newWorker["LanguageEnglish"] = 3;
+                var draftSkills = draft.Sections.Single(section =>
+                    section.Table == "tblWorkerSkills").Records.Rows.Single();
+                draftSkills["Brawling"] = 61;
+                draftSkills["Charisma"] = 76;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, draft, null))
                     throw new Exception("New worker was not inserted.");
 
@@ -241,12 +248,26 @@ internal static class Program
 
                 loaded.Sections.Single(section => section.Table == "tblWorker")
                     .Records.Rows[0]["Name"] = "Regression Updated";
+                loaded.Sections.Single(section => section.Table == "tblWorkerSkills")
+                    .Records.Rows.Single()["Brawling"] = 82;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, loaded, null))
                     throw new Exception("Existing worker edit was not persisted.");
 
                 var reloaded = PrwWorkerRepository.Load(first.MdbPath, created.Uid);
-                if (reloaded.Identity.Name != "Regression Updated")
-                    throw new Exception("Worker Save did not update the actual MDB.");
+                var savedWorker = reloaded.Sections.Single(section =>
+                    section.Table == "tblWorker").Records.Rows.Single();
+                var savedSkills = reloaded.Sections.Single(section =>
+                    section.Table == "tblWorkerSkills").Records.Rows.Single();
+                if (reloaded.Identity.Name != "Regression Updated" ||
+                    !Equals(savedSkills["Brawling"], 82) ||
+                    !Equals(savedSkills["Charisma"], 76) ||
+                    Convert.ToString(savedWorker["CompetesVs"]) !=
+                        WorkerFieldRules.DivisionStorage[2] ||
+                    Convert.ToInt32(savedWorker["LanguageEnglish"]) != 3 ||
+                    Convert.ToDateTime(savedWorker["Born"]).Date !=
+                        new DateTime(1997, 5, 12))
+                    throw new Exception(
+                        "Worker Save did not persist skills, dates, languages or division in the MDB.");
 
                 string backups = Path.Combine(first.DirectoryPath, "Backups");
                 if (Directory.Exists(backups) &&
