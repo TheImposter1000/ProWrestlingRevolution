@@ -48,7 +48,7 @@ public sealed partial class LauncherForm : Form
     {
         if (e.KeyCode == Keys.Escape && _currentPage != "HOME")
         {
-            ShowHome();
+            Navigate("back");
             e.Handled = true;
             return;
         }
@@ -77,7 +77,13 @@ public sealed partial class LauncherForm : Form
 
         switch (key)
         {
-            case "back": if (_currentPage != "HOME") ShowHome(); break;
+            case "back":
+                if (_currentPage == "DATABASE EDITOR" &&
+                    _page.Controls.OfType<DatabaseEditorWorkspace>()
+                        .FirstOrDefault()?.TryCloseWorkerProfile() == true)
+                    break;
+                if (_currentPage != "HOME") ShowHome();
+                break;
             case "updates": _ = GameUpdate.CheckAndInstallAsync(this, _updateButton); break;
             case "new": ShowNewGame(); break;
             case "load": ShowLoadGame(); break;
