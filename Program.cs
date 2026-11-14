@@ -693,6 +693,11 @@ internal static class Program
                             rows.ClientSize.Height - rows.Padding.Bottom + 2)
                             throw new Exception(
                                 "At game resolution, one or more Skills ratings are clipped or scroll.");
+                        if (rows.Controls.Cast<Control>().Any(rating =>
+                            rating.Right > rows.ClientSize.Width -
+                                rows.Padding.Right + 3))
+                            throw new Exception(
+                                "Compact Skills rating inputs exceed the panel's right gutter.");
                     }
                     var longestSkill = compactSkills.Controls
                         .Find("SkillLabel_PotentialFundamentals", true)
@@ -835,6 +840,19 @@ internal static class Program
                     editableSkillsPreview.CreateControl();
                     editableSkillsPreview.PerformLayout();
                     Application.DoEvents();
+                    foreach (var glass in editableSkillsPreview.Controls
+                        .Find("SkillsFourPanels", true).Single()
+                        .Controls.Cast<Control>().OfType<SkillGlassPanel>())
+                    {
+                        var rows = glass.Controls.OfType<TableLayoutPanel>()
+                            .SelectMany(c => c.Controls.OfType<FlowLayoutPanel>())
+                            .Single();
+                        if (rows.Controls.Cast<Control>().Any(rating =>
+                            rating.Right > rows.ClientSize.Width -
+                                rows.Padding.Right + 3))
+                            throw new Exception(
+                                "Reference-sized Skills numeric controls spill into the frame.");
+                    }
                     using var skillImage = new System.Drawing.Bitmap(
                         editableSkillsPreview.ClientSize.Width,
                         editableSkillsPreview.ClientSize.Height);
