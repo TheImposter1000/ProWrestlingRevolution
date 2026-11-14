@@ -1278,12 +1278,12 @@ internal sealed class ContractsWorkspaceView : UserControl
             TabStop = true;
             Cursor = Cursors.Hand;
             ForeColor = White;
-            BackColor = Color.Transparent;
             Font = new Font("Segoe UI", 10.6f, FontStyle.Bold);
             SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint |
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
