@@ -232,7 +232,7 @@ internal static class Program
                 newWorker["CompetesVs"] = WorkerFieldRules.DivisionStorage[2];
                 newWorker["LanguageEnglish"] = 3;
                 var draftSkills = draft.Sections.Single(section =>
-                    section.Table == "tblWorkerSkills").Records.Rows.Single();
+                    section.Table == "tblWorkerSkills").Records.Rows[0];
                 draftSkills["Brawling"] = 61;
                 draftSkills["Charisma"] = 76;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, draft, null))
@@ -249,15 +249,15 @@ internal static class Program
                 loaded.Sections.Single(section => section.Table == "tblWorker")
                     .Records.Rows[0]["Name"] = "Regression Updated";
                 loaded.Sections.Single(section => section.Table == "tblWorkerSkills")
-                    .Records.Rows.Single()["Brawling"] = 82;
+                    .Records.Rows[0]["Brawling"] = 82;
                 if (!PrwWorkerEditorService.Save(first.MdbPath, loaded, null))
                     throw new Exception("Existing worker edit was not persisted.");
 
                 var reloaded = PrwWorkerRepository.Load(first.MdbPath, created.Uid);
                 var savedWorker = reloaded.Sections.Single(section =>
-                    section.Table == "tblWorker").Records.Rows.Single();
+                    section.Table == "tblWorker").Records.Rows[0];
                 var savedSkills = reloaded.Sections.Single(section =>
-                    section.Table == "tblWorkerSkills").Records.Rows.Single();
+                    section.Table == "tblWorkerSkills").Records.Rows[0];
                 if (reloaded.Identity.Name != "Regression Updated" ||
                     !Equals(savedSkills["Brawling"], 82) ||
                     !Equals(savedSkills["Charisma"], 76) ||
