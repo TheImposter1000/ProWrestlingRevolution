@@ -100,6 +100,49 @@ internal static class WorkerEditorTheme
             bounds.Right - 1, bounds.Bottom - 1);
     }
 
+    /// <summary>
+    /// General and Contracts must resolve the SAME photograph, including
+    /// Default/Workers and legacy People/Worker picture pack folders.
+    /// The returned detached bitmap belongs to the calling view.
+    /// </summary>
+    internal static Bitmap? LoadWorkerPortrait(AppPaths paths, string? storedPicture,
+        string workerName)
+    {
+        string picture = Path.GetFileName(storedPicture ?? "");
+        string[] folders =
+        [
+            paths.Pictures,
+            Path.Combine(paths.Pictures, "Default", "Workers"),
+            Path.Combine(paths.Pictures, "Workers"),
+            Path.Combine(paths.Pictures, "People"),
+            Path.Combine(paths.Pictures, "Worker")
+        ];
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(picture))
+            candidates.AddRange(folders.Select(folder => Path.Combine(folder, picture)));
+        if (!string.IsNullOrWhiteSpace(workerName))
+            foreach (string extension in new[] { ".gif", ".jpg", ".jpeg", ".png", ".bmp" })
+                candidates.AddRange(folders.Select(folder =>
+                    Path.Combine(folder, workerName + extension)));
+
+        foreach (string file in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(file)) continue;
+            try
+            {
+                using var stream = File.OpenRead(file);
+                using var original = Image.FromStream(stream);
+                return new Bitmap(original);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or ArgumentException or OutOfMemoryException)
+            {
+                // An optional damaged picture does not prevent editing.
+            }
+        }
+        return null;
+    }
+
     internal static PictureBox CreatePortrait(string name)
     {
         return new PictureBox
