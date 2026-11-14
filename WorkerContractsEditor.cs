@@ -37,11 +37,12 @@ internal sealed class WorkerContractsEditor : UserControl
     private readonly List<PrwContractEditorService.Company> _companies = [];
     private readonly List<PrwContractEditorService.Template> _templates = [];
     private readonly Panel _view = new() { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-    private readonly DataGridView _grid = new();
-    private readonly TextBox _search = new();
-    private readonly ComboBox _filter = new();
-    private readonly Label _listStatus = new();
-    private readonly Label _editorStatus = new();
+    // Each view is disposed when navigating; controls must be recreated.
+    private DataGridView _grid = new();
+    private TextBox _search = new();
+    private ComboBox _filter = new();
+    private Label _listStatus = new();
+    private Label _editorStatus = new();
     private DataRow? _editing;
     private bool _busy;
     private int _tempUid = -1;
@@ -316,6 +317,10 @@ internal sealed class WorkerContractsEditor : UserControl
         _editing = null;
         _invalidFields.Clear();
         ClearView();
+        _grid = new DataGridView();
+        _search = new TextBox();
+        _filter = new ComboBox();
+        _listStatus = new Label();
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
@@ -609,6 +614,7 @@ internal sealed class WorkerContractsEditor : UserControl
         _editing = row;
         _invalidFields.Clear();
         ClearView();
+        _editorStatus = new Label();
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
