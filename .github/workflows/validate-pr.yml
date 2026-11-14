@@ -54,6 +54,8 @@ jobs:
             pwr-header-popularity.png
             pwr-header-business-skills.png
             pwr-header-database.png
+            worker-contract-list-preview.png
+            worker-contract-editor-preview.png
           if-no-files-found: warn
           retention-days: 30
       - name: Verify published runtime paths and base template

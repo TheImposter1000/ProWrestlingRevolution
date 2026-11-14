@@ -1,5 +1,17 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.7: Worker Contracts selection and detailed editor
+
+The Worker Editor's Contracts section is now a dedicated two-stage workspace, directly following the supplied list and editor reference images. The selection view provides employer names and logos where available, contract type, calculated status, start/end dates, primary role, search, status filter, sortable rows and functioning Open/Add/Remove controls. Double-click and Enter open the selected contract.
+
+The detail view contains the selected worker's portrait, employer, contract-specific identity and biography, four organized cards for Basic Details, Roster Details, Terms and Roles, plus Reset, Back, Save, alter-ego import and copy from another worker's existing contract. Every editable control is bound to a native `tblContract` or `tblContractBio` column. Employers and managers come from real MDB records. Dropdown options are populated from existing native data, while date and numeric inputs use their actual Access types.
+
+The current 14-table PRW MDB does **not** provide dedicated fields for all mockup perks, including Creative Control, Hiring Veto, Merchandise Cut, Wage Matching, Shows Control and bonuses. These are displayed as **Not in MDB** and cannot falsely overwrite other fields. The forthcoming redesigned database can add them later without compromising the current native data.
+
+The new contract save layer commits only contract-related rows and biographies in one transaction, with new UIDs, conflict detection and safe deletion of linked biographies. It does not commit unrelated worker fields or add database backup files. The in-game EXE updater continues to leave existing databases, saves, artwork, skins and settings intact.
+
+Windows smoke tests use in-memory contract records to verify navigation, search, role field mapping, Add and binding. Real MDB writes still require Microsoft ACE OLE DB on the player's Windows installation.
+
 ## Version 0.6.6: one consistent PWR application header
 
 The launcher and all Worker Editor sections now share a single **PwrSharedHeader** component and one full-width **MetalTopBar**. The header follows the supplied reference design: blue-metal gradients, a PWR logo and two-line wordmark, cyan separator and lower rule, contextual page title and italic subtitle, with the four existing live sound/help/minimize/close controls. It is 56 pixels tall and identically styled on all interior pages. The version-only red-slash title bar and Skills-specific title artwork have been retired.

@@ -30,7 +30,8 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly string? _databaseFile;
     private readonly string? _password;
     private sealed record WorkerFieldBinding(DataRow? Row, string Field, string? Table = null);
-    private string _initialValueSnapshot = "";
+    private readonly Dictionary<string, string> _savedSectionSnapshots =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Label _saveStatus = new()
     {
         Name = "WorkerSaveStatus", Location = new Point(8, 510),
@@ -76,6 +77,8 @@ internal sealed class WorkerEditorForm : UserControl
             ShowSection("General");
             return;
         }
+        if (_active == "Contracts" && ActiveContractsEditor()?.ReturnToList() == true)
+            return;
         if (HasPendingChanges() &&
             MessageBox.Show(FindForm(),
                 "Discard unsaved worker changes and return to the Database Editor?",
@@ -85,18 +88,31 @@ internal sealed class WorkerEditorForm : UserControl
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private static string SnapshotValues(PrwWorkerProfile profile) =>
-        string.Join("\u001e", profile.Sections.SelectMany(section =>
-            section.Records.Rows.Cast<DataRow>().Select(row =>
-                section.Table + ":" + string.Join("\u001f",
-                    row.ItemArray.Select(value =>
-                        value is DBNull ? "<null>" :
-                        Convert.ToString(value, CultureInfo.InvariantCulture) ?? "")))));
-    
+    private static string SnapshotSection(PrwProfileSection section) =>
+        string.Join("\u001e", section.Records.Rows.Cast<DataRow>()
+            .Where(row => row.RowState != DataRowState.Deleted)
+            .Select(row => string.Join("\u001f", row.ItemArray.Select(value =>
+                value is DBNull ? "<null>" :
+                Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""))));
+
+    private void MarkSavedSections(params string[] names)
+    {
+        foreach (var section in _profile.Sections)
+        {
+            if (names.Length > 0 &&
+                !names.Contains(section.Table, StringComparer.OrdinalIgnoreCase))
+                continue;
+            _savedSectionSnapshots[section.Table] = SnapshotSection(section);
+        }
+    }
+
     private bool HasPendingChanges() =>
-        !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
-            StringComparison.Ordinal) ||
-        ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true;
+        _profile.Sections.Any(section =>
+            !_savedSectionSnapshots.TryGetValue(section.Table, out string? snapshot) ||
+            !string.Equals(snapshot, SnapshotSection(section),
+                StringComparison.Ordinal)) ||
+        ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true ||
+        ActiveContractsEditor()?.ValidateBeforeLeaving() == false;
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
         PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
@@ -133,7 +149,7 @@ internal sealed class WorkerEditorForm : UserControl
         timer.Restart();
 
         ShowSection("General");
-        _initialValueSnapshot = SnapshotValues(_profile);
+        MarkSavedSections();
 
         System.Diagnostics.Debug.WriteLine(
             $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
@@ -164,6 +180,7 @@ internal sealed class WorkerEditorForm : UserControl
         // All cached controls hold DataRows from the previous worker. Discard
         // them before swapping profiles so no changes can leak across workers.
         InvalidateSectionViews();
+        _savedSectionSnapshots.Clear();
         _profile = profile;
         _loadedSkillValues = CaptureSkillValues(profile);
         RequestedNavigation = null;
@@ -193,7 +210,7 @@ internal sealed class WorkerEditorForm : UserControl
 
         ShowSection("General");
         _saveStatus.Text = "";
-        _initialValueSnapshot = SnapshotValues(_profile);
+        MarkSavedSections();
     }
 
     private void RequestMainMenu(string key)
@@ -690,6 +707,9 @@ internal sealed class WorkerEditorForm : UserControl
     private WorkerSkillsEditor? ActiveSkillsEditor() =>
         _content.Controls.OfType<WorkerSkillsEditor>().FirstOrDefault();
 
+    private WorkerContractsEditor? ActiveContractsEditor() =>
+        _content.Controls.OfType<WorkerContractsEditor>().FirstOrDefault();
+
     private DataRow? First(string table) =>
         _profile.Sections.FirstOrDefault(s => s.Table.Equals(table, StringComparison.OrdinalIgnoreCase))
             ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
@@ -927,7 +947,7 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         var timer = System.Diagnostics.Stopwatch.StartNew();
 
-        bool skills = _active == "Skills";
+        bool skills = _active is "Skills" or "Contracts";
         _identityBiography.Visible = !skills;
         _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
         long topTime = timer.ElapsedMilliseconds;
@@ -1650,6 +1670,9 @@ else
         if (_active == "Skills" &&
             ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
             return;
+        if (_active == "Contracts" &&
+            ActiveContractsEditor()?.ValidateBeforeLeaving() == false)
+            return;
 
         var timer = System.Diagnostics.Stopwatch.StartNew();
         bool existingPage = _sectionViews.TryGetValue(section, out var target) &&
@@ -1693,13 +1716,14 @@ else
             {
                 if (section == "General") BuildGeneral();
                 else if (section == "Skills") BuildSkills();
+                else if (section == "Contracts") BuildContracts();
                 else BuildSecondary(section);
                 var rendered = _content.Controls.Cast<Control>().Single();
                 _sectionViews[section] = rendered;
                 SectionViewBuildCount++;
             }
 
-            SetImmersiveSkillsLayout(section == "Skills");
+            SetImmersiveSkillsLayout(section is "Skills" or "Contracts");
         }
         finally
         {
@@ -1711,14 +1735,16 @@ else
         System.Diagnostics.Trace.WriteLine(
             $"Worker tab '{section}': {LastSectionSwitchMilliseconds} ms; " +
             $"cached={_sectionViews.Count}, builds={SectionViewBuildCount}");
-        SectionChanged?.Invoke(section);
+        SectionChanged?.Invoke(section == "Contracts" &&
+            ActiveContractsEditor()?.IsEditing == true
+            ? "Contracts.Edit" : section);
         PwrPerformanceLog.Record("Tab." + section, timer,
             existingPage ? "cached=true" : "cached=false");
     }
 
     private void RestoreCachedActions(Control view, string section)
     {
-        if (section == "Skills") return;
+        if (section is "Skills" or "Contracts") return;
         if (section == "General" && view is TableLayoutPanel general)
         {
             _actionArea.Dock = DockStyle.Fill;
@@ -1769,6 +1795,20 @@ else
     {
         _content.Controls.Add(new WorkerSkillsEditor(_profile,
             _databaseFile is not null, SaveWorker, _loadedSkillValues));
+    }
+
+    private void BuildContracts()
+    {
+        _content.Controls.Add(new WorkerContractsEditor(_paths, _profile,
+            _databaseFile, _password,
+            context => SectionChanged?.Invoke(context),
+            () =>
+            {
+                // A contract Save should return to its list, not close the
+                // Worker Editor or commit unrelated unsaved worker fields.
+                MarkSavedSections("tblContract", "tblContractBio");
+                _saveStatus.Text = "";
+            }));
     }
 
     private static string? SectionTable(string section) => section switch
@@ -2431,10 +2471,19 @@ else
     private void SaveWorker()
     {
         if (_databaseFile is null) return;
+        // Contracts have their own transactional editor. Do not let the
+        // Worker General save attempt to write an incomplete linked record
+        // or silently commit contract changes while editing other fields.
+        if (PrwContractEditorService.HasPendingChanges(_profile))
+        {
+            _saveStatus.Text = "Save pending contract changes in Contracts first.";
+            ShowSection("Contracts");
+            return;
+        }
         try
         {
             PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
-            _initialValueSnapshot = SnapshotValues(_profile);
+            MarkSavedSections();
             _saveStatus.Text = "";
             // Save closes the overlay directly. The Database Editor refreshes
             // its worker list in the existing CloseRequested handler.

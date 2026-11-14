@@ -41,7 +41,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.6 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.7 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor and Skills visual verification previews
         if: always()
@@ -53,6 +53,8 @@ jobs:
             worker-skills-preview.png
             worker-skills-compact-preview.png
             worker-skills-header-preview.png
+            worker-contract-list-preview.png
+            worker-contract-editor-preview.png
             pwr-header-worker.png
             pwr-header-skills.png
             pwr-header-contracts.png
@@ -104,7 +106,7 @@ jobs:
           mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
           if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
 
-      - name: Assemble the Version 0.6.6 complete game ZIP
+      - name: Assemble the Version 0.6.7 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -128,7 +130,7 @@ jobs:
         run: |
           Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
           if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.6.0") {
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.7.0") {
             throw "Standalone EXE file version does not match this release"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -159,51 +161,61 @@ jobs:
       - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.6.6
-          name: Pro Wrestling Revolution 0.6.6 - Unified Application Header
+          tag_name: v0.6.7
+          name: Pro Wrestling Revolution 0.6.7 - Worker Contracts
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            PWR v0.6.6 replaces the two incompatible interior title-bar
-            designs with one consistent PWR application header.
+            PWR v0.6.7 introduces the two-stage Worker Contracts workspace,
+            using the supplied selection-screen and Contract Editor designs.
 
-            ONE HEADER FOR ALL INTERIOR PAGES
-            Worker Editor, Skills, Contracts, Popularity, Attributes,
-            Business Skills, Job History, Business History, Legacy, Alter
-            Ego, Database Editor, New Game, Skins, Credits and Achievements
-            now use the same blue-metal title bar.
+            CONTRACT SELECTION SCREEN
+            Displays contracts for the current worker with employer/initials,
+            available employer logo, contract type, calculated active/expired
+            status, begin date, expiration date and primary role. Search,
+            status filter, row sorting, keyboard Enter, double-click, Open,
+            Add Contract and confirmed Remove are all functional. The
+            existing Worker Editor background is prepared and cached behind
+            the listing without repeated image stretching.
 
-            The approved PWR logo and two-line PRO WRESTLING REVOLUTION
-            wordmark, cyan vertical divider, page title and subtitle,
-            angular blue highlight and continuous cyan bottom rule
-            remain constant. Only page-specific title text changes.
-            The former red slash/version bar and separate Skills-only
-            plaque have been removed.
+            CONTRACT EDITOR
+            Presents an employee/employer/contract identity strip, editable
+            per-contract biography, Basic Details, Roster Details,
+            Terms/Perks & Bonuses and eight role checkboxes. Employer and
+            manager selectors resolve existing company and worker records.
+            Other dropdown values are sourced from the active MDB rather
+            than inventing TEW-specific numeric codes. Contract Start and
+            End dates, wages, booleans and manual fields preserve their
+            native database types. Reset, Back, Save, alter-ego import and
+            Copy Terms From Another Contract are connected.
 
-            UTILITY CONTROLS
-            The existing four real sound, help, minimize and close actions
-            remain functional and share the same height, alignment,
-            backgrounds, hover treatment and button geometry on every
-            interior page. The Help glyph remains vector drawn and
-            correctly centered.
+            DATA INTEGRITY
+            Add, Edit and Remove use tblContract and tblContractBio within a
+            single MDB transaction, with linked UID generation, conflict
+            detection and restoration of draft keys after a failed write.
+            A contract Save does not commit unrelated unsaved worker edits.
+            The existing PRW MDB schema is not changed. Fields drawn in
+            the visual mockup without an existing native column (including
+            Creative Control, Hiring Veto, Merchandise Cut, Wage Matching,
+            Shows Control and bonuses) are visibly read-only until the
+            redesigned database defines them. We do not silently save them
+            into unrelated columns.
 
-            SCOPE AND TESTING
-            The home/title screen artwork, navigation sidebar, Worker
-            General controls, Skills layout, game data, and gameplay are
-            unchanged. Windows CI verifies the shared header on Worker
-            General, Skills, Contracts, Popularity, Business Skills,
-            Database Editor, Skins, Achievements, Credits and New Game.
-            It compares all five Worker-section screenshots for identical
-            background and dimensions, checks utility alignment and
-            composited text visibility, and runs the compiled standalone EXE.
+            WINDOWS VERIFICATION
+            PR checks cover contract listing, search, opening, Back,
+            in-memory Add and field binding; they also produce image
+            previews for the list and editor. Native Access MDB writes
+            cannot run on hosted CI without Microsoft ACE OLE DB and
+            should be verified in the installed game against a writable
+            test universe.
 
-            CHECK FOR UPDATES
-            The updater replaces only ProWrestlingRevolution.exe.
-            Existing universes, saved games, databases, pictures, skins,
-            and settings remain in their current folders.
+            INSTALLATION
+            Check for Updates replaces only ProWrestlingRevolution.exe.
+            Existing universes, game saves, skins, pictures and settings
+            remain untouched. A complete ZIP is available separately.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
