@@ -86,8 +86,12 @@ internal static class PrwWorkerEditorService
         OleDbConnection connection, object? candidate)
     {
         if (candidate is null or DBNull) return;
-        if (!long.TryParse(Convert.ToString(candidate,
-                System.Globalization.CultureInfo.InvariantCulture), out long companyId))
+        string? raw = Convert.ToString(candidate,
+            System.Globalization.CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(raw) ||
+            string.Equals(raw, "None", StringComparison.OrdinalIgnoreCase))
+            return;
+        if (!long.TryParse(raw, out long companyId))
             throw new InvalidDataException("Company loyalty must reference a company ID.");
 
         if (companyId == 0) return;
