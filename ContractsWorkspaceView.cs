@@ -1105,6 +1105,8 @@ internal sealed class ContractsWorkspaceView : UserControl
 
     private sealed class RoleToggle : Control
     {
+        [System.ComponentModel.DesignerSerializationVisibility(
+            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal bool Checked { get; set; }
         internal RoleToggle(string title)
         {
