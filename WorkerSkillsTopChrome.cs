@@ -21,16 +21,17 @@ internal sealed class WorkerSkillsTopChrome : Control
         SetStyle(ControlStyles.UserPaint |
                  ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.OptimizedDoubleBuffer |
-                 ControlStyles.ResizeRedraw, true);
-        BackColor = Color.FromArgb(6, 21, 40);
+                 ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
         AccessibleName = "PWR Skills, Worker Skill Editor";
     }
 
-    protected override void OnPaint(PaintEventArgs e)
+    // One continuous gradient, facet and cyan accent behind the title
+    // AND all four actual interactive window controls.
+    internal static void PaintBackdrop(Graphics g, Rectangle rect)
     {
-        var rect = ClientRectangle;
-        if (rect.Width < 450 || rect.Height < 28) return;
-        var g = e.Graphics;
+        if (rect.Width <= 0 || rect.Height <= 0) return;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using (var background = new LinearGradientBrush(rect,
             Color.FromArgb(4, 15, 30), Color.FromArgb(11, 56, 95),
@@ -66,6 +67,16 @@ internal sealed class WorkerSkillsTopChrome : Control
             g.DrawLine(soft, rect.Width * 43 / 100, rect.Height - 3,
                 rect.Width * 89 / 100, rect.Height - 3);
 
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var rect = ClientRectangle;
+        if (rect.Width < 450 || rect.Height < 28) return;
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        // The background is painted once across the full MetalTopBar.
+        // This overlay paints only the title information.
         // The PWR monogram and three angular blue swooshes are drawn from
         // primitives, not a brittle screenshot cropped into a bitmap.
         using var swoosh = new Pen(Color.FromArgb(8, 159, 235), 3.4f);
