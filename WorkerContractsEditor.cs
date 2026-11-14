@@ -78,7 +78,7 @@ internal sealed class WorkerContractsEditor : UserControl
             _logoCache.Clear();
         };
         BuildList();
-        if (_databaseFile is not null)
+        if (_databaseFile is not null && File.Exists(_databaseFile))
         {
             HandleCreated += (_, _) => _ = FetchLookupsAsync();
             if (IsHandleCreated) _ = FetchLookupsAsync();
@@ -976,9 +976,18 @@ internal sealed class WorkerContractsEditor : UserControl
             AutoScroll = true,
             Padding = new Padding(11, 10, 8, 9)
         };
-        frame.Controls.Add(body);
-        frame.Controls.Add(header);
-        header.BringToFront();
+        var slots = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            BackColor = Color.Transparent,
+            Padding = Padding.Empty, Margin = Padding.Empty
+        };
+        slots.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        slots.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
+        slots.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        slots.Controls.Add(header, 0, 0);
+        slots.Controls.Add(body, 0, 1);
+        frame.Controls.Add(slots);
         void Arrange()
         {
             int inner = Math.Max(100, body.ClientSize.Width - 27);
@@ -1208,9 +1217,18 @@ internal sealed class WorkerContractsEditor : UserControl
             BackColor = Color.FromArgb(6, 23, 43),
             Padding = new Padding(12, 15, 4, 5)
         };
-        card.Controls.Add(body);
-        card.Controls.Add(header);
-        header.BringToFront();
+        var slots = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            BackColor = Color.Transparent,
+            Padding = Padding.Empty, Margin = Padding.Empty
+        };
+        slots.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        slots.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
+        slots.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        slots.Controls.Add(header, 0, 0);
+        slots.Controls.Add(body, 0, 1);
+        card.Controls.Add(slots);
         foreach (var (name, label) in new[]
         {
             ("RoleWrestler", "Wrestler"),
