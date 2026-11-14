@@ -362,6 +362,7 @@ internal static class Program
                 // The four utility buttons remain in their real launcher bar.
                 launcher.SetWorkerSectionChrome("Skills");
                 if (topbar.Height != 56 ||
+                    !launcher.SkillsImmersiveMode ||
                     topbar.Controls.Find("WorkerSkillsTopChrome", false)
                         .SingleOrDefault() is not WorkerSkillsTopChrome skillsHeader ||
                     skillsHeader.Height != 56 ||
@@ -369,8 +370,10 @@ internal static class Program
                     controls.Any(button => button.Height != 56))
                     throw new Exception("Skills header lost its reference proportions or obscured utilities.");
                 launcher.SetWorkerSectionChrome(null);
-                if (topbar.Height != 40 || controls.Any(button => button.Height != 40))
-                    throw new Exception("Leaving Skills did not restore the original header.");
+                if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
+                    controls.Any(button => button.Height != 40))
+                    throw new Exception(
+                        "Leaving Skills did not restore the original header and icon rail.");
 
                 // The editor is a full-width directory. The name of the MDB is the
                 // central heading, and the mass-edit dropdown sits beneath its button.
@@ -733,10 +736,29 @@ internal static class Program
                         System.Reflection.BindingFlags.NonPublic)!
                         .Invoke(workerEditor, ["Skills"]);
                     Application.DoEvents();
-                    if (workerEditor.Controls.Find("WorkerSkillsEditor", true).Length != 1 ||
+                    var livePage = workerEditor.Controls.Find("WorkerPage", true)
+                        .Single() as TableLayoutPanel;
+                    var liveBody = workerEditor.Controls.Find("WorkerEditorBody", true).Single();
+                    var liveRail = workerEditor.Controls.Find("WorkerSectionNavigation", true).Single();
+                    var liveSkills = workerEditor.Controls.Find("WorkerSkillsEditor", true)
+                        .SingleOrDefault() as WorkerSkillsEditor;
+                    if (livePage is null || liveSkills is null ||
+                        livePage.ColumnStyles[0].Width != 0 ||
+                        liveRail.Visible ||
+                        liveBody.Width < livePage.ClientSize.Width - 12 ||
                         workerEditor.Controls.Find("WorkerIdentityBiographyRow", true)
                             .Single().Visible)
-                        throw new Exception("Skills must occupy the content area without identity/biography.");
+                        throw new Exception(
+                            "Skills must occupy the full Worker Editor width without tabs or biography.");
+
+                    // Back leaves the dedicated Skills screen, preserving
+                    // the Worker profile and restoring its normal navigation.
+                    workerEditor.Close();
+                    Application.DoEvents();
+                    if (workerEditor.ActiveSection != "General" ||
+                        livePage.ColumnStyles[0].Width != 158 ||
+                        liveBody.Width > livePage.ClientSize.Width - 140)
+                        throw new Exception("Back did not restore the standard Worker profile.");
 
                     string skillPreview = Path.Combine(
                         Path.GetDirectoryName(previewPath)!,
