@@ -59,6 +59,8 @@ internal sealed class WorkerEditorForm : UserControl
 
     internal string? RequestedNavigation { get; private set; }
     internal event EventHandler? CloseRequested;
+    internal event Action<string>? SectionChanged;
+    internal string ActiveSection => _active;
 
     internal void Close()
     {
@@ -1669,6 +1671,7 @@ internal sealed class WorkerEditorForm : UserControl
         else BuildSecondary(section);
         LayoutWorkerCanvas();
         _content.ResumeLayout();
+        SectionChanged?.Invoke(section);
     }
 
     private void BuildSkills()
