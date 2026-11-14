@@ -47,7 +47,12 @@ internal sealed class WorkerSkillsTopChrome : Control
             };
             g.FillRectangle(background, rect);
         }
-        using (var facet = new SolidBrush(Color.FromArgb(38, 28, 111, 183)))
+        using (var brushed = new LinearGradientBrush(
+            new Rectangle(0, 0, rect.Width, Math.Max(2, rect.Height / 2)),
+            Color.FromArgb(37, 19, 111, 194),
+            Color.FromArgb(0, 8, 42, 101), LinearGradientMode.Vertical))
+            g.FillRectangle(brushed, 0, 0, rect.Width, rect.Height / 2);
+        using (var facet = new SolidBrush(Color.FromArgb(56, 28, 111, 183)))
             g.FillPolygon(facet,
             [
                 new Point(rect.Width * 76 / 100, 0),
@@ -68,25 +73,25 @@ internal sealed class WorkerSkillsTopChrome : Control
         g.DrawBezier(swoosh, 22, 35, 42, 15, 76, 12, 151, 17);
         g.DrawBezier(swoosh, 22, 42, 44, 28, 83, 23, 154, 23);
 
-        float logoSize = rect.Height >= 51 ? 28f : 24f;
+        float logoSize = rect.Height >= 51 ? 31f : 25f;
         using var logoFont = new Font("Arial", logoSize,
             FontStyle.Bold | FontStyle.Italic);
         TextRenderer.DrawText(g, "PWR", logoFont,
-            new Rectangle(49, 0, 148, rect.Height),
+            new Rectangle(47, 0, 148, rect.Height),
             Color.FromArgb(60, 120, 166), TextFormatFlags.VerticalCenter |
             TextFormatFlags.NoPrefix);
         TextRenderer.DrawText(g, "PWR", logoFont,
-            new Rectangle(46, -2, 148, rect.Height),
+            new Rectangle(44, -2, 148, rect.Height),
             White, TextFormatFlags.VerticalCenter |
             TextFormatFlags.NoPrefix);
 
-        using var brandFont = new Font("Segoe UI", 11.8f,
+        using var brandFont = new Font("Segoe UI", 12.3f,
             FontStyle.Bold | FontStyle.Italic);
         TextRenderer.DrawText(g, "PRO WRESTLING", brandFont,
-            new Rectangle(195, 6, 192, rect.Height / 2),
+            new Rectangle(167, 6, 215, rect.Height / 2),
             White, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         TextRenderer.DrawText(g, "REVOLUTION", brandFont,
-            new Rectangle(195, rect.Height / 2 - 1, 192, rect.Height / 2),
+            new Rectangle(167, rect.Height / 2 - 1, 215, rect.Height / 2),
             White, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
         int dividerX = 400;
