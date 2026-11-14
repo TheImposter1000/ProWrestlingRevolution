@@ -277,8 +277,12 @@ internal sealed class WorkerSkillsEditor : UserControl
                         skillRow.Width = availableWidth;
                     if (skillRow.Height != availableHeight)
                         skillRow.Height = availableHeight;
-                    if (i == 3 && skillRow is SkillRatingRow longRow)
-                        longRow.SetLabelShare(compact ? 46f : 37.6f);
+                    if (skillRow is SkillRatingRow rating)
+                    {
+                        rating.SetDensity(compact);
+                        if (i == 3)
+                            rating.SetLabelShare(compact ? 46f : 37.6f);
+                    }
                 }
                 ratings.ResumeLayout(true);
             }
@@ -371,8 +375,12 @@ internal sealed class WorkerSkillsEditor : UserControl
             {
                 if (rating.Width != width) rating.Width = width;
                 if (rating.Height != height) rating.Height = height;
-                if (groupIndex == 3 && rating is SkillRatingRow skillRow)
-                    skillRow.SetLabelShare(Height < 790 ? 46f : 37.6f);
+                if (rating is SkillRatingRow skillRow)
+                {
+                    skillRow.SetDensity(Height < 790);
+                    if (groupIndex == 3)
+                        skillRow.SetLabelShare(Height < 790 ? 46f : 37.6f);
+                }
             }
         }
         rows.Resize += (_, _) => PlaceRows();
@@ -633,6 +641,11 @@ internal sealed class WorkerSkillsEditor : UserControl
 
     private sealed class SkillRatingRow : UserControl
     {
+        private static readonly Font WideLabelFont =
+            new("Segoe UI", 12.7f, FontStyle.Bold);
+        private static readonly Font CompactLabelFont =
+            new("Segoe UI", 10.2f, FontStyle.Bold);
+        private readonly Label _label;
         private readonly SkillGlowSlider _slider;
         private readonly SkillNumberSpinner _spinner;
         private readonly TableLayoutPanel _columns;
@@ -666,12 +679,12 @@ internal sealed class WorkerSkillsEditor : UserControl
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
             columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            var title = new Label
+            _label = new Label
             {
                 Name = "SkillLabel_" + field,
                 Text = label, UseMnemonic = false,
                 Dock = DockStyle.Fill, AutoEllipsis = true,
-                Font = new Font("Segoe UI", 12.7f, FontStyle.Bold),
+                Font = WideLabelFont,
                 ForeColor = SkillChrome.White,
                 BackColor = Color.Transparent,
                 Margin = Padding.Empty,
@@ -688,7 +701,9 @@ internal sealed class WorkerSkillsEditor : UserControl
             _spinner = new SkillNumberSpinner(field, rating, enabled)
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(0, 1, 4, 1)
+                // A 2px vertical gutter keeps adjacent numeric editors from
+                // forming one continuous column at PWR's compact resolution.
+                Margin = new Padding(0, 2, 4, 2)
             };
             _slider.RatingChanged += (_, _) =>
             {
@@ -702,10 +717,17 @@ internal sealed class WorkerSkillsEditor : UserControl
                 _slider.SetValue(number);
                 _changed(number);
             };
-            columns.Controls.Add(title, 0, 0);
+            columns.Controls.Add(_label, 0, 0);
             columns.Controls.Add(_slider, 1, 0);
             columns.Controls.Add(_spinner, 2, 0);
             Controls.Add(columns);
+        }
+
+        internal void SetDensity(bool compact)
+        {
+            var target = compact ? CompactLabelFont : WideLabelFont;
+            if (!ReferenceEquals(_label.Font, target))
+                _label.Font = target;
         }
 
         internal void SetLabelShare(float percent)
