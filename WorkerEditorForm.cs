@@ -43,6 +43,7 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Color.Transparent };
     private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
     private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty, BackColor = Color.Transparent };
+    private TableLayoutPanel? _workerPage;
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
     private readonly Dictionary<TextBox, WorkerFieldBinding> _manualEditors = new();
     private readonly HashSet<TextBox> _invalidManualEditors = new();
@@ -64,6 +65,14 @@ internal sealed class WorkerEditorForm : UserControl
 
     internal void Close()
     {
+        // The reference Skills tab is a nested, full-screen workspace.
+        // The existing Back/Escape action returns to General first.
+        // Saving from Skills still returns directly to the Database Editor.
+        if (_active == "Skills")
+        {
+            ShowSection("General");
+            return;
+        }
         if (HasPendingChanges() &&
             MessageBox.Show(FindForm(),
                 "Discard unsaved worker changes and return to the Database Editor?",
@@ -721,6 +730,7 @@ internal sealed class WorkerEditorForm : UserControl
         page.HandleCreated += (_, _) =>
             _ = RestoreBackgroundAsync(page, backgroundPath);
 
+        _workerPage = page;
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -1641,6 +1651,7 @@ internal sealed class WorkerEditorForm : UserControl
             return;
         _active = section;
         _recordIndex = 0;
+        SetImmersiveSkillsLayout(section == "Skills");
         foreach (var (name, button) in _tabs)
         {
             // The approved General composition uses Alter Ego as the
@@ -1672,6 +1683,17 @@ internal sealed class WorkerEditorForm : UserControl
         LayoutWorkerCanvas();
         _content.ResumeLayout();
         SectionChanged?.Invoke(section);
+    }
+
+    private void SetImmersiveSkillsLayout(bool skills)
+    {
+        if (_workerPage is null || _workerPage.IsDisposed) return;
+        // No Worker tab strip may consume width on the reference Skills page.
+        // Keep its controls allocated for instantaneous restoration on Back.
+        _workerPage.SuspendLayout();
+        _sectionNavigation.Visible = !skills;
+        _workerPage.ColumnStyles[0].Width = skills ? 0 : 158;
+        _workerPage.ResumeLayout(true);
     }
 
     private void BuildSkills()
