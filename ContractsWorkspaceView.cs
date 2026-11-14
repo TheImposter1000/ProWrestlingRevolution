@@ -465,7 +465,10 @@ internal sealed class ContractsWorkspaceView : UserControl
         if (_creating && !text &&
             template?.Table.Columns[column]?.DataType is Type inputType &&
             inputType != typeof(string))
-            current = choicesForField.FirstOrDefault() ?? current;
+            current = choicesForField.FirstOrDefault() ??
+                (inputType == typeof(DateTime)
+                    ? DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : inputType == typeof(bool) ? "No" : "0");
         if (!text && current.Length != 0)
             choicesForField.Insert(0, current);
 
@@ -716,7 +719,6 @@ internal sealed class ContractsWorkspaceView : UserControl
                 catch (Exception ex) when (ex is FormatException or InvalidCastException
                                            or OverflowException)
                 {
-                    if (_creating) continue; // Database-defined default for an unmapped enum.
                     throw new InvalidDataException(
                         key + " needs a value supported by the universe.", ex);
                 }
