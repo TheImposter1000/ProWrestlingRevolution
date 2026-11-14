@@ -432,17 +432,8 @@ internal sealed class WorkerEditorForm : UserControl
                     y += current.Top;
                 }
 
-                float scaleX = (float)artwork.Width / page.ClientSize.Width;
-                float scaleY = (float)artwork.Height / page.ClientSize.Height;
-
-                e.Graphics.DrawImage(
-                    artwork,
-                    ClientRectangle,
-                    x * scaleX,
-                    y * scaleY,
-                    Width * scaleX,
-                    Height * scaleY,
-                    GraphicsUnit.Pixel);
+                PaintPageBackdrop(e.Graphics, artwork, page,
+                    ClientRectangle, x, y);
             }
             else
             {
@@ -703,6 +694,31 @@ internal sealed class WorkerEditorForm : UserControl
         _profile.Sections.FirstOrDefault(s => s.Table.Equals(table, StringComparison.OrdinalIgnoreCase))
             ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
 
+    private static void PaintPageBackdrop(Graphics graphics, Image artwork,
+        Control page, Rectangle destination, int originX, int originY)
+    {
+        // The image cache now prepares an exact-size bitmap. Do a direct
+        // 1:1 blit of the correct portion instead of invoking GDI+ resampling
+        // individually for every dropdown, card, and action panel.
+        if (artwork.Size == page.ClientSize)
+        {
+            var state = graphics.Save();
+            graphics.SetClip(destination);
+            graphics.DrawImageUnscaled(artwork, -originX, -originY);
+            graphics.Restore(state);
+            return;
+        }
+
+        // This fallback is needed only during a resize while a newly
+        // prepared bitmap is still being generated in the background.
+        float scaleX = (float)artwork.Width / page.ClientSize.Width;
+        float scaleY = (float)artwork.Height / page.ClientSize.Height;
+        graphics.DrawImage(artwork, destination,
+            originX * scaleX, originY * scaleY,
+            destination.Width * scaleX, destination.Height * scaleY,
+            GraphicsUnit.Pixel);
+    }
+
     private void BuildFrame()
     {
         // An explicit fixed logical canvas matches the approved 1366x768
@@ -823,17 +839,8 @@ internal sealed class WorkerEditorForm : UserControl
                     origin.Offset(current.Left, current.Top);
                 }
 
-                float scaleX = (float)artwork.Width / page.ClientSize.Width;
-                float scaleY = (float)artwork.Height / page.ClientSize.Height;
-
-                e.Graphics.DrawImage(
-                    artwork,
-                    top.ClientRectangle,
-                    origin.X * scaleX,
-                    origin.Y * scaleY,
-                    top.ClientSize.Width * scaleX,
-                    top.ClientSize.Height * scaleY,
-                    GraphicsUnit.Pixel);
+                PaintPageBackdrop(e.Graphics, artwork, page,
+                    top.ClientRectangle, origin.X, origin.Y);
 
                 using var glassTint = new SolidBrush(
                     Color.FromArgb(90, 9, 18, 31));
@@ -891,17 +898,8 @@ internal sealed class WorkerEditorForm : UserControl
                 origin.Offset(current.Left, current.Top);
             }
 
-            float scaleX = (float)artwork.Width / page.ClientSize.Width;
-            float scaleY = (float)artwork.Height / page.ClientSize.Height;
-
-            e.Graphics.DrawImage(
-                artwork,
-                _mainArea.ClientRectangle,
-                origin.X * scaleX,
-                origin.Y * scaleY,
-                _mainArea.ClientSize.Width * scaleX,
-                _mainArea.ClientSize.Height * scaleY,
-                GraphicsUnit.Pixel);
+            PaintPageBackdrop(e.Graphics, artwork, page,
+                _mainArea.ClientRectangle, origin.X, origin.Y);
 
             using var glassTint = new SolidBrush(
                 Color.FromArgb(90, 9, 18, 31));
@@ -2480,17 +2478,8 @@ else
                 origin.Offset(current.Left, current.Top);
             }
 
-            float scaleX = (float)background.Width / page.ClientSize.Width;
-            float scaleY = (float)background.Height / page.ClientSize.Height;
-
-            e.Graphics.DrawImage(
-                background,
-                _actionArea.ClientRectangle,
-                origin.X * scaleX,
-                origin.Y * scaleY,
-                _actionArea.ClientSize.Width * scaleX,
-                _actionArea.ClientSize.Height * scaleY,
-                GraphicsUnit.Pixel);
+            PaintPageBackdrop(e.Graphics, background, page,
+                _actionArea.ClientRectangle, origin.X, origin.Y);
 
             using var tint = new SolidBrush(Color.FromArgb(90, 9, 18, 31));
             e.Graphics.FillRectangle(tint, _actionArea.ClientRectangle);
@@ -2526,17 +2515,8 @@ else
                 origin.Offset(current.Left, current.Top);
             }
 
-            float scaleX = (float)artwork.Width / page.ClientSize.Width;
-            float scaleY = (float)artwork.Height / page.ClientSize.Height;
-
-            e.Graphics.DrawImage(
-                artwork,
-                buttons.ClientRectangle,
-                origin.X * scaleX,
-                origin.Y * scaleY,
-                buttons.ClientSize.Width * scaleX,
-                buttons.ClientSize.Height * scaleY,
-                GraphicsUnit.Pixel);
+            PaintPageBackdrop(e.Graphics, artwork, page,
+                buttons.ClientRectangle, origin.X, origin.Y);
 
             using var tint = new SolidBrush(
                 Color.FromArgb(90, 9, 18, 31));
