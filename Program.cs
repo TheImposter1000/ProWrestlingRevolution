@@ -30,7 +30,6 @@ internal static class Program
 
             ApplicationConfiguration.Initialize();
             var paths = new AppPaths(FindGameRoot());
-            MessageBox.Show("Game folder: " + paths.Root + "\nExecutable folder: " + AppContext.BaseDirectory);
             paths.EnsureLayout();
             Application.Run(new LauncherForm(paths));
             return 0;
@@ -315,6 +314,19 @@ internal static class Program
                 var massField = descendants.SingleOrDefault(c => c.Name == "MassEditFieldSelector");
                 var categories = descendants.SingleOrDefault(c => c.Name == "EditorCategorySelector");
                 var notes = descendants.SingleOrDefault(c => c.Name == "EditorNotes");
+                foreach (string name in new[]
+                    { "AddRecordButton", "DeleteRecordsButton",
+                      "CopyRecordsButton", "ImportRecordsButton" })
+                {
+                    if (descendants.SingleOrDefault(c => c.Name == name) is not Button action ||
+                        !action.Enabled)
+                        throw new Exception(name + " must be a functional editor action.");
+                }
+                if (!PrwRecordOperations.Supports("tblWorker") ||
+                    !PrwRecordOperations.Supports("tblFed") ||
+                    !PrwRecordOperations.Supports("tblMatch") ||
+                    PrwRecordOperations.Supports("tblContract"))
+                    throw new Exception("Native record operation categories are incorrect.");
                 if (databaseName is null || categories is null || notes is null)
                     throw new Exception("Editor directory sections are missing.");
                 if (massButton is null || massField is null ||
@@ -323,7 +335,7 @@ internal static class Program
 
             }
 
-            // Fixed Worker Editor is an interface-only view: verify its
+            // Fixed Worker Editor layout can be verified using in-memory workers.
             // screenshot-based layout using in-memory worker records. It
             // must not need the Access provider for UI construction.
             var workerTable = new System.Data.DataTable("tblWorker");
@@ -377,6 +389,24 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerSectionContent", true)
                         .OfType<ScrollableControl>().Any(control => control.AutoScroll))
                     throw new Exception("Worker Editor may not use scrolling in its fixed layout.");
+
+                // A form with an assigned native file path exposes functional
+                // actions without requiring the Access provider just to draw them.
+                using (var editableWorker = new WorkerEditorForm(
+                    paths, skin, profile, Path.Combine(root, "worker-smoke.mdb")))
+                {
+                    foreach (string action in new[]
+                        { "WorkerSave", "WorkerCreateMoveset",
+                          "WorkerSuggestName", "WorkerMakeBiography" })
+                    {
+                        if (editableWorker.Controls.Find(action, true)
+                                .SingleOrDefault() is not Button active || !active.Enabled)
+                            throw new Exception(action + " is not enabled in editing mode.");
+                    }
+                    if (editableWorker.Controls.Find("WorkerField_Name", true)
+                            .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton)
+                        throw new Exception("Worker name must be an accessible editing control.");
+                }
 
                 // The current Worker Editor has a single-column popup shell
                 // containing a two-column page: 158px section navigation and
