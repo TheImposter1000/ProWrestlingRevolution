@@ -83,11 +83,26 @@ internal static class PrwWorkerEditorService
             .Select(c => c.ColumnName).ToArray();
     }
 
-    private static OleDbParameter AddValue(OleDbCommand cmd, object? value)
+    private static void AddValue(OleDbCommand cmd, object? value,
+        DataColumn? column = null)
     {
-        var parameter = cmd.Parameters.Add("p" + cmd.Parameters.Count, OleDbType.Variant);
+        var dataType = column?.DataType ??
+            (value is not null and not DBNull ? value.GetType() : typeof(string));
+        var type = dataType == typeof(string)
+            ? value is string text && text.Length > 255
+                ? OleDbType.LongVarWChar : OleDbType.VarWChar
+            : dataType == typeof(bool) ? OleDbType.Boolean
+            : dataType == typeof(DateTime) ? OleDbType.DBTimeStamp
+            : dataType == typeof(int) ? OleDbType.Integer
+            : dataType == typeof(short) ? OleDbType.SmallInt
+            : dataType == typeof(long) ? OleDbType.BigInt
+            : dataType == typeof(byte) ? OleDbType.UnsignedTinyInt
+            : dataType == typeof(float) ? OleDbType.Single
+            : dataType == typeof(double) ? OleDbType.Double
+            : dataType == typeof(decimal) ? OleDbType.Decimal
+            : OleDbType.Variant;
+        var parameter = cmd.Parameters.Add("p" + cmd.Parameters.Count, type);
         parameter.Value = value ?? DBNull.Value;
-        return parameter;
     }
 
     private static void ValidateChange(OleDbConnection connection, string tableName, DataRow row)
@@ -119,7 +134,7 @@ internal static class PrwWorkerEditorService
                 throw new InvalidDataException("New biographies require a worker UID.");
             using var check = new OleDbCommand(
                 "SELECT COUNT(*) FROM [tblWorkerBio] WHERE [WorkerUID] = ?", connection);
-            AddValue(check, row["WorkerUID"]);
+            AddValue(check, row["WorkerUID"], row.Table.Columns["WorkerUID"]);
             if (Convert.ToInt32(check.ExecuteScalar()) != 0)
                 throw new DBConcurrencyException("This worker already has a biography.");
             return;
@@ -129,7 +144,7 @@ internal static class PrwWorkerEditorService
             table.KeyColumns.Select(column => Quote(column) + " = ?"));
         using var current = new OleDbCommand(
             "SELECT * FROM " + Quote(table.Name) + " WHERE " + clause, connection);
-        foreach (var key in table.KeyColumns) AddValue(current, row[key, DataRowVersion.Original]);
+        foreach (var key in table.KeyColumns) AddValue(current, row[key, DataRowVersion.Original], row.Table.Columns[key]);
         using var reader = current.ExecuteReader()
             ?? throw new IOException("Cannot verify the existing worker record.");
         if (!reader.Read())
@@ -161,7 +176,8 @@ internal static class PrwWorkerEditorService
                 "INSERT INTO " + Quote(table.Name) +
                 " (" + string.Join(", ", columns.Select(Quote)) + ") VALUES (" +
                 string.Join(", ", columns.Select(_ => "?")) + ")", connection, transaction);
-            foreach (string column in columns) AddValue(insert, row[column]);
+            foreach (string column in columns)
+                AddValue(insert, row[column], row.Table.Columns[column]);
             if (insert.ExecuteNonQuery() != 1)
                 throw new DBConcurrencyException("The biography could not be inserted.");
             return;
@@ -174,9 +190,10 @@ internal static class PrwWorkerEditorService
             string.Join(", ", edited.Select(column => Quote(column) + " = ?")) +
             " WHERE " + string.Join(" AND ", table.KeyColumns.Select(key => Quote(key) + " = ?")),
             connection, transaction);
-        foreach (string column in edited) AddValue(update, row[column]);
+        foreach (string column in edited)
+            AddValue(update, row[column], row.Table.Columns[column]);
         foreach (string key in table.KeyColumns)
-            AddValue(update, row[key, DataRowVersion.Original]);
+            AddValue(update, row[key, DataRowVersion.Original], row.Table.Columns[key]);
         if (update.ExecuteNonQuery() != 1)
             throw new DBConcurrencyException("A worker record could not be updated uniquely.");
     }
