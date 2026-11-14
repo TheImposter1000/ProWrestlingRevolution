@@ -139,7 +139,7 @@ internal sealed class WorkerContractsEditor : UserControl
                 _choices[field] = values;
             }
             if (_editing is null) BuildList();
-            else BuildEditor(_editing);
+            else PopulateLiveChoices();
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException
                                    or System.Data.OleDb.OleDbException)
@@ -149,6 +149,69 @@ internal sealed class WorkerContractsEditor : UserControl
         }
         finally { _busy = false; }
     }
+
+    private void PopulateLiveChoices()
+    {
+        // A slow MDB lookup must never destroy a textbox while the user is
+        // typing. Add the newly discovered options to the active controls.
+        var employers = _view.Controls.Find("ContractEmployer", true)
+            .OfType<ComboBox>().FirstOrDefault();
+        if (employers is not null)
+        {
+            foreach (var company in _companies)
+                if (!employers.Items.Contains(company)) employers.Items.Add(company);
+            if (_editing is not null)
+            {
+                var actual = _companies.FirstOrDefault(c =>
+                    Convert.ToString(c.Uid, CultureInfo.InvariantCulture) ==
+                        Value(_editing, "FedUID"));
+                if (actual is not null) employers.SelectedItem = actual;
+            }
+        }
+        var manager = _view.Controls.Find("ContractField_ManagerWorkerUID", true)
+            .OfType<ComboBox>().FirstOrDefault();
+        if (manager is not null)
+        {
+            foreach (var worker in _workers)
+                if (!manager.Items.Contains(worker)) manager.Items.Add(worker);
+            if (_editing is not null)
+            {
+                var actual = _workers.FirstOrDefault(w =>
+                    Convert.ToString(w.Uid, CultureInfo.InvariantCulture) ==
+                        Value(_editing, "ManagerWorkerUID"));
+                if (actual is not null) manager.SelectedItem = actual;
+            }
+        }
+        var templates = _view.Controls.Find("ContractTemplateSelector", true)
+            .OfType<ComboBox>().FirstOrDefault();
+        if (templates is not null)
+        {
+            foreach (var template in _templates)
+                if (!templates.Items.Contains(template))
+                    templates.Items.Add(template);
+            if (templates.SelectedIndex < 0 && templates.Items.Count > 0)
+                templates.SelectedIndex = 0;
+            var apply = _view.Controls.Find("ContractCopyTerms", true)
+                .OfType<Button>().FirstOrDefault();
+            if (apply is not null) apply.Enabled = templates.Items.Count != 0;
+        }
+        foreach (var control in _view.Controls.Find("ContractFourCards", true)
+            .SelectMany(card => Descendants(card)).OfType<ComboBox>())
+        {
+            if (!control.Name.StartsWith("ContractField_", StringComparison.Ordinal) ||
+                control.DropDownStyle != ComboBoxStyle.DropDown) continue;
+            string field = control.Name["ContractField_".Length..];
+            if (!_choices.TryGetValue(field, out var values)) continue;
+            string typed = control.Text;
+            foreach (var choice in values)
+                if (!control.Items.Contains(choice)) control.Items.Add(choice);
+            control.Text = typed;
+        }
+    }
+
+    private static IEnumerable<Control> Descendants(Control parent) =>
+        parent.Controls.Cast<Control>().SelectMany(child =>
+            new[] { child }.Concat(Descendants(child)));
 
     private static string Value(DataRow? row, string field)
     {
@@ -916,6 +979,9 @@ internal sealed class WorkerContractsEditor : UserControl
             Name = "ContractBiography", BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.FromArgb(8, 28, 48), ForeColor = White,
             Font = new Font("Segoe UI", 9.2f),
+            MaxLength = _bios?.Columns.Contains("Biography") == true &&
+                _bios.Columns["Biography"]!.MaxLength > 0
+                ? _bios.Columns["Biography"]!.MaxLength : 32767,
             Text = Biography(row), ScrollBars = RichTextBoxScrollBars.Vertical,
             Enabled = _databaseFile is not null
         };
