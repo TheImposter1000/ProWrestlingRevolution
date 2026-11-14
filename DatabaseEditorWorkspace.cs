@@ -470,19 +470,19 @@ internal sealed class DatabaseEditorWorkspace : UserControl
         Add(_section);
 
         var add = Button("Add New Item", false, "plus");
-        SetEnabled(add, false, "Category-specific Add screens will be implemented separately.");
+        add.Click += (_, _) => Safe(AddRecord);
         Add(add);
 
         var delete = Button("Delete Item(s)", false, "delete");
-        SetEnabled(delete, false, "Direct record deletion is not enabled; use the MDB editor in Access.");
+        delete.Click += (_, _) => Safe(DeleteRecords);
         Add(delete);
 
         var copy = Button("Copy Item(s)", false, "copy");
-        SetEnabled(copy, false, "Record duplication requires a category-specific editor.");
+        copy.Click += (_, _) => Safe(CopyRecords);
         Add(copy);
 
         var import = Button("Import Items", false, "import");
-        SetEnabled(import, false, "Import individual records will be implemented for each category.");
+        import.Click += (_, _) => Safe(ImportRecords);
         Add(import);
 
         var external = Button("External Editing", false, "edit");
@@ -1167,6 +1167,106 @@ return;
             System.Diagnostics.Debug.WriteLine(
                 $"Worker Visible: {timer.ElapsedMilliseconds} ms");
         }
+
+
+    private (UniverseEntry Database, string Table) CurrentEditableCategory()
+    {
+        if (_universe is null || !_nativePrw ||
+            _section.SelectedItem is not string table ||
+            !PrwRecordOperations.Supports(table))
+            throw new NotSupportedException(
+                "These actions require a native PWR universe and the Workers, " +
+                "Companies or Match Types category. External MDB categories " +
+                "remain available for browsing and Mass Edit only.");
+        return (_universe, table);
+    }
+
+    private object[] SelectedIds()
+    {
+        var rows = _records.SelectedItems.Cast<Entry>().ToArray();
+        if (rows.Length == 0)
+            throw new InvalidOperationException("Select at least one record first.");
+        if (rows.Any(entry => !entry.Row.Table.Columns.Contains("UID") ||
+            entry.Row["UID"] is null or DBNull))
+            throw new InvalidDataException("The selected records have no valid native UID.");
+        return rows.Select(entry => entry.Row["UID"]).ToArray();
+    }
+
+    private void AddRecord()
+    {
+        var (db, table) = CurrentEditableCategory();
+        string? name = PromptValue("Add New Item",
+            "Enter the name of the new " +
+            (table == "tblWorker" ? "worker" :
+             table == "tblFed" ? "company" : "match type") +
+            ". The new record starts with basic identity fields.");
+        if (name is null) return;
+        var result = PrwRecordOperations.Add(db.MdbPath, table, name, _password);
+        LoadRecords();
+        Alert("One new record was created. Add its details in the editor." +
+            "\n\nBackup:\n" + result.Backup);
+    }
+
+    private void CopyRecords()
+    {
+        var (db, table) = CurrentEditableCategory();
+        object[] ids = SelectedIds();
+        if (MessageBox.Show(FindForm(),
+                "Copy " + ids.Length + " record(s) and their native linked details?\n\n" +
+                "Employment contracts are intentionally not duplicated. " +
+                "A complete MDB backup will be saved first.",
+                "Copy Records", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        var result = PrwRecordOperations.Copy(db.MdbPath, table, ids, _password);
+        LoadRecords();
+        Alert(result.Count + " record(s) copied.\n\nBackup:\n" + result.Backup);
+    }
+
+    private void DeleteRecords()
+    {
+        var (db, table) = CurrentEditableCategory();
+        object[] ids = SelectedIds();
+        if (MessageBox.Show(FindForm(),
+                "Permanently delete " + ids.Length + " selected record(s) from " +
+                db.Name + "?\n\n" +
+                "This also deletes records connected by declared PRW relationships, " +
+                "including contracts where applicable. A backup will be created first.",
+                "Confirm Record Deletion", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            return;
+        var result = PrwRecordOperations.Delete(db.MdbPath, table, ids, _password);
+        LoadRecords();
+        Alert(result.Count + " record(s) deleted.\n\nBackup:\n" + result.Backup);
+    }
+
+    private void ImportRecords()
+    {
+        var (db, table) = CurrentEditableCategory();
+        using var file = new OpenFileDialog
+        {
+            Filter = "Microsoft Access databases (*.mdb)|*.mdb",
+            Title = "Import Items From a Native PWR Database",
+            CheckFileExists = true
+        };
+        if (file.ShowDialog(FindForm()) != DialogResult.OK) return;
+        string? filter = PromptValue("Import Items",
+            "Optional: enter part of a record name to import only matching items.\n" +
+            "Leave blank to import all (maximum 500 at a time).\n" +
+            "Linked details are included; contracts are not.");
+        if (filter is null) return;
+        if (MessageBox.Show(FindForm(),
+                "Import " + (table == "tblWorker" ? "workers" :
+                             table == "tblFed" ? "companies" : "match types") +
+                " into " + db.Name + "? An MDB backup will be created first.",
+                "Confirm Import", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        var result = PrwRecordOperations.Import(
+            db.MdbPath, file.FileName, table, filter.Trim(), _password);
+        LoadRecords();
+        Alert(result.Count + " record(s) imported.\n\nBackup:\n" + result.Backup);
+    }
 
     private void MassEdit()
     {
