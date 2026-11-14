@@ -234,7 +234,10 @@ internal sealed class TopUtilityButton : Control
         g.DrawLine(divider, 0, 7, 0, Height - 7);
         g.DrawLine(bottom, 0, Height - 1, Width, Height - 1);
 
-        g.TranslateTransform(3, 2);
+        // Utility glyphs are designed on a 40px artboard. The Skills
+        // title is 56px high, so center the same glyphs without stretching
+        // or changing their size. Normal 40px pages remain pixel-identical.
+        g.TranslateTransform(3, 2 + (Height - 40) / 2f);
         var color = _kind == "close" ? Color.FromArgb(248, 62, 78)
             : _hovered ? _palette.AccentSecondary : Color.FromArgb(235, 240, 247);
         using var pen = new Pen(color, 1.9f)
