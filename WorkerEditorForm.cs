@@ -1735,7 +1735,9 @@ else
         System.Diagnostics.Trace.WriteLine(
             $"Worker tab '{section}': {LastSectionSwitchMilliseconds} ms; " +
             $"cached={_sectionViews.Count}, builds={SectionViewBuildCount}");
-        SectionChanged?.Invoke(section);
+        SectionChanged?.Invoke(section == "Contracts" &&
+            ActiveContractsEditor()?.IsEditing == true
+            ? "Contracts.Edit" : section);
         PwrPerformanceLog.Record("Tab." + section, timer,
             existingPage ? "cached=true" : "cached=false");
     }
