@@ -41,7 +41,7 @@ internal sealed class WorkerContractsEditor : UserControl
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _view = new() { Dock = DockStyle.Fill, BackColor = Color.Transparent };
     // Each view is disposed when navigating; controls must be recreated.
-    private DataGridView _grid = new();
+    private ContractGrid _grid = new();
     private TextBox _search = new();
     private ComboBox _filter = new();
     private Label _listStatus = new();
@@ -447,6 +447,49 @@ internal sealed class WorkerContractsEditor : UserControl
         return path;
     }
 
+    private sealed class ContractGrid : DataGridView
+    {
+        internal Image? Artwork { get; set; }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            base.OnPaintBackground(e);
+            if (Artwork is null || Width < 10 || Height < 10) return;
+            // The prepared bitmap is exactly the grid size. Avoid GDI+
+            // interpolation on every repaint, which delayed Worker pages.
+            if (Artwork.Size == ClientSize)
+                e.Graphics.DrawImageUnscaled(Artwork, 0, 0);
+            else
+                e.Graphics.DrawImage(Artwork, ClientRectangle);
+            using var tint = new SolidBrush(Color.FromArgb(164, 3, 17, 34));
+            e.Graphics.FillRectangle(tint, ClientRectangle);
+        }
+    }
+
+    private async Task RestoreListArtworkAsync(ContractGrid grid)
+    {
+        try
+        {
+            string skin = _paths.ReadSetting("Skin", "Obsidian");
+            string current = Path.Combine(_paths.SkinsRoot, skin,
+                "Backgrounds", "Worker_Editor.jpg");
+            string fallback = Path.Combine(_paths.SkinsRoot, "Obsidian",
+                "Backgrounds", "Worker_Editor.jpg");
+            string imageFile = File.Exists(current) ? current : fallback;
+            if (!File.Exists(imageFile) || grid.IsDisposed) return;
+            Size target = grid.ClientSize;
+            if (target.Width < 10 || target.Height < 10) return;
+            var prepared = await WorkerBackgroundCache.GetPreparedAsync(
+                imageFile, target);
+            if (!grid.IsDisposed && grid.ClientSize == target && prepared is not null)
+            {
+                grid.Artwork = prepared;
+                grid.Invalidate();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException) { }
+    }
+
     private sealed class ContractButton : Button
     {
         private readonly bool _primary;
@@ -499,7 +542,7 @@ internal sealed class WorkerContractsEditor : UserControl
         _editing = null;
         _invalidFields.Clear();
         ClearView();
-        _grid = new DataGridView();
+        _grid = new ContractGrid();
         _search = new TextBox();
         _filter = new ComboBox();
         _listStatus = new Label();
@@ -626,6 +669,15 @@ internal sealed class WorkerContractsEditor : UserControl
             });
         }
         _grid.CellPainting += PaintEmployerCell;
+        var artworkGrid = _grid;
+        artworkGrid.HandleCreated += (_, _) =>
+            _ = RestoreListArtworkAsync(artworkGrid);
+        artworkGrid.SizeChanged += (_, _) =>
+        {
+            if (artworkGrid.IsHandleCreated &&
+                artworkGrid.Artwork?.Size != artworkGrid.ClientSize)
+                _ = RestoreListArtworkAsync(artworkGrid);
+        };
         _grid.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0) OpenSelected();
