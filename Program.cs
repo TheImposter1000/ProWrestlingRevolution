@@ -721,6 +721,39 @@ internal static class Program
                     throw new Exception("Switching worker did not invalidate its cached tab views.");
                 Console.WriteLine("Worker tab cache lifecycle and performance passed.");
 
+                // Previous "0 ms" tests were performed in a UserControl
+                // without a visible parent Form. They tested control caching,
+                // not the expensive WinForms repaint on a real screen.
+                // Now time first and repeated transitions inside a visible
+                // top-level window, explicitly flushing paint messages.
+                using (var visibleWindow = new Form
+                {
+                    Text = "PWR Worker Rendering Smoke",
+                    ClientSize = new System.Drawing.Size(1220, 740),
+                    ShowInTaskbar = false,
+                    StartPosition = FormStartPosition.Manual,
+                    Location = new System.Drawing.Point(10, 10)
+                })
+                using (var visibleWorker = new WorkerEditorForm(paths, skin, profile))
+                {
+                    visibleWorker.Dock = DockStyle.Fill;
+                    visibleWindow.Controls.Add(visibleWorker);
+                    visibleWindow.Show();
+                    Application.DoEvents();
+                    foreach (string section in new[] { "Contracts", "Skills", "General",
+                            "Contracts", "Skills", "General" })
+                    {
+                        var paint = System.Diagnostics.Stopwatch.StartNew();
+                        switchSection.Invoke(visibleWorker, [section]);
+                        visibleWorker.Invalidate(true);
+                        visibleWorker.Update();
+                        Application.DoEvents();
+                        Console.WriteLine("Worker VISIBLE tab + repaint: " + section +
+                            " = " + paint.ElapsedMilliseconds + " ms");
+                    }
+                    visibleWindow.Hide();
+                }
+
                 // Verify the new dedicated, database-bound Skills workspace
                 // without duplicating identity, biography or global navigation.
                 using (var skillsEditor = new WorkerSkillsEditor(profile, true, () => { }))
