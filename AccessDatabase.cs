@@ -92,9 +92,9 @@ public static class AccessDatabase
     /// Applies one text-field mass edit to selected records with a primary key.
     /// Rejects tables without exactly one primary-key column; no fuzzy matching,
     /// row-index updates, or guessed identifiers are permitted. The MDB is backed
-    /// up before changing anything, and the updates execute in one transaction.
+    /// and the updates execute in one transaction.
     /// </summary>
-    public static string MassSetText(string file, string table, string field,
+    public static void MassSetText(string file, string table, string field,
         IReadOnlyList<DataRow> chosen, string value, string? password)
     {
         if (chosen.Count == 0) throw new ArgumentException("Select one or more records.");
@@ -131,13 +131,6 @@ public static class AccessDatabase
                 throw new InvalidOperationException(
                     "A selected record lacks a usable primary key. No changes were made.");
 
-        string backups = Path.Combine(Path.GetDirectoryName(file)!, "Backups");
-        Directory.CreateDirectory(backups);
-        string backup = Path.Combine(backups,
-            "editor-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" +
-            Guid.NewGuid().ToString("N")[..8] + ".mdb");
-        File.Copy(file, backup);
-
         using var writable = Open(file, password);
         using var transaction = writable.BeginTransaction();
         try
@@ -159,7 +152,7 @@ public static class AccessDatabase
             }
 
             transaction.Commit();
-            return backup;
+            return;
         }
         catch
         {

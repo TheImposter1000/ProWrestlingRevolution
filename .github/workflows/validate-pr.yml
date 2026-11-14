@@ -52,3 +52,12 @@ jobs:
           if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
             throw "Published replacement template is not the uploaded MDB"
           }
+
+      - name: Upload standalone Windows test EXE
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PWR-v0.6.1-WorkerEditor-Test
+          path: publish/ProWrestlingRevolution.exe
+          if-no-files-found: error
+          retention-days: 30

@@ -4,13 +4,13 @@ using System.Data.OleDb;
 namespace ProWrestlingRevolution;
 
 /// <summary>
-/// Persists edits to existing native PRW worker records, preserving MDB types,
-/// composite keys and referential links. It never edits the source universe
-/// when given a career path, and creates a recovery copy before any writes.
+/// Persists native PRW worker edits in a transaction without generating
+/// an additional file backup every time the editor is used.
+/// Supports new worker profiles and existing worker/one-to-one detail edits.
 /// </summary>
 internal static class PrwWorkerEditorService
 {
-    internal static string Save(string file, PrwWorkerProfile profile, string? password)
+    internal static bool Save(string file, PrwWorkerProfile profile, string? password)
     {
         if (File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly))
             throw new IOException("This worker database is read-only.");
@@ -20,33 +20,46 @@ internal static class PrwWorkerEditorService
                 .Where(row => row.RowState is DataRowState.Modified or DataRowState.Added)
                 .Select(row => (section.Table, Row: row)))
             .ToArray();
-        if (changes.Length == 0) return "";
+        if (changes.Length == 0) return false;
 
         var identity = profile.Sections.Single(s => s.Table == "tblWorker").Records.Rows[0];
         if (string.IsNullOrWhiteSpace(Convert.ToString(identity["Name"])) ||
             string.IsNullOrWhiteSpace(Convert.ToString(identity["ShortName"])))
             throw new InvalidDataException("Worker name and short name cannot be empty.");
 
-        using (var read = AccessDatabase.Open(file, password))
-        {
-            var inspection = PrwSchema.Inspect(read, requireExpandedTables: false);
-            if (!inspection.IsValid)
-                throw new InvalidDataException("The native PRW worker schema is invalid.");
-            foreach (var change in changes)
-                ValidateChange(read, change.Table, change.Row);
-        }
-
-        var backupFolder = Path.Combine(Path.GetDirectoryName(file)!, "Backups");
-        Directory.CreateDirectory(backupFolder);
-        var backup = Path.Combine(backupFolder, "worker-" +
-            DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" +
-            Guid.NewGuid().ToString("N")[..8] + ".mdb");
-        File.Copy(file, backup);
-
+        bool creating = identity.RowState == DataRowState.Added;
         using var connection = AccessDatabase.Open(file, password);
+        if (!PrwSchema.Inspect(connection, requireExpandedTables: false).IsValid)
+            throw new InvalidDataException("This is not a compatible native PWR worker database.");
+
+        // Existing worker changes retain their loaded-data conflict detection.
+        // Fresh profiles have no pre-existing rows to compare against.
+        if (!creating)
+            foreach (var change in changes)
+                ValidateChange(connection, change.Table, change.Row);
+
         using var transaction = connection.BeginTransaction();
         try
         {
+            if (creating)
+            {
+                using var next = new OleDbCommand(
+                    "SELECT MAX([UID]) FROM [tblWorker]", connection, transaction);
+                object max = next.ExecuteScalar() ?? DBNull.Value;
+                long uid = max is DBNull ? 1 : Convert.ToInt64(max) + 1;
+                if (uid > int.MaxValue)
+                    throw new OverflowException("No worker IDs remain available.");
+                identity["UID"] = Convert.ChangeType(uid,
+                    identity.Table.Columns["UID"]!.DataType);
+                foreach (var change in changes)
+                {
+                    if (change.Table != "tblWorker" &&
+                        change.Row.Table.Columns.Contains("WorkerUID"))
+                        change.Row["WorkerUID"] = Convert.ChangeType(uid,
+                            change.Row.Table.Columns["WorkerUID"]!.DataType);
+                }
+            }
+
             foreach (var change in changes)
                 Apply(connection, transaction, change.Table, change.Row);
             transaction.Commit();
@@ -58,7 +71,7 @@ internal static class PrwWorkerEditorService
         }
 
         foreach (var change in changes) change.Row.AcceptChanges();
-        return backup;
+        return true;
     }
 
     private static PrwSchema.Table GetTable(string table) =>
@@ -71,7 +84,8 @@ internal static class PrwWorkerEditorService
 
     private static bool IsProtectedColumn(PrwSchema.Table table, string field) =>
         table.KeyColumns.Contains(field, StringComparer.OrdinalIgnoreCase) ||
-        field.EndsWith("UID", StringComparison.OrdinalIgnoreCase);
+        (field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) &&
+         field != "LoyaltyWorkerUID");
 
     private static string[] EditedFields(DataRow row)
     {
@@ -110,8 +124,11 @@ internal static class PrwWorkerEditorService
         var table = GetTable(tableName);
         var fields = EditedFields(row);
 
-        if (row.RowState == DataRowState.Added && tableName != "tblWorkerBio")
-            throw new NotSupportedException("Only missing worker biographies can be created here.");
+        if (row.RowState == DataRowState.Added &&
+            tableName is not ("tblWorkerBio" or "tblWorkerBusiness" or
+                "tblWorkerPhysical" or "tblWorkerSkills"))
+            throw new NotSupportedException(
+                "Creating this linked worker record is not supported.");
 
         if (row.RowState == DataRowState.Modified &&
             fields.Any(field => IsProtectedColumn(table, field)))
@@ -131,12 +148,13 @@ internal static class PrwWorkerEditorService
         if (row.RowState == DataRowState.Added)
         {
             if (row["WorkerUID"] is null or DBNull)
-                throw new InvalidDataException("New biographies require a worker UID.");
+                throw new InvalidDataException("New worker details require a worker UID.");
             using var check = new OleDbCommand(
-                "SELECT COUNT(*) FROM [tblWorkerBio] WHERE [WorkerUID] = ?", connection);
+                "SELECT COUNT(*) FROM " + Quote(tableName) +
+                " WHERE [WorkerUID] = ?", connection);
             AddValue(check, row["WorkerUID"], row.Table.Columns["WorkerUID"]);
             if (Convert.ToInt32(check.ExecuteScalar()) != 0)
-                throw new DBConcurrencyException("This worker already has a biography.");
+                throw new DBConcurrencyException("This worker already has this detail record.");
             return;
         }
 
@@ -179,7 +197,7 @@ internal static class PrwWorkerEditorService
             foreach (string column in columns)
                 AddValue(insert, row[column], row.Table.Columns[column]);
             if (insert.ExecuteNonQuery() != 1)
-                throw new DBConcurrencyException("The biography could not be inserted.");
+                throw new DBConcurrencyException("The worker record could not be inserted.");
             return;
         }
 

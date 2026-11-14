@@ -1,5 +1,15 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.1: streamlined Worker Editor workflow
+
+When **Workers** is selected in the Database Editor, **Add New Item** opens the same full-screen Worker Editor used for existing profiles. The profile is initially unsaved and creates a worker and its standard one-to-one detail rows only when Save succeeds.
+
+Save commits the worker's changes as one transaction and immediately returns to the Database Editor list. It no longer shows a success dialog or creates a new backup file. Save failures display inline without losing the unfinished profile. The extra Back to Database button is removed; existing Back navigation is retained.
+
+Dropdown controls now load typed choices from the installed `System/PRWDefault.mdb` and the selected universe, instead of acting as decorative arrows. Yes/No choices and current-universe worker loyalty references are handled appropriately, with custom entry for fields that allow it. The values available depend on the fields and actual entries present in these MDB files; PWR does not invent a TEW enum table.
+
+Per-operation backup creation is also removed from Add, Copy, Delete, Import and Mass Edit. Transactions, protected keys and concurrency checks remain. Initial career recovery files are unchanged. **Before testing destructive database operations, keep your own separate copy of any important universe.**
+
 ## Version 0.6.0: functional database and worker editing
 
 The Worker Editor supports typed field changes, role and active-area toggles, biography editing, name suggestions and assignment of a default moveset reference. Save writes modified native worker records in a transaction after creating an MDB backup, checks for external edits, and keeps protected IDs unchanged. Full moveset definitions still require their own data model.

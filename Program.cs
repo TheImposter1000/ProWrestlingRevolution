@@ -188,6 +188,53 @@ internal static class Program
             if (!File.Exists(second.MdbPath) ||
                 !Directory.Exists(Path.Combine(first.DirectoryPath, "SaveGames")))
                 throw new Exception("New universe folder structure was not created.");
+            // Exercise the complete new-worker Save path when this runner
+            // has the optional 64-bit ACE OLE DB provider installed.
+            bool hasAce = true;
+            try
+            {
+                using var providerCheck = AccessDatabase.Open(first.MdbPath, null);
+            }
+            catch (InvalidOperationException error)
+                when (error.Message.StartsWith("Could not open the MDB",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                hasAce = false;
+                Console.WriteLine("ACE provider unavailable: live MDB integration test skipped.");
+            }
+            if (hasAce)
+            {
+                var draft = PrwWorkerRepository.CreateDraft(first.MdbPath);
+                var newWorker = draft.Sections.Single(section =>
+                    section.Table == "tblWorker").Records.Rows[0];
+                newWorker["Name"] = "Regression Worker";
+                newWorker["ShortName"] = "Regression";
+                if (!PrwWorkerEditorService.Save(first.MdbPath, draft, null))
+                    throw new Exception("New worker was not inserted.");
+
+                var created = PrwWorkerRepository.List(first.MdbPath)
+                    .SingleOrDefault(worker => worker.Name == "Regression Worker")
+                    ?? throw new Exception("The new worker was not listed in the active MDB.");
+                var loaded = PrwWorkerRepository.Load(first.MdbPath, created.Uid);
+                if (!loaded.Sections.Any(section =>
+                    section.Table == "tblWorkerBio" && section.Records.Rows.Count == 1))
+                    throw new Exception("New worker linked details were not created.");
+
+                loaded.Sections.Single(section => section.Table == "tblWorker")
+                    .Records.Rows[0]["Name"] = "Regression Updated";
+                if (!PrwWorkerEditorService.Save(first.MdbPath, loaded, null))
+                    throw new Exception("Existing worker edit was not persisted.");
+
+                var reloaded = PrwWorkerRepository.Load(first.MdbPath, created.Uid);
+                if (reloaded.Identity.Name != "Regression Updated")
+                    throw new Exception("Worker Save did not update the actual MDB.");
+
+                string backups = Path.Combine(first.DirectoryPath, "Backups");
+                if (Directory.Exists(backups) &&
+                    Directory.EnumerateFiles(backups, "*.mdb").Any())
+                    throw new Exception("Worker editor created an unwanted backup MDB.");
+                Console.WriteLine("Live worker MDB create/edit/save tests passed.");
+            }
             bool duplicateRejected = false;
             try { paths.CreateUniverse("From Base"); }
             catch (IOException) { duplicateRejected = true; }
@@ -335,14 +382,21 @@ internal static class Program
 
             }
 
-            // Fixed Worker Editor layout can be verified using in-memory workers.
-            // screenshot-based layout using in-memory worker records. It
-            // must not need the Access provider for UI construction.
+            // Verify the Worker Editor's fixed layout using in-memory worker data.
+            // UI checks do not need a database provider.
             var workerTable = new System.Data.DataTable("tblWorker");
             workerTable.Columns.Add("UID", typeof(int));
             workerTable.Columns.Add("Name", typeof(string));
             workerTable.Columns.Add("ShortName", typeof(string));
-            workerTable.Rows.Add(1, "Sample Worker", "Sample");
+            workerTable.Columns.Add("Freelance", typeof(bool));
+            workerTable.Rows.Add(1, "Sample Worker", "Sample", false);
+            var boolChoices = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "not-a-real-mdb.mdb"), null,
+                workerTable.Rows[0], "Freelance");
+            if (boolChoices.Count != 2 ||
+                !boolChoices.Any(choice => Equals(choice.Value, false)) ||
+                !boolChoices.Any(choice => Equals(choice.Value, true)))
+                throw new Exception("Native Boolean worker dropdowns must offer Yes and No.");
             var biographyTable = new System.Data.DataTable("tblWorkerBio");
             biographyTable.Columns.Add("Biography", typeof(string));
             biographyTable.Rows.Add("An example worker biography.");
@@ -377,6 +431,8 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerPage", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
+                if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
+                    throw new Exception("Worker Editor must not add an extra Back to Database button.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)

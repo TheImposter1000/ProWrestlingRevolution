@@ -90,6 +90,66 @@ public static class PrwWorkerRepository
         return new PrwWorkerProfile(identity, sections);
     }
 
+    /// <summary>
+    /// Builds an unsaved worker profile from the actual selected MDB field schema.
+    /// No database record is created until the user presses Save.
+    /// </summary>
+    public static PrwWorkerProfile CreateDraft(string databaseFile, string? password = null)
+    {
+        using var connection = AccessDatabase.Open(databaseFile, password);
+        EnsureSchema(connection);
+
+        string[] tables =
+        [
+            "tblWorker", "tblWorkerBio", "tblWorkerBusiness",
+            "tblWorkerOver", "tblWorkerPhysical", "tblWorkerSkills",
+            "tblWorkerAttributes", "tblAlternative", "tblContract",
+            "tblContractBio"
+        ];
+        var sections = new List<PrwProfileSection>();
+        foreach (string tableName in tables)
+        {
+            using var adapter = new OleDbDataAdapter(
+                "SELECT * FROM [" + tableName + "] WHERE 1 = 0", connection);
+            var table = new DataTable(tableName);
+            adapter.FillSchema(table, SchemaType.Source);
+            if (tableName is "tblWorker" or "tblWorkerBio" or
+                "tblWorkerBusiness" or "tblWorkerPhysical" or "tblWorkerSkills")
+            {
+                DataRow row = table.NewRow();
+                foreach (DataColumn column in table.Columns)
+                {
+                    if (column.ColumnName is "UID" or "WorkerUID")
+                    {
+                        row[column] = Convert.ChangeType(0, column.DataType);
+                        continue;
+                    }
+                    if (column.ColumnName is "Name" or "ShortName" or "Biography")
+                    {
+                        row[column] = "";
+                        continue;
+                    }
+                    if (!column.AllowDBNull && row[column] is DBNull)
+                    {
+                        object fallback = column.DataType == typeof(string) ? ""
+                            : column.DataType == typeof(bool) ? false
+                            : column.DataType == typeof(DateTime) ? DateTime.Today
+                            : column.DataType.IsValueType
+                                ? Activator.CreateInstance(column.DataType)!
+                                : throw new InvalidDataException(
+                                    "A required worker field has no default: " +
+                                    tableName + "." + column.ColumnName);
+                        row[column] = fallback;
+                    }
+                }
+                table.Rows.Add(row);
+            }
+            sections.Add(new PrwProfileSection(tableName, table));
+        }
+        return new PrwWorkerProfile(
+            new PrwWorkerSummary(0, "", ""), sections);
+    }
+
     private static void EnsureSchema(OleDbConnection connection)
     {
         var inspection = PrwSchema.Inspect(connection, requireExpandedTables: false);
