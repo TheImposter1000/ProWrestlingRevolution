@@ -694,6 +694,22 @@ internal static class Program
                             throw new Exception(
                                 "At game resolution, one or more Skills ratings are clipped or scroll.");
                     }
+                    string? fullPreview =
+                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                    if (!string.IsNullOrWhiteSpace(fullPreview))
+                    {
+                        string compactPath = Path.Combine(
+                            Path.GetDirectoryName(fullPreview)!,
+                            "worker-skills-compact-preview.png");
+                        using var image = new System.Drawing.Bitmap(
+                            compactSkills.ClientSize.Width, compactSkills.ClientSize.Height);
+                        compactSkills.DrawToBitmap(image,
+                            new System.Drawing.Rectangle(
+                                System.Drawing.Point.Empty, image.Size));
+                        image.Save(compactPath,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Compact Skills preview saved to " + compactPath);
+                    }
                 }
 
                 // The current Worker Editor has a single-column popup shell
