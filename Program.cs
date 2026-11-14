@@ -551,6 +551,29 @@ internal static class Program
                     massField.Top <= massButton.Top)
                     throw new Exception("Mass edit dropdown must be under the mass edit button.");
 
+                // The launcher screens share the same physical header,
+                // not copies of the Worker/Skills implementation.
+                foreach (var (method, expectedPage, expectedDetail) in new[]
+                {
+                    ("ShowSkins", "Skins", "Customize Appearance"),
+                    ("ShowAchievements", "Achievements", "Career Milestones"),
+                    ("ShowCredits", "Credits", "About PWR"),
+                    ("ShowNewGame", "New Game", "Create Career")
+                })
+                {
+                    typeof(LauncherForm).GetMethod(method,
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)!
+                        .Invoke(launcher, null);
+                    Application.DoEvents();
+                    if (sharedHeader.PageTitle != expectedPage ||
+                        sharedHeader.PageDetail != expectedDetail ||
+                        topbar.Height != 56 ||
+                        topbar.Controls.OfType<PwrSharedHeader>().Count() != 1)
+                        throw new Exception(
+                            "Launcher screen did not use the shared PWR header: " + method);
+                }
+
             }
 
             WorkerSkillsEditor.AssertSchemaMapping();
