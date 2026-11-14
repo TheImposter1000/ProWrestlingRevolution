@@ -1,5 +1,17 @@
 # Pro Wrestling Revolution
 
+## Unreleased development: Worker inputs and dedicated Skills Editor
+
+This section documents draft pull request #16. **It is not a published game update.** No release tag, merged change or new updater EXE is included.
+
+The Worker Editor no longer shows a fictional Picture Type selection based on the unrelated `BiographyType` column. Birth, debut and death dates, height and weight measurements, physical conditions and face/heel gimmick names are now typed directly into the worker profile. Date and numeric inputs use explicit validation against the current MDB column type, while other categorical values keep real dropdown choices.
+
+The eight Worker Roles are Wrestler, Part-Time Wrestler, Manager, On Screen Personality, Play by Play Commentator, Colour Commentator, Referee and Producer. Competing Division offers Men's Division, Women's Division and Both Divisions, independently of gender identity. Languages offer exactly None, Passable, Basic and Fluent. The legacy `LoyaltyWorkerUID` database column is retained for compatibility, but its display and selectable IDs now refer to companies in `tblFed`, not workers. Worker saving validates the selected company's existence.
+
+Skills now has a dedicated, responsive four-panel workspace covering all 36 native `tblWorkerSkills` columns. Every rating has a synchronized slider and numeric input with a 0 to 100 range; unset values remain unset when allowed by the MDB. Modifications stay in the worker's in-memory DataRows until Save. Reset restores the values loaded when this worker was opened. Existing Worker Editor transactional saving, unsaved-change prompts and inline Save errors remain. The Skills screen does not repeat the worker's name, portrait or biography and does not show unrelated Create Moveset/Suggest Name/Make Biography controls.
+
+Preset and Auto Balance remain intentionally absent pending a real defined feature. No replacement database or new skill fields are introduced. Automated Windows checks validate field mappings, the number and grouping of Skills controls, and reset/zero/unset behavior. A manual Windows test with Microsoft ACE OLE DB is still required before this draft can safely become a release.
+
 ## Version 0.6.2: Worker Editor stability and visual update
 
 The Worker Editor dropdown crash caused by disposing a WinForms `ContextMenuStrip` during its `Closed` event has been fixed. Field menus now reuse a live popup with the PWR dark-navy, cyan-outlined theme, and selected choices are applied after the popup interaction finishes. No worker data or existing database field choices have been replaced.
