@@ -42,8 +42,13 @@ public static class PrwWorkerRepository
         if (workerUid is null or DBNull)
             throw new ArgumentException("Select a worker with a valid UID.", nameof(workerUid));
 
+        var fullLoad = System.Diagnostics.Stopwatch.StartNew();
+        var opening = System.Diagnostics.Stopwatch.StartNew();
         using var connection = AccessDatabase.Open(databaseFile, password);
+        PwrPerformanceLog.Record("MDB.Open", opening);
+        var schema = System.Diagnostics.Stopwatch.StartNew();
         EnsureSchema(connection);
+        PwrPerformanceLog.Record("MDB.Schema", schema);
 
         DataTable worker = ForKey(connection, "tblWorker", "UID", workerUid);
         if (worker.Rows.Count != 1)
@@ -86,6 +91,9 @@ public static class PrwWorkerRepository
                 contractBios.ImportRow(bio);
         }
         sections.Add(new PrwProfileSection("tblContractBio", contractBios));
+        PwrPerformanceLog.Record("MDB.WorkerProfileTotal", fullLoad,
+            "sections=" + sections.Count + "; contracts=" +
+            contracts.Rows.Count);
 
         return new PrwWorkerProfile(identity, sections);
     }
@@ -162,10 +170,12 @@ public static class PrwWorkerRepository
 
     private static DataTable EmptyTable(OleDbConnection connection, string table)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         using var adapter = new OleDbDataAdapter(
             "SELECT * FROM [" + table + "] WHERE 1 = 0", connection);
         var rows = new DataTable(table);
         adapter.Fill(rows);
+        PwrPerformanceLog.Record("MDB." + table + ".SchemaOnly", stopwatch);
         return rows;
     }
 
@@ -174,12 +184,15 @@ public static class PrwWorkerRepository
     {
         // All table/column arguments are fixed, trusted names from PrwSchema,
         // and the value is passed as an OLE DB positional parameter.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         using var command = new OleDbCommand(
             "SELECT * FROM [" + table + "] WHERE [" + key + "] = ?", connection);
         command.Parameters.AddWithValue("lookup_value", value);
         using var adapter = new OleDbDataAdapter(command);
         var rows = new DataTable(table);
         adapter.Fill(rows);
+        PwrPerformanceLog.Record("MDB." + table + ".Load", stopwatch,
+            "rows=" + rows.Rows.Count);
         return rows;
     }
 }

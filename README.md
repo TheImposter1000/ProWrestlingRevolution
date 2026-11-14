@@ -1,5 +1,13 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.5: unified Skills title bar and significantly faster Worker rendering
+
+The Skills title plaque and sound/help/minimize/close controls now share one continuous metallic gradient and cyan baseline. The previously displaced Help question mark is fully vector drawn and stays centered at either bar height. The game's normal top bar remains unchanged outside Skills.
+
+The true source of much of the worker-tab lag was background artwork being stretched and resampled repeatedly through WinForms' transparent controls. The background is now prepared once at the actual page size and reused with one-to-one image copies, retaining the existing appearance. A visible Windows form test, rather than the old offscreen-only cache test, now measures repeat section rendering. In the synthetic CI fixture, repeating General improved from around 2.2 s to 0.53 s, Skills from 1.20 s to 0.45 s, and Contracts from 0.45 s to 0.13 s. Rendering is significantly improved but not instant, and actual-world performance may vary.
+
+For accurate diagnostics, PWR logs local worker profile MDB query and tab-paint durations into `System/Logs/PWR-performance.log`. The log is bounded to 1 MB, never contains worker names, database record IDs or field values, and is not uploaded. Do not edit your MDB to diagnose lag. No universe files or skin backgrounds are overwritten.
+
 ## Version 0.6.4: v0.6.2 Worker Editor restoration and fast tabs
 
 The **Worker Editor General page and all generic profile sections** have been restored to their complete v0.6.2 input controls, formatting, labels, dropdown choices, and underlying edit/save behavior. The v0.6.3-only worker field conversion rules have been removed because the native MDB is being redesigned. The modern full-width **Skills workspace is retained** as a separate screen; it is not part of the reverted General page.

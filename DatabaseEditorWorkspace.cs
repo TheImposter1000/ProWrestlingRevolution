@@ -996,6 +996,7 @@ var profile = PrwWorkerRepository.Load(
 
 System.Diagnostics.Debug.WriteLine(
     $"Worker Database Load: {timer.ElapsedMilliseconds} ms");
+PwrPerformanceLog.Record("Worker.OpenDatabase", timer);
 
 timer.Restart();
 
@@ -1003,6 +1004,7 @@ OpenWorkerPopup(profile);
 
 System.Diagnostics.Debug.WriteLine(
     $"Worker Popup Setup: {timer.ElapsedMilliseconds} ms");
+PwrPerformanceLog.Record("Worker.OpenOverlay", timer);
 
 return;
         }
@@ -1076,6 +1078,7 @@ return;
 
             System.Diagnostics.Debug.WriteLine(
                 $"Worker Popup Cache Reused: {cacheTimer.ElapsedMilliseconds} ms");
+            PwrPerformanceLog.Record("Worker.ReopenOverlay", cacheTimer);
 
             return;
         }

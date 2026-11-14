@@ -379,6 +379,14 @@ internal static class Program
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
                     throw new Exception("Top utility controls must be flush with the header.");
                 
+                // Earlier screenshots were taken from a hidden launcher.
+                // Transparent child controls do not composite into an
+                // offscreen parent bitmap reliably. Exercise the real
+                // visible Form so the branding and four utility controls
+                // must actually be painted together.
+                launcher.Show();
+                topbar.Visible = true;
+                Application.DoEvents();
                 // Skills alone receives the tall PWR-branded 56px plaque.
                 // The four utility buttons remain in their real launcher bar.
                 launcher.SetWorkerSectionChrome("Skills");
@@ -390,7 +398,67 @@ internal static class Program
                     skillsHeader.Right > orderedChrome[0].Left ||
                     controls.Any(button => button.Height != 56))
                     throw new Exception("Skills header lost its reference proportions or obscured utilities.");
+                // Render the actual composed parent and all four interactive
+                // child buttons. An isolated brand preview cannot detect
+                // the visible seam between the plaque and the utility cluster.
+                topbar.CreateControl();
+                topbar.PerformLayout();
+                Application.DoEvents();
+                using (var composed = new System.Drawing.Bitmap(
+                    topbar.Width, topbar.Height))
+                {
+                    topbar.DrawToBitmap(composed,
+                        new System.Drawing.Rectangle(0, 0,
+                            composed.Width, composed.Height));
+                    int border = orderedChrome[0].Left;
+                    var leftPixel = composed.GetPixel(border - 4, 3);
+                    var rightPixel = composed.GetPixel(border + 4, 3);
+                    int seamDifference =
+                        Math.Abs(leftPixel.R - rightPixel.R) +
+                        Math.Abs(leftPixel.G - rightPixel.G) +
+                        Math.Abs(leftPixel.B - rightPixel.B);
+                    if (seamDifference > 72)
+                        throw new Exception(
+                            "Skills header has a mismatched background at the utility boundary.");
+
+                    int paintedLetterPixels = 0;
+                    for (int y = 8; y < Math.Min(45, composed.Height); y++)
+                        for (int x = 435; x < Math.Min(570, composed.Width); x++)
+                        {
+                            var pixel = composed.GetPixel(x, y);
+                            if (pixel.R > 155 && pixel.G > 155 && pixel.B > 155)
+                                paintedLetterPixels++;
+                        }
+                    if (paintedLetterPixels < 80)
+                        throw new Exception(
+                            "The composed Skills screenshot has no visible heading. " +
+                            "The test must capture actual child painting, not a bare parent gradient.");
+
+                    string? workerPreview =
+                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                    if (!string.IsNullOrWhiteSpace(workerPreview))
+                    {
+                        string composedPath = Path.Combine(
+                            Path.GetDirectoryName(workerPreview)!,
+                            "worker-skills-composed-header-preview.png");
+                        composed.Save(composedPath,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        // The old detached title-only preview had a blank
+                        // white background because its transparency requires
+                        // a parent. Replace it with the actual combined
+                        // header and its functional utilities.
+                        composed.Save(Path.Combine(
+                            Path.GetDirectoryName(workerPreview)!,
+                            "worker-skills-header-preview.png"),
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Composed Skills header saved to " +
+                            composedPath);
+                    }
+                }
+
                 launcher.SetWorkerSectionChrome(null);
+                topbar.Visible = false;
+                launcher.Hide();
                 if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
                     controls.Any(button => button.Height != 40))
                     throw new Exception(
@@ -684,6 +752,62 @@ internal static class Program
                     throw new Exception("Switching worker did not invalidate its cached tab views.");
                 Console.WriteLine("Worker tab cache lifecycle and performance passed.");
 
+                // Previous "0 ms" tests were performed in a UserControl
+                // without a visible parent Form. They tested control caching,
+                // not the expensive WinForms repaint on a real screen.
+                // Now time first and repeated transitions inside a visible
+                // top-level window, explicitly flushing paint messages.
+                using (var visibleWindow = new Form
+                {
+                    Text = "PWR Worker Rendering Smoke",
+                    ClientSize = new System.Drawing.Size(1220, 740),
+                    ShowInTaskbar = false,
+                    StartPosition = FormStartPosition.Manual,
+                    Location = new System.Drawing.Point(10, 10)
+                })
+                using (var visibleWorker = new WorkerEditorForm(paths, skin, profile))
+                {
+                    visibleWorker.Dock = DockStyle.Fill;
+                    visibleWindow.Controls.Add(visibleWorker);
+                    visibleWindow.Show();
+                    Application.DoEvents();
+                    foreach (string section in new[] { "Contracts", "Skills", "General",
+                            "Contracts", "Skills", "General" })
+                    {
+                        var paint = System.Diagnostics.Stopwatch.StartNew();
+                        switchSection.Invoke(visibleWorker, [section]);
+                        visibleWorker.Invalidate(true);
+                        visibleWorker.Update();
+                        Application.DoEvents();
+                        Console.WriteLine("Worker VISIBLE tab + repaint: " + section +
+                            " = " + paint.ElapsedMilliseconds + " ms");
+                    }
+                    // Diagnostic A/B only: temporarily hide the already
+                    // decoded background to quantify repeated image paints.
+                    // Restore the original bitmap before closing the window;
+                    // this never changes a skin or universe on disk.
+                    var runtimePage = visibleWorker.Controls
+                        .Find("WorkerPage", true).Single() as TableLayoutPanel;
+                    if (runtimePage is not null)
+                    {
+                        Image? originalBackdrop = runtimePage.BackgroundImage;
+                        runtimePage.BackgroundImage = null;
+                        foreach (string section in new[] { "General", "Skills", "General" })
+                        {
+                            var noBackdropTime = System.Diagnostics.Stopwatch.StartNew();
+                            switchSection.Invoke(visibleWorker, [section]);
+                            visibleWorker.Invalidate(true);
+                            visibleWorker.Update();
+                            Application.DoEvents();
+                            Console.WriteLine(
+                                "Worker VISIBLE tab NO-BACKDROP: " + section +
+                                " = " + noBackdropTime.ElapsedMilliseconds + " ms");
+                        }
+                        runtimePage.BackgroundImage = originalBackdrop;
+                    }
+                    visibleWindow.Hide();
+                }
+
                 // Verify the new dedicated, database-bound Skills workspace
                 // without duplicating identity, biography or global navigation.
                 using (var skillsEditor = new WorkerSkillsEditor(profile, true, () => { }))
@@ -945,23 +1069,6 @@ internal static class Program
                         System.Drawing.Imaging.ImageFormat.Png);
                     Console.WriteLine("Skills preview saved to " + skillPreview);
 
-                    using (var skillBar = new WorkerSkillsTopChrome
-                    {
-                        Size = new System.Drawing.Size(1672, 56)
-                    })
-                    {
-                        skillBar.CreateControl();
-                        using var barImage = new System.Drawing.Bitmap(1672, 56);
-                        skillBar.DrawToBitmap(barImage,
-                            new System.Drawing.Rectangle(0, 0, 1672, 56));
-                        string headerPreview = Path.Combine(
-                            Path.GetDirectoryName(previewPath)!,
-                            "worker-skills-header-preview.png");
-                        barImage.Save(headerPreview,
-                            System.Drawing.Imaging.ImageFormat.Png);
-                        Console.WriteLine("Skills header preview saved to " +
-                            headerPreview);
-                    }
                 }
             }
 
