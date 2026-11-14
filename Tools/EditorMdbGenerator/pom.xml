@@ -9,6 +9,7 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <pwr.mainClass>EditorMdbGenerator</pwr.mainClass>
   </properties>
   <dependencies>
     <dependency>
@@ -28,7 +29,7 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.5.1</version>
-        <configuration><mainClass>EditorMdbGenerator</mainClass></configuration>
+        <configuration><mainClass>${pwr.mainClass}</mainClass></configuration>
       </plugin>
     </plugins>
   </build>
