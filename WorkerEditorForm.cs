@@ -689,6 +689,15 @@ internal sealed class WorkerEditorForm : UserControl
             _tabs[section] = button;
             _sectionNavigation.Controls.Add(button);
         }
+        var backToDatabase = new WorkerSectionButton
+        {
+            Name = "WorkerBackToDatabase",
+            Text = "Back to Database",
+            Location = new Point(8, 450),
+            Size = new Size(142, 39)
+        };
+        backToDatabase.Click += (_, _) => Close();
+        _sectionNavigation.Controls.Add(backToDatabase);
         page.Controls.Add(_sectionNavigation, 0, 0);
 
         _body.Paint += (_, e) =>
@@ -2017,13 +2026,18 @@ else
             description += " Their recorded nationality is " + nationality + ".";
         if (!string.IsNullOrWhiteSpace(based))
             description += " They are based in " + based + ".";
-        var bio = Controls.Find("WorkerBiography", true).OfType<RichTextBox>().FirstOrDefault();
-        if (bio is null) return;
-        string? proposed = PromptText("Make Biography",
-            "Generated only from the worker's recorded information. " +
-            "Review and edit before applying.", description);
-        if (proposed is null) return;
-        bio.Text = proposed;
+        var biography = Controls.Find("WorkerBiography", true)
+            .OfType<RichTextBox>().FirstOrDefault();
+        if (biography is null) return;
+        if (!string.IsNullOrWhiteSpace(biography.Text) &&
+            biography.Text != "No biography has been entered for this worker." &&
+            MessageBox.Show(FindForm(),
+                "Replace the current biography with a draft built from the worker's recorded details?",
+                "Make Biography", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        biography.Text = description;
+        biography.Focus();
     }
 
     private void SaveWorker()
