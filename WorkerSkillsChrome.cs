@@ -266,15 +266,10 @@ internal sealed class SkillGlassHeader : Control
         using var underline = new Pen(Color.FromArgb(170, 0, 206, 253), 1f);
         g.DrawLine(underline, 0, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
 
-        int iconSize = Math.Clamp(rect.Height - 10, 35, 53);
-        SkillChrome.DrawIcon(g, _icon,
-            new Rectangle(23, (rect.Height - iconSize) / 2, iconSize, iconSize),
-            Color.FromArgb(239, 249, 255));
-
-        // The target has a deliberate gap between the heading and cyan
-        // divider, rather than letting Windows measure the gap implicitly.
-        // Each of the four headings has a different visual width.
-        int left = iconSize + 45;
+        // Header typography shares one left inset with all other PWR cards.
+        // Category logos are intentionally omitted for visual consistency.
+        // Retain the clean metallic gradient and cyan dividing line.
+        int left = 25;
         bool longHeading = _icon == "clipboard";
         float headingSize = longHeading
             ? (rect.Width >= 730 ? 15.5f : 13.4f)
