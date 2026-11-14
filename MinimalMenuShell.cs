@@ -15,6 +15,7 @@ public sealed partial class LauncherForm
     private readonly Label _editorPageTitle = new();
     private WorkerSkillsTopChrome? _skillsTopChrome;
     private int _normalTopbarHeight;
+    internal bool SkillsImmersiveMode { get; private set; }
     private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
@@ -29,6 +30,11 @@ public sealed partial class LauncherForm
     {
         bool skills = string.Equals(section, "Skills",
             StringComparison.OrdinalIgnoreCase);
+        SkillsImmersiveMode = skills;
+        // Skills is a standalone full-width workspace in the approved design.
+        // The global launcher icon rail must not be visible behind the editor.
+        // Normal sections and the database directory restore it immediately.
+        _sidebar.Visible = !skills;
         _titleText.Visible = !skills;
         _versionText.Visible = !skills;
         _editorPageTitle.Visible = false;
