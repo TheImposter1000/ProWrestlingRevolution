@@ -350,6 +350,8 @@ internal sealed class WorkerSkillsEditor : UserControl
             {
                 if (rating.Width != width) rating.Width = width;
                 if (rating.Height != height) rating.Height = height;
+                if (groupIndex == 3 && rating is SkillRatingRow skillRow)
+                    skillRow.SetLabelShare(Height < 790 ? 46f : 37.6f);
             }
         }
         rows.Resize += (_, _) => PlaceRows();
@@ -660,6 +662,7 @@ internal sealed class WorkerSkillsEditor : UserControl
     {
         private readonly SkillGlowSlider _slider;
         private readonly SkillNumberSpinner _spinner;
+        private readonly TableLayoutPanel _columns;
         private readonly Action<int?> _changed;
         private bool _syncing;
 
@@ -684,6 +687,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             };
             // The screenshot's rhythm is label / wide illuminated rail /
             // metal number spinner, with a real 15px gap before the spinner.
+            _columns = columns;
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelPercent));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f - labelPercent));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
@@ -729,6 +733,13 @@ internal sealed class WorkerSkillsEditor : UserControl
             columns.Controls.Add(_slider, 1, 0);
             columns.Controls.Add(_spinner, 2, 0);
             Controls.Add(columns);
+        }
+
+        internal void SetLabelShare(float percent)
+        {
+            if (Math.Abs(_columns.ColumnStyles[0].Width - percent) > 0.01f)
+                _columns.ColumnStyles[0].Width = percent;
+            _columns.ColumnStyles[1].Width = 100f - percent;
         }
 
         internal string? ValidateNumber() => _spinner.ValidateNumber();
