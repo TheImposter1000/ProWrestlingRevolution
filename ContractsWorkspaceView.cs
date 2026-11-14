@@ -31,6 +31,8 @@ internal sealed class ContractsWorkspaceView : UserControl
     private readonly Action<bool> _editorMode;
     private readonly Action _saved;
     private readonly IReadOnlyList<PrwContractStore.Employer> _employers;
+    private readonly Image? _portrait;
+    private readonly Dictionary<string, Image?> _logos = new(StringComparer.OrdinalIgnoreCase);
     private readonly DataTable _records;
     private readonly object _workerUid;
     private readonly string _workerName;
@@ -78,6 +80,12 @@ internal sealed class ContractsWorkspaceView : UserControl
         _workerUid = profile.Identity.Uid;
         _workerName = profile.Identity.Name;
         _employers = file is null ? [] : PrwContractStore.Employers(file, password);
+        var identity = profile.Sections.First(s => s.Table == "tblWorker")
+            .Records.Rows.Cast<DataRow>().FirstOrDefault();
+        _portrait = Picture(Read(identity, "Picture", ""), _workerName, "Workers");
+        foreach (var employer in _employers)
+            _logos.TryAdd(employer.Initials,
+                Picture(employer.Logo, employer.Initials, "Logos"));
 
         Name = "WorkerContractsView";
         Dock = DockStyle.Fill;
@@ -90,7 +98,12 @@ internal sealed class ContractsWorkspaceView : UserControl
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         BuildSelector();
         Resize += (_, _) => PositionAll();
-        Disposed += (_, _) => _help.Dispose();
+        Disposed += (_, _) =>
+        {
+            _help.Dispose();
+            _portrait?.Dispose();
+            foreach (var img in _logos.Values) img?.Dispose();
+        };
     }
 
     internal bool ReturnToList()
@@ -102,6 +115,39 @@ internal sealed class ContractsWorkspaceView : UserControl
         SetVisibleControls();
         Invalidate();
         return true;
+    }
+
+    private Image? Picture(string stored, string defaultName, string group)
+    {
+        string name = Path.GetFileName(stored);
+        var possible = new List<string>();
+        if (name.Length > 0) possible.Add(name);
+        if (defaultName.Length > 0)
+            foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".gif", ".bmp" })
+                possible.Add(defaultName + ext);
+        foreach (string image in possible.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (string folder in new[]
+            {
+                _paths.Pictures, Path.Combine(_paths.Pictures, "Default", group),
+                Path.Combine(_paths.Pictures, group),
+                Path.Combine(_paths.Pictures, "Default", group == "Logos" ? "Companies" : group)
+            })
+            {
+                string path = Path.Combine(folder, image);
+                if (!File.Exists(path)) continue;
+                try
+                {
+                    using var data = File.OpenRead(path);
+                    using var original = Image.FromStream(data);
+                    return new Bitmap(original);
+                }
+                catch (Exception ex) when (ex is IOException or ArgumentException
+                                           or OutOfMemoryException)
+                {
+                    // Optional art never prevents editing a record.
+                }
+            }
+        return null;
     }
 
     private float SX => Width / (float)DesignWidth;
@@ -338,6 +384,7 @@ internal sealed class ContractsWorkspaceView : UserControl
             control.Dispose();
         }
         _editorControls.Clear();
+        _buttons.RemoveAll(button => button.IsDisposed);
         _positioned.RemoveAll(x => x.Control.IsDisposed);
         _fields.Clear();
         _roles.Clear();
@@ -376,15 +423,21 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             var drop = new DarkDrop(_palette);
             var items = new List<string>();
-            if (_selected is not null && _file is not null &&
-                _selected.Table.Columns.Contains(column))
+            DataRow? template = _selected ??
+                _records.Rows.Cast<DataRow>().FirstOrDefault();
+            if (template is not null && _file is not null &&
+                template.Table.Columns.Contains(column))
             {
                 foreach (var value in PrwWorkerFieldOptions.Get(_paths, _file,
-                             _password, _selected, column))
+                             _password, template, column))
                     items.Add(value.Label);
             }
-            if (_selected is null || _selected.Table.Columns[column]?.DataType == typeof(string))
+            if (template?.Table.Columns[column]?.DataType is null ||
+                template.Table.Columns[column]!.DataType == typeof(string))
                 items.AddRange(choices);
+            if (_creating && template?.Table.Columns[column]?.DataType is Type inputType &&
+                inputType != typeof(string) && !text)
+                current = items.FirstOrDefault() ?? current;
             if (!items.Contains(current, StringComparer.OrdinalIgnoreCase))
                 items.Insert(0, current);
             drop.SetChoices(items.Where(x => !string.IsNullOrWhiteSpace(x))
@@ -625,6 +678,19 @@ internal sealed class ContractsWorkspaceView : UserControl
                     "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out _))
                 throw new InvalidDataException("Contract Begin must use YYYY-MM-DD.");
+            var column = (_selected ?? _records.Rows.Cast<DataRow>().FirstOrDefault())
+                ?.Table.Columns[key];
+            if (column is not null && column.DataType != typeof(string))
+            {
+                try { _ = PrwContractStore.ConvertInput(text, column); }
+                catch (Exception ex) when (ex is FormatException or InvalidCastException
+                                           or OverflowException)
+                {
+                    if (_creating) continue; // Database-defined default for an unmapped enum.
+                    throw new InvalidDataException(
+                        key + " needs a value supported by the universe.", ex);
+                }
+            }
             values[key] = text;
         }
         values["FedUID"] = Convert.ToString(employer.Uid, CultureInfo.InvariantCulture) ?? "";
@@ -823,8 +889,11 @@ internal sealed class ContractsWorkspaceView : UserControl
                 g.DrawLine(divider, 51, y + 51, 1315, y + 51);
             }
             string initials = row.EmployerName;
-            Caption(g, initials, 85, y + 5, 94, 40, 21, true,
-                row.Status == "Expired" ? White : Cyan, italic: true);
+            if (_logos.TryGetValue(initials, out var logo) && logo is not null)
+                g.DrawImage(logo, new Rectangle(85, y + 7, 85, 37));
+            else
+                Caption(g, initials, 85, y + 5, 94, 40, 21, true,
+                    row.Status == "Expired" ? White : Cyan, italic: true);
             Caption(g, initials, 177, y + 4, 121, 41, 15, true);
             Caption(g, row.ContractType == "Written" ? "▤" : "◇",
                 335, y + 4, 43, 41, 21, true);
@@ -871,7 +940,10 @@ internal sealed class ContractsWorkspaceView : UserControl
         Caption(g, _workerName.ToUpperInvariant(),
             48, 116, 110, 18, 9f, true, White,
             alignment: ContentAlignment.MiddleCenter);
-        DrawHeadPortrait(g, new Rectangle(62, 28, 79, 83));
+        if (_portrait is not null)
+            g.DrawImage(_portrait, new Rectangle(48, 19, 109, 96));
+        else
+            DrawHeadPortrait(g, new Rectangle(62, 28, 79, 83));
 
         int[] xs = [25, 366, 706, 1055];
         int[] widths = [330, 329, 335, 286];
