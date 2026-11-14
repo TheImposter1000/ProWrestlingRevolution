@@ -1199,6 +1199,14 @@ return;
     private void AddRecord()
     {
         var (db, table) = CurrentEditableCategory();
+        if (table == PrwSchema.WorkerTable)
+        {
+            // Workers are entered in the normal full-size Worker Editor.
+            // Do not create an incomplete MDB record before the user saves.
+            var draft = PrwWorkerRepository.CreateDraft(db.MdbPath, _password);
+            OpenWorkerPopup(draft);
+            return;
+        }
         string? name = PromptValue("Add New Item",
             "Enter the name of the new " +
             (table == "tblWorker" ? "worker" :
@@ -1207,8 +1215,7 @@ return;
         if (name is null) return;
         var result = PrwRecordOperations.Add(db.MdbPath, table, name, _password);
         LoadRecords();
-        Alert("One new record was created. Add its details in the editor." +
-            "\n\nBackup:\n" + result.Backup);
+        Alert("One new record was created.");
     }
 
     private void CopyRecords()
@@ -1217,14 +1224,13 @@ return;
         object[] ids = SelectedIds();
         if (MessageBox.Show(FindForm(),
                 "Copy " + ids.Length + " record(s) and their native linked details?\n\n" +
-                "Employment contracts are intentionally not duplicated. " +
-                "A complete MDB backup will be saved first.",
+                "Employment contracts are intentionally not duplicated.",
                 "Copy Records", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) != DialogResult.Yes)
             return;
         var result = PrwRecordOperations.Copy(db.MdbPath, table, ids, _password);
         LoadRecords();
-        Alert(result.Count + " record(s) copied.\n\nBackup:\n" + result.Backup);
+        Alert(result.Count + " record(s) copied.");
     }
 
     private void DeleteRecords()
@@ -1235,13 +1241,13 @@ return;
                 "Permanently delete " + ids.Length + " selected record(s) from " +
                 db.Name + "?\n\n" +
                 "This also deletes records connected by declared PRW relationships, " +
-                "including contracts where applicable. A backup will be created first.",
+                "including contracts where applicable.",
                 "Confirm Record Deletion", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
             return;
         var result = PrwRecordOperations.Delete(db.MdbPath, table, ids, _password);
         LoadRecords();
-        Alert(result.Count + " record(s) deleted.\n\nBackup:\n" + result.Backup);
+        Alert(result.Count + " record(s) deleted.");
     }
 
     private void ImportRecords()
@@ -1262,14 +1268,14 @@ return;
         if (MessageBox.Show(FindForm(),
                 "Import " + (table == "tblWorker" ? "workers" :
                              table == "tblFed" ? "companies" : "match types") +
-                " into " + db.Name + "? An MDB backup will be created first.",
+                " into " + db.Name + "?",
                 "Confirm Import", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) != DialogResult.Yes)
             return;
         var result = PrwRecordOperations.Import(
             db.MdbPath, file.FileName, table, filter.Trim(), _password);
         LoadRecords();
-        Alert(result.Count + " record(s) imported.\n\nBackup:\n" + result.Backup);
+        Alert(result.Count + " record(s) imported.");
     }
 
     private void MassEdit()
@@ -1293,19 +1299,19 @@ return;
 
         string field = (string)_massField.SelectedItem!;
         string? value = PromptValue("Mass Edit: " + field,
-            $"Set {field} for {chosen.Length:N0} selected record(s).\nThe operation creates a backup first.");
+            $"Set {field} for {chosen.Length:N0} selected record(s).");
         if (value is null) return;
         if (MessageBox.Show(FindForm(),
                 $"Change '{field}' in {chosen.Length:N0} record(s)?\n\n" +
-                "A backup is created before changes. This cannot be undone from the editor.",
+                "This changes the selected database directly.",
                 "Confirm Mass Edit", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning) != DialogResult.Yes) return;
 
-        string backup = AccessDatabase.MassSetText(
+        AccessDatabase.MassSetText(
             _universe.MdbPath, table, field,
             chosen.Select(x => x.Row).ToArray(), value, _password);
         LoadRecords();
-        Alert("Changes saved.\n\nBackup:\n" + backup);
+        Alert("Changes saved.");
     }
 
     private string? PromptValue(string title, string instructions)
