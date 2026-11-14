@@ -686,7 +686,16 @@ internal static class Program
                 contractHost.CreateControl();
                 contractView.CreateControl();
                 contractView.Show();
-                contractView.PrepareArtworkForPreviewAsync().GetAwaiter().GetResult();
+                // Worker art uses the normal async cache. Pump the UI
+                // message loop while preparing it, rather than blocking a
+                // captured WinForms synchronization context.
+                var artworkTask = contractView.PrepareArtworkForPreviewAsync();
+                while (!artworkTask.IsCompleted)
+                {
+                    Application.DoEvents();
+                    Thread.Sleep(10);
+                }
+                artworkTask.GetAwaiter().GetResult();
                 Application.DoEvents();
                 if (contractView.Controls.Find("ContractSearch", true).Length != 1 ||
                     contractView.Controls.Find("ContractStatusFilter", true).Length != 1 ||
