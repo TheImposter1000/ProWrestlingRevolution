@@ -730,7 +730,26 @@ internal static class Program
                             editorShot.Width, editorShot.Height));
                     editorShot.Save(Path.Combine(rootPreview, "worker-contract-editor-preview.png"),
                         System.Drawing.Imaging.ImageFormat.Png);
+                    contractsView.ReturnToList();
                 }
+                // Add must enter the same full editor, create a real staged
+                // tblContract row, and allow that draft to be discarded
+                // without writing to a database.
+                contractsView.Controls.Find("ContractAdd", true)
+                    .OfType<Button>().Single().PerformClick();
+                var drafts = contractTable.Rows.Cast<DataRow>()
+                    .Where(row => row.RowState == DataRowState.Added).ToArray();
+                if (!contractsView.IsEditing || drafts.Length != 1 ||
+                    contractsView.Controls.Find("ContractField_Name", true).Length != 1)
+                    throw new Exception(
+                        "Add Contract did not enter the editor with a new native row.");
+                var contractName = contractsView.Controls
+                    .Find("ContractField_Name", true).OfType<TextBox>().Single();
+                contractName.Text = "Draft Contract";
+                if (!Equals(drafts[0]["Name"], "Draft Contract"))
+                    throw new Exception("Contract editor text is not bound to its native DataRow.");
+                contractsView.ReturnToList();
+                drafts[0].Delete();
             }
             // Contract saves must never alter unrelated worker records.
             if (PrwContractEditorService.HasPendingChanges(profile))
