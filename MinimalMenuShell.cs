@@ -14,6 +14,7 @@ public sealed partial class LauncherForm
     private readonly Label _titleText = new();
     private readonly Label _editorPageTitle = new();
     private WorkerSkillsTopChrome? _skillsTopChrome;
+    private int _normalTopbarHeight;
     private readonly Label _versionText = new();
     private readonly Button _updateButton = new();
     private readonly Font _navFont = new("Segoe UI", 10.5f, FontStyle.Regular);
@@ -36,8 +37,15 @@ public sealed partial class LauncherForm
         {
             if (_skillsTopChrome is not null && !_skillsTopChrome.IsDisposed)
                 _skillsTopChrome.Visible = false;
+            if (_normalTopbarHeight > 0 && _topbar.Height != _normalTopbarHeight)
+                _topbar.Height = _normalTopbarHeight;
             return;
         }
+
+        if (_normalTopbarHeight == 0)
+            _normalTopbarHeight = _topbar.Height;
+        if (_topbar.Height != 56)
+            _topbar.Height = 56;
 
         if (_skillsTopChrome is null || _skillsTopChrome.IsDisposed)
         {
