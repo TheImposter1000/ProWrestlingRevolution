@@ -38,14 +38,6 @@ internal static class PrwWorkerEditorService
             foreach (var change in changes)
                 ValidateChange(connection, change.Table, change.Row);
 
-        // The legacy column name is LoyaltyWorkerUID; its intended value
-        // is a tblFed UID. Verify company existence before modifying the MDB.
-        if (identity.Table.Columns.Contains("LoyaltyWorkerUID") &&
-            (creating ||
-             !Equals(identity["LoyaltyWorkerUID", DataRowVersion.Original],
-                     identity["LoyaltyWorkerUID"])))
-            ValidateCompanyLoyalty(connection, identity["LoyaltyWorkerUID"]);
-
         using var transaction = connection.BeginTransaction();
         try
         {
@@ -80,27 +72,6 @@ internal static class PrwWorkerEditorService
 
         foreach (var change in changes) change.Row.AcceptChanges();
         return true;
-    }
-
-    private static void ValidateCompanyLoyalty(
-        OleDbConnection connection, object? candidate)
-    {
-        if (candidate is null or DBNull) return;
-        string? raw = Convert.ToString(candidate,
-            System.Globalization.CultureInfo.InvariantCulture);
-        if (string.IsNullOrWhiteSpace(raw) ||
-            string.Equals(raw, "None", StringComparison.OrdinalIgnoreCase))
-            return;
-        if (!long.TryParse(raw, out long companyId))
-            throw new InvalidDataException("Company loyalty must reference a company ID.");
-
-        if (companyId == 0) return;
-        using var command = new OleDbCommand(
-            "SELECT COUNT(*) FROM [tblFed] WHERE [UID] = ?", connection);
-        AddValue(command, candidate);
-        if (Convert.ToInt32(command.ExecuteScalar()) != 1)
-            throw new InvalidDataException(
-                "The selected loyalty company does not exist in this universe.");
     }
 
     private static PrwSchema.Table GetTable(string table) =>
