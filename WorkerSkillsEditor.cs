@@ -260,6 +260,27 @@ internal sealed class WorkerSkillsEditor : UserControl
                     : new Padding(31, 12, 32, 5);
                 if (ratings.Padding != rowPadding)
                     ratings.Padding = rowPadding;
+                // Changing Padding does not raise Resize on FlowLayoutPanel.
+                // Explicitly recompute each row's width, or spinner boxes
+                // drift 25-30px toward the card rim in the full-size preview.
+                int availableWidth = Math.Max(150,
+                    ratings.ClientSize.Width - ratings.Padding.Horizontal -
+                    (ratings.VerticalScroll.Visible
+                        ? SystemInformation.VerticalScrollBarWidth : 0) - 2);
+                int availableHeight = Math.Clamp(
+                    (ratings.ClientSize.Height - ratings.Padding.Vertical) /
+                        Groups[i].Skills.Count, compact ? 20 : 22, 33);
+                ratings.SuspendLayout();
+                foreach (Control skillRow in ratings.Controls)
+                {
+                    if (skillRow.Width != availableWidth)
+                        skillRow.Width = availableWidth;
+                    if (skillRow.Height != availableHeight)
+                        skillRow.Height = availableHeight;
+                    if (i == 3 && skillRow is SkillRatingRow longRow)
+                        longRow.SetLabelShare(compact ? 46f : 37.6f);
+                }
+                ratings.ResumeLayout(true);
             }
         }
         Resize += (_, _) => AdaptDensity();
