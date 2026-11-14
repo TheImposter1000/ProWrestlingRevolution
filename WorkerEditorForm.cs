@@ -2469,6 +2469,15 @@ else
     private void SaveWorker()
     {
         if (_databaseFile is null) return;
+        // Contracts have their own transactional editor. Do not let the
+        // Worker General save attempt to write an incomplete linked record
+        // or silently commit contract changes while editing other fields.
+        if (PrwContractEditorService.HasPendingChanges(_profile))
+        {
+            _saveStatus.Text = "Save pending contract changes in Contracts first.";
+            ShowSection("Contracts");
+            return;
+        }
         try
         {
             PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
