@@ -498,9 +498,19 @@ internal sealed class ContractsWorkspaceView : UserControl
 
     private void BuildEditor()
     {
-        Field("Employee", "_Employee", 178, 22, 267, 183, _workerName,
-            false, _workerName);
-        _fields["_Employee"].Enabled = false;
+        // The General Worker Editor is the blueprint: Name and Short Name
+        // appear above the picture, and Biography occupies the adjacent pane.
+        // Contracts adds Employee and Employer to the spare identity space;
+        // the sidebar remains absent so the whole top row is available.
+        Field("Name", "Name", 53, 23, 151, 234,
+            Read(_selected, "Name", _workerName), true);
+        Field("Short Name", "ShortName", 53, 55, 151, 234,
+            Read(_selected, "ShortName", _profile.Identity.ShortName), true);
+
+        var employee = new DarkDrop(_palette) { Name = "ContractEmployee" };
+        employee.SetChoices([], _workerName);
+        employee.SetReadOnly(true);
+        Place(employee, 512, 23, 170, 25, true);
 
         var employer = new DarkDrop(_palette) { Name = "ContractEmployer" };
         var selectedEmployer = _selected is null ? null : _employers.FirstOrDefault(x =>
@@ -508,17 +518,39 @@ internal sealed class ContractsWorkspaceView : UserControl
         employer.SetChoices(_employers.Select(x => x.ToString()).ToArray(),
             selectedEmployer?.ToString() ?? _employers.FirstOrDefault()?.ToString() ?? "None");
         _employerPicker = employer;
-        Place(employer, 553, 22, 155, 27, true);
+        Place(employer, 512, 55, 170, 25, true);
         if (!_creating) _help.SetToolTip(employer,
             "Changing employer updates the contract's company link.");
 
-        Field("Name", "Name", 179, 61, 267, 183, Read(_selected, "Name", _workerName),
-            true);
-        Field("Short Name", "ShortName", 179, 97, 267, 183,
-            Read(_selected, "ShortName", _profile.Identity.ShortName), true);
+        // Reuse the General Worker's exact PictureBox, image search, zoom,
+        // framing, and no-image presentation. Picture follows the two names.
+        var portrait = WorkerEditorTheme.CreatePortrait("ContractWorkerPicture");
+        portrait.Image = _portrait;
+        if (_portrait is null)
+        {
+            portrait.Controls.Add(new Label
+            {
+                Text = "NO IMAGE",
+                Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(144, 178, 200),
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 7.8f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+        }
+        Place(portrait, 151, 84, 91, 91, true);
 
-        // The same light biography editor and frame as General, widened to
-        // use the area freed by hiding the worker section sidebar.
+        // Picture Type is worker-level data. Show it in the same place as
+        // General, without accidentally editing the worker from Contracts.
+        var workerRecord = _profile.Sections.FirstOrDefault(s => s.Table == "tblWorker")
+            ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
+        var pictureType = new DarkDrop(_palette) { Name = "ContractPictureType" };
+        pictureType.SetChoices([], Read(workerRecord, "BiographyType", "Organic"));
+        pictureType.SetReadOnly(true);
+        Place(pictureType, 262, 116, 124, 25, true);
+
+        // The biography frame and actual RichTextBox are the SAME controls
+        // used by General, only wider to fit the Contracts canvas.
         var biographyFrame = new Panel
         {
             Name = "ContractBiographyFrame",
@@ -533,77 +565,58 @@ internal sealed class ContractsWorkspaceView : UserControl
             ContractBiography(), _file is null);
         _biography.Dock = DockStyle.Fill;
         biographyFrame.Controls.Add(_biography);
-        Place(biographyFrame, 817, 22, 502, 102, true);
+        Place(biographyFrame, 812, 22, 509, 150, true);
 
-        // Match General's picture box exactly: 91x91, a single subtle
-        // border, zoomed worker photograph, and NO IMAGE fallback.
-        var portrait = WorkerEditorTheme.CreatePortrait("ContractWorkerPicture");
-        portrait.Image = _portrait;
-        portrait.Location = new Point(0, 0);
-        if (_portrait is null)
-        {
-            portrait.Controls.Add(new Label
-            {
-                Text = "NO IMAGE",
-                Dock = DockStyle.Fill,
-                ForeColor = Color.FromArgb(144, 178, 200),
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 7.8f, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter
-            });
-        }
-        Place(portrait, 64, 26, 91, 91, true);
-
-        int y = 216;
+        int y = 236;
         Field("Contract Type", "ContractType", 49, y, 175, 167, "Handshake",
             false, "Handshake", "Written");
-        Field("Exclusive", "Exclusive", 49, y += 29, 175, 167, "No",
+        Field("Exclusive", "Exclusive", 49, y += 27, 175, 167, "No",
             false, "No", "Yes");
-        Field("Touring", "Touring", 49, y += 29, 175, 167, "No",
+        Field("Touring", "Touring", 49, y += 27, 175, 167, "No",
             false, "No", "Yes");
-        Field("Pay", "PayBasis", 49, y += 29, 175, 167, "Per Show",
+        Field("Pay", "PayBasis", 49, y += 27, 175, 167, "Per Show",
             false, "Per Show", "Monthly");
-        Field("On Loan", "OnLoan", 49, y += 29, 175, 167, "No",
+        Field("On Loan", "OnLoan", 49, y += 27, 175, 167, "No",
             false, "No", "Yes");
-        Field("In Developmental", "InDevelopmental", 49, y += 29, 175, 167,
+        Field("In Developmental", "InDevelopmental", 49, y += 27, 175, 167,
             "No", false, "No", "Yes");
-        Field("Iron Clad", "IronClad", 49, y += 29, 175, 167, "No",
+        Field("Iron Clad", "IronClad", 49, y += 27, 175, 167, "No",
             false, "No", "Yes");
-        Field("Wage", "Wage", 49, y += 29, 175, 167, "0", true);
-        Field("Downside", "Downside", 49, y += 29, 175, 167, "0", true);
-        Field("Contract Begin", "StartDate", 49, y += 29, 175, 167,
+        Field("Wage", "Wage", 49, y += 27, 175, 167, "0", true);
+        Field("Downside", "Downside", 49, y += 27, 175, 167, "0", true);
+        Field("Contract Begin", "StartDate", 49, y += 27, 175, 167,
             DateTime.Today.ToString("yyyy-MM-dd"), true);
-        Field("Expires In", "TermCode", 49, y += 29, 175, 167, "Random",
+        Field("Expires In", "TermCode", 49, y += 27, 175, 167, "Random",
             false, "Random", "Ongoing", "One Year", "Two Years");
-        Field("Appearances Left", "AppearanceLimit", 49, y += 29, 175, 167,
+        Field("Appearances Left", "AppearanceLimit", 49, y += 27, 175, 167,
             "Unlimited Appearances", false, "Unlimited Appearances");
 
-        y = 211;
+        y = 231;
         Field("Alignment", "Alignment", 389, y, 504, 185, "Babyface",
             false, "Babyface", "Heel");
-        Field("Last Turn", "LastTurn", 389, y += 28, 504, 185, "Random",
+        Field("Last Turn", "LastTurn", 389, y += 26, 504, 185, "Random",
             false, "Random");
-        Field("Competes In", "CompetesIn", 389, y += 28, 504, 185, "Men's Division",
+        Field("Competes In", "CompetesIn", 389, y += 26, 504, 185, "Men's Division",
             false, "Men's Division", "Women's Division");
-        Field("Brand", "Brands", 389, y += 28, 504, 185, "None", false, "None");
-        Field("Division", "Divisions", 389, y += 28, 504, 185, "None", false, "None");
-        Field("Manager", "ManagerWorkerUID", 389, y += 28, 504, 185, "None", false, "None");
-        Field("Mask", "MaskRespect", 389, y += 28, 504, 185, "No Mask",
+        Field("Brand", "Brands", 389, y += 26, 504, 185, "None", false, "None");
+        Field("Division", "Divisions", 389, y += 26, 504, 185, "None", false, "None");
+        Field("Manager", "ManagerWorkerUID", 389, y += 26, 504, 185, "None", false, "None");
+        Field("Mask", "MaskRespect", 389, y += 26, 504, 185, "No Mask",
             false, "No Mask");
-        Field("Move Set", "MoveSet", 389, y += 28, 504, 185, _workerName,
+        Field("Move Set", "MoveSet", 389, y += 26, 504, 185, _workerName,
             false, _workerName);
-        Field("Momentum", "Momentum", 389, y += 28, 504, 185, "Neutral",
+        Field("Momentum", "Momentum", 389, y += 26, 504, 185, "Neutral",
             false, "Neutral");
-        Field("Gimmick", "GimmickName", 389, y += 28, 504, 185, "None",
+        Field("Gimmick", "GimmickName", 389, y += 26, 504, 185, "None",
             false, "None");
-        Field("Gimmick Basis", "GimmickBasis", 389, y += 28, 504, 185, "None",
+        Field("Gimmick Basis", "GimmickBasis", 389, y += 26, 504, 185, "None",
             false, "None");
-        Field("Gimmick Rating", "GimmickRating", 389, y += 28, 504, 185, "Random",
+        Field("Gimmick Rating", "GimmickRating", 389, y += 26, 504, 185, "Random",
             false, "Random");
-        Field("Gimmick Status", "GimmickStatus", 389, y += 28, 504, 185, "Random",
+        Field("Gimmick Status", "GimmickStatus", 389, y += 26, 504, 185, "Random",
             false, "Random");
 
-        y = 216;
+        y = 236;
         Field("Creative Control", "CreativeControl", 738, y, 872, 164, "No",
             false, "No", "Yes");
         Field("Hiring Veto", "HiringVeto", 738, y += 29, 872, 164, "No",
@@ -656,7 +669,7 @@ internal sealed class ContractsWorkspaceView : UserControl
                 TextAlign = ContentAlignment.MiddleLeft
             };
             _roles.Add(roleKeys[i], toggle);
-            Place(toggle, 1088, 222 + i * 34, 240, 29, true);
+            Place(toggle, 1086, 239 + i * 29, 241, 25, true);
         }
 
         var alter = new DarkDrop(_palette) { Name = "ContractAlterEgoSelector" };
@@ -964,19 +977,24 @@ internal sealed class ContractsWorkspaceView : UserControl
 
     private void PaintEditor(Graphics g)
     {
-        PanelFrame(g, new Rectangle(25, 8, 1316, 133));
-        Caption(g, "Employee", 179, 23, 87, 25, 10.4f, true);
-        Caption(g, "Employer", 471, 23, 81, 25, 10.4f, true);
-        Caption(g, "Name", 179, 62, 87, 25, 10.4f, true);
-        Caption(g, "Short Name", 179, 97, 87, 25, 9.1f, true);
-        Caption(g, "Biography", 732, 23, 84, 25, 10.4f, true);
+        // These two adjacent panels reproduce the General Worker's
+        // identity + biography hierarchy. Contracts simply widens them.
+        PanelFrame(g, new Rectangle(25, 8, 674, 178));
+        PanelFrame(g, new Rectangle(709, 8, 632, 178));
+        Caption(g, "Name", 52, 22, 92, 25, 9.5f, true);
+        Caption(g, "Short Name", 52, 54, 96, 25, 9.5f, true);
+        Caption(g, "Picture", 52, 89, 92, 25, 9.5f, true);
+        Caption(g, "Picture Type", 262, 88, 125, 23, 9.3f, true);
+        Caption(g, "Employee", 420, 22, 88, 25, 9.5f, true);
+        Caption(g, "Employer", 420, 54, 88, 25, 9.5f, true);
+        Caption(g, "Biography", 724, 22, 88, 25, 9.5f, true);
         int[] xs = [25, 366, 706, 1055];
         int[] widths = [330, 329, 335, 286];
         for (int i = 0; i < 4; i++)
         {
-            var card = new Rectangle(xs[i], 155, widths[i], 426);
+            var card = new Rectangle(xs[i], 198, widths[i], 383);
             PanelFrame(g, card);
-            SectionBand(g, new Rectangle(xs[i] + 1, 156, widths[i] - 2, 30),
+            SectionBand(g, new Rectangle(xs[i] + 1, 199, widths[i] - 2, 30),
                 new[] { "Basic Details", "Roster Details",
                     "Terms, Perks & Bonuses", "Roles" }[i]);
         }
@@ -1147,6 +1165,14 @@ internal sealed class ContractsWorkspaceView : UserControl
         internal void SetValue(string value)
         {
             _input.Text = value;
+            Invalidate();
+        }
+
+        internal void SetReadOnly(bool readOnly)
+        {
+            _input.ReadOnly = readOnly;
+            _input.TabStop = !readOnly;
+            Cursor = readOnly ? Cursors.Default : Cursors.IBeam;
             Invalidate();
         }
 

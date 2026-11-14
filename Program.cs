@@ -736,6 +736,28 @@ internal static class Program
                         contractPortrait.BackColor != expectedPortrait.BackColor)
                         throw new Exception("Contract portrait diverged from General.");
                 }
+                // A shared color is not enough. Contract identity geometry
+                // must follow General: names first, portrait underneath,
+                // separate adjoining biography, and no sidebar.
+                var nameBox = contractView.Controls.Find("ContractField_Name", true).Single();
+                var shortBox = contractView.Controls.Find("ContractField_ShortName", true).Single();
+                var pictureTypeBox = contractView.Controls.Find("ContractPictureType", true).Single();
+                var employeeBox = contractView.Controls.Find("ContractEmployee", true).Single();
+                var employerBox = contractView.Controls.Find("ContractEmployer", true).Single();
+                var bioFrame = contractView.Controls.Find("ContractBiographyFrame", true).Single();
+                if (nameBox.Left != shortBox.Left ||
+                    nameBox.Top >= shortBox.Top ||
+                    contractPortrait.Top <= shortBox.Bottom ||
+                    contractPortrait.Left != nameBox.Left ||
+                    pictureTypeBox.Left <= contractPortrait.Right ||
+                    pictureTypeBox.Top <= shortBox.Bottom ||
+                    employeeBox.Left <= nameBox.Right ||
+                    employerBox.Left != employeeBox.Left ||
+                    employerBox.Top <= employeeBox.Top ||
+                    bioFrame.Left <= employerBox.Right ||
+                    bioFrame.Height < contractPortrait.Height)
+                    throw new Exception(
+                        "Contracts identity no longer follows General's vertical layout.");
                 var contractBio = contractView.Controls.Find("ContractBiography", true)
                     .OfType<RichTextBox>().Single();
                 if (contractBio.BackColor != WorkerEditorTheme.FieldInk ||
