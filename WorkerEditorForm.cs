@@ -31,6 +31,7 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly string? _password;
     private sealed record WorkerFieldBinding(DataRow? Row, string Field, string? Table = null);
     private string _initialValueSnapshot = "";
+    private Dictionary<string, object> _loadedSkillValues = new(StringComparer.Ordinal);
     private readonly Label _saveStatus = new()
     {
         Name = "WorkerSaveStatus", Location = new Point(8, 510),
@@ -70,6 +71,22 @@ internal sealed class WorkerEditorForm : UserControl
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    private static Dictionary<string, object> CaptureSkillValues(PrwWorkerProfile profile)
+    {
+        var result = new Dictionary<string, object>(StringComparer.Ordinal);
+        var row = profile.Sections.FirstOrDefault(section =>
+            section.Table == "tblWorkerSkills")?.Records.Rows
+                .Cast<DataRow>().FirstOrDefault();
+        foreach (string field in PrwSchema.Tables.Single(x =>
+            x.Name == "tblWorkerSkills").Columns.Where(x => x != "WorkerUID"))
+            result[field] = row is not null && row.Table.Columns.Contains(field)
+                ? row[field] : DBNull.Value;
+        return result;
+    }
+
+    private WorkerSkillsEditor? ActiveSkillsEditor() =>
+        _content.Controls.OfType<WorkerSkillsEditor>().FirstOrDefault();
+
     private static string SnapshotValues(PrwWorkerProfile profile) =>
         string.Join("\u001e", profile.Sections.SelectMany(section =>
             section.Records.Rows.Cast<DataRow>().Select(row =>
@@ -81,7 +98,8 @@ internal sealed class WorkerEditorForm : UserControl
     private bool HasPendingChanges() =>
         !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
             StringComparison.Ordinal) ||
-        _invalidManualEditors.Any(input => !input.IsDisposed);
+        _invalidManualEditors.Any(input => !input.IsDisposed) ||
+        ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true;
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
         PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
@@ -89,6 +107,7 @@ internal sealed class WorkerEditorForm : UserControl
         _paths = paths;
         _palette = palette;
         _profile = profile;
+        _loadedSkillValues = CaptureSkillValues(profile);
         _databaseFile = databaseFile;
         _password = password;
 
@@ -143,6 +162,7 @@ internal sealed class WorkerEditorForm : UserControl
     internal void LoadProfile(PrwWorkerProfile profile)
     {
         _profile = profile;
+        _loadedSkillValues = CaptureSkillValues(profile);
         RequestedNavigation = null;
 
         if (_identityBiography is TableLayoutPanel top)
@@ -1615,6 +1635,8 @@ internal sealed class WorkerEditorForm : UserControl
     {
         if (_manualEditors.Count > 0 && !ValidateManualEditors())
             return;
+        if (ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
+            return;
         _active = section;
         _recordIndex = 0;
         foreach (var (name, button) in _tabs)
@@ -1653,7 +1675,8 @@ internal sealed class WorkerEditorForm : UserControl
     {
         // Skills are a dedicated editor over the current profile. Do not
         // repeat the identity, biography, portrait, or generic action strip.
-        var skills = new WorkerSkillsEditor(_profile, _databaseFile is not null, SaveWorker);
+        var skills = new WorkerSkillsEditor(_profile,
+            _databaseFile is not null, SaveWorker, _loadedSkillValues);
         _content.Controls.Add(skills);
     }
 
@@ -2325,6 +2348,7 @@ internal sealed class WorkerEditorForm : UserControl
             // Keep the editor open with the unsaved inputs intact. No modal
             // success/failure popup interrupts the desired workflow.
             _saveStatus.Text = "Save failed: " + ex.Message;
+            ActiveSkillsEditor()?.ShowSaveError(ex.Message);
             _tips.SetToolTip(_saveStatus, ex.Message);
         }
     }
