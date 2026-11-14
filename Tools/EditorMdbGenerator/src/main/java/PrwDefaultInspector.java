@@ -19,7 +19,7 @@ public final class PrwDefaultInspector {
         try (Database db = DatabaseBuilder.open(new File(args[0]))) {
             check(db, "tblWorker", new String[] {
                 "Born", "SetToDebut", "DeathDate", "HeightInches",
-                "WeightPounds", "HeadCondition", "FaceGimmick", "HeelGimmick",
+                "WeightPounds", "FaceGimmick", "HeelGimmick",
                 "LoyaltyWorkerUID", "CompetesVs", "LanguageEnglish", "LanguageJapanese",
                 "RoleWrestler", "RolePartTimeWrestler"
             });
