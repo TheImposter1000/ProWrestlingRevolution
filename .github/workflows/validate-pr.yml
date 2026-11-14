@@ -30,8 +30,23 @@ jobs:
           if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Missing editor metadata MDB" }
       - name: Build Windows Forms game
         run: dotnet build ProWrestlingRevolution.csproj -c Release
-      - name: Run application smoke tests
-        run: dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
+      - name: Run application smoke tests and capture worker previews
+        shell: pwsh
+        run: |
+          $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
+          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Worker/Skills smoke tests failed" }
+
+      - name: Upload Worker Editor and Skills visual previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Worker-Editor-Draft-Visuals
+          path: |
+            worker-editor-preview.png
+            worker-skills-preview.png
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify published runtime paths and base template
         shell: pwsh
         run: |
