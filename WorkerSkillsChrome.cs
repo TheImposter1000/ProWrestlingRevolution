@@ -524,10 +524,10 @@ internal sealed class SkillNumberSpinner : UserControl
 
     private void PlaceEditor()
     {
-        var width = Math.Max(1, Width - 23);
+        int width = Math.Max(1, Width - 27);
         _editor.Bounds = new Rectangle(5,
-            Math.Max(2, (Height - _editor.PreferredHeight) / 2), width - 4,
-            Math.Max(17, _editor.PreferredHeight));
+            Math.Max(2, (Height - _editor.PreferredHeight) / 2),
+            width, Math.Max(17, _editor.PreferredHeight));
     }
 
     internal void SetRating(int? value)
@@ -782,8 +782,8 @@ internal sealed class SkillChromePreset : Control
         g.FillPath(fill, path);
         using var outline = new Pen(Color.FromArgb(104, 158, 201), 1f);
         g.DrawPath(outline, path);
-        TextRenderer.DrawText(g, Selection,
-            new Font("Segoe UI", 10.5f, FontStyle.Bold),
+        using var textFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        TextRenderer.DrawText(g, Selection, textFont,
             new Rectangle(9, 0, Width - 33, Height),
             Color.FromArgb(9, 30, 52), TextFormatFlags.NoPrefix |
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
