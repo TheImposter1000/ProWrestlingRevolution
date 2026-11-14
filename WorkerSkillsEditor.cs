@@ -78,6 +78,7 @@ internal sealed class WorkerSkillsEditor : UserControl
     private readonly bool _canEdit;
     private bool _createdRow;
     private bool _resetting;
+    private SkillChromePreset? _preset;
 
     internal WorkerSkillsEditor(PrwWorkerProfile profile, bool canEdit, Action save,
         IReadOnlyDictionary<string, object>? loadedValues = null)
@@ -169,58 +170,52 @@ internal sealed class WorkerSkillsEditor : UserControl
 
     private void Build()
     {
+        // The game shell already owns the PWR title bar. The approved screen
+        // begins immediately with four large, illustrated skill cards.
         var layout = new TableLayoutPanel
         {
             Name = "SkillsWorkspaceLayout",
             Dock = DockStyle.Fill,
-            ColumnCount = 1, RowCount = 3,
-            Padding = new Padding(10, 6, 10, 6),
-            Margin = Padding.Empty, BackColor = Color.Transparent
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 65));
-
-        var title = new Label
-        {
-            Name = "SkillsSectionHeading", Dock = DockStyle.Fill,
-            Text = "Skills    /    Worker Skill Editor",
-            Font = new Font("Segoe UI", 15f, FontStyle.Bold),
-            ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft,
+            ColumnCount = 1, RowCount = 2,
+            Padding = new Padding(10, 8, 10, 9),
+            Margin = Padding.Empty,
             BackColor = Color.Transparent
         };
-        layout.Controls.Add(title, 0, 0);
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 81));
 
         var panels = new TableLayoutPanel
         {
             Name = "SkillsFourPanels", Dock = DockStyle.Fill,
-            ColumnCount = 2, RowCount = 2, Margin = Padding.Empty,
-            Padding = Padding.Empty, BackColor = Color.Transparent
+            ColumnCount = 2, RowCount = 2,
+            Margin = Padding.Empty, Padding = Padding.Empty,
+            BackColor = Color.Transparent
         };
         panels.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         panels.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 49));
-        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 51));
+        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 48));
+        panels.RowStyles.Add(new RowStyle(SizeType.Percent, 52));
 
-        for (int groupIndex = 0; groupIndex < Groups.Count; groupIndex++)
-            panels.Controls.Add(CreateGroup(Groups[groupIndex]), groupIndex % 2,
-                groupIndex / 2);
-        layout.Controls.Add(panels, 0, 1);
-        layout.Controls.Add(CreateActions(), 0, 2);
+        for (int i = 0; i < Groups.Count; i++)
+            panels.Controls.Add(CreateGroup(Groups[i], i), i % 2, i / 2);
+
+        layout.Controls.Add(panels, 0, 0);
+        layout.Controls.Add(CreateActions(), 0, 1);
         Controls.Add(layout);
     }
 
-    private Control CreateGroup(SkillGroup group)
+    private Control CreateGroup(SkillGroup group, int groupIndex)
     {
-        var panel = new SkillPanel
+        var panel = new SkillGlassPanel
         {
-            Name = "SkillPanel_" + group.Title.Replace(" ", "").Replace("/", ""),
+            Name = "SkillPanel_" + group.Title.Replace(" ", "")
+                .Replace("/", "").Replace(",", "").Replace("&", ""),
             Dock = DockStyle.Fill,
-            Margin = new Padding(4, 3, 5, 4),
-            Padding = new Padding(1),
-            BackColor = PanelInk
+            Margin = new Padding(5, 5, 6, 6),
+            Padding = new Padding(3),
         };
+
         var inner = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -229,139 +224,188 @@ internal sealed class WorkerSkillsEditor : UserControl
             BackColor = Color.Transparent
         };
         inner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        inner.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
+        inner.RowStyles.Add(new RowStyle(SizeType.Absolute, 59));
         inner.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        var header = new SkillPanelHeader
+        string icon = groupIndex switch
         {
-            Dock = DockStyle.Fill, Margin = Padding.Empty
+            0 => "ring",
+            1 => "microphone",
+            2 => "physical",
+            _ => "clipboard"
         };
-        var icon = new Label
+        var header = new SkillGlassHeader(group.Title, group.Description, icon)
         {
-            Dock = DockStyle.Left, Width = 41,
-            Text = group.Icon, ForeColor = Color.White,
-            Font = new Font("Segoe UI Symbol", 21f, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleCenter,
-            BackColor = Color.Transparent
+            Name = "SkillsHeader_" + groupIndex,
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty
         };
-        var words = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
-            BackColor = Color.Transparent, Padding = Padding.Empty
-        };
-        words.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
-        words.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        words.Controls.Add(new Label
-        {
-            Dock = DockStyle.Fill, AutoEllipsis = true,
-            Text = group.Title, UseMnemonic = false,
-            Font = new Font("Segoe UI", 12.4f, FontStyle.Bold),
-            ForeColor = Color.White, TextAlign = ContentAlignment.BottomLeft
-        }, 0, 0);
-        words.Controls.Add(new Label
-        {
-            Dock = DockStyle.Fill, AutoEllipsis = true,
-            Text = group.Description, Font = new Font("Segoe UI", 9f, FontStyle.Italic),
-            ForeColor = Color.FromArgb(199, 222, 239),
-            TextAlign = ContentAlignment.TopLeft
-        }, 0, 1);
-        header.Controls.Add(words);
-        header.Controls.Add(icon);
         inner.Controls.Add(header, 0, 0);
 
-        // A top-down stack fixes the TableLayoutPanel surplus-height issue
-        // that separated the last skill rating from the preceding rows.
         var rows = new FlowLayoutPanel
         {
-            Name = "SkillRows_" + group.Title.Replace(" ", ""),
+            Name = "SkillRows_" + groupIndex,
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Padding = new Padding(8, 3, 8, 3), Margin = Padding.Empty,
-            BackColor = Color.Transparent, AutoScroll = true
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Margin = Padding.Empty,
+            Padding = new Padding(13, 6, 12, 5),
+            BackColor = SkillChrome.Ink,
+            AutoScroll = true
         };
-        int rowHeight = group.Skills.Count <= 8 ? 29 :
-            group.Skills.Count == 9 ? 27 : 23;
-        for (int skillIndex = 0; skillIndex < group.Skills.Count; skillIndex++)
+        foreach (var skill in group.Skills)
         {
-            var skill = group.Skills[skillIndex];
             var rating = new SkillRatingRow(skill.Label, skill.Column,
                 InitialRating(skill.Column), _canEdit,
                 value => UpdateSkill(skill.Column, value))
             {
-                Height = rowHeight, Margin = Padding.Empty
+                Height = group.Skills.Count > 9 ? 24 : 28,
+                Margin = Padding.Empty
             };
-            rating.Width = Math.Max(200, rows.ClientSize.Width - 20);
             rows.Controls.Add(rating);
             _rows.Add(skill.Column, rating);
         }
-        void ResizeRatingRows()
+
+        void PlaceRows()
         {
-            int width = Math.Max(200,
-                rows.ClientSize.Width - rows.Padding.Horizontal -
-                (rows.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 2);
+            int height = Math.Clamp(
+                (rows.ClientSize.Height - rows.Padding.Vertical) /
+                    group.Skills.Count, 22, 33);
+            int width = Math.Max(150, rows.ClientSize.Width -
+                rows.Padding.Horizontal -
+                (rows.VerticalScroll.Visible
+                    ? SystemInformation.VerticalScrollBarWidth : 0) - 2);
             foreach (Control rating in rows.Controls)
-                rating.Width = width;
+            {
+                if (rating.Width != width) rating.Width = width;
+                if (rating.Height != height) rating.Height = height;
+            }
         }
-        rows.Resize += (_, _) => ResizeRatingRows();
-        ResizeRatingRows();
+        rows.Resize += (_, _) => PlaceRows();
         inner.Controls.Add(rows, 0, 1);
         panel.Controls.Add(inner);
+        panel.Resize += (_, _) =>
+        {
+            int desired = panel.ClientSize.Width >= 730 ? 61 : 57;
+            if (inner.RowStyles[0].Height != desired)
+                inner.RowStyles[0].Height = desired;
+            PlaceRows();
+        };
+        PlaceRows();
         return panel;
     }
 
     private Control CreateActions()
     {
-        var action = new SkillPanel
+        var footer = new SkillGlassPanel
         {
-            Name = "WorkerSkillsActions", Dock = DockStyle.Fill,
-            Padding = new Padding(11, 9, 9, 9),
-            Margin = new Padding(4, 7, 5, 1)
+            Name = "WorkerSkillsActions", Footer = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(5, 8, 6, 2),
+            Padding = Padding.Empty
         };
-        var strip = new TableLayoutPanel
+        var presetLabel = new Label
         {
-            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1,
-            Margin = Padding.Empty, BackColor = Color.Transparent
+            Name = "SkillsPresetLabel",
+            Text = "Preset:",
+            Font = new Font("Segoe UI", 12.3f, FontStyle.Bold),
+            ForeColor = SkillChrome.White,
+            TextAlign = ContentAlignment.MiddleLeft,
+            BackColor = Color.Transparent,
+            UseMnemonic = false
         };
-        strip.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126));
-        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142));
-        strip.Controls.Add(_status, 0, 0);
+        _preset = new SkillChromePreset(
+            "None", "Balanced (50)", "In-Ring Specialist",
+            "Entertainment Specialist", "Physical Specialist",
+            "Commentary Specialist")
+        { Enabled = _canEdit };
+        _preset.Selected += ApplyPreset;
 
-        Button MakeButton(string text, string name, bool primary) =>
-            new SkillActionButton(primary)
-            {
-                Name = name, Dock = DockStyle.Fill, Text = text,
-                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-                Margin = new Padding(4, 0, 4, 0),
-                ForeColor = Color.White, Cursor = Cursors.Hand,
-                Enabled = _canEdit
-            };
+        _status.AutoEllipsis = true;
+        _status.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+        _status.ForeColor = Color.FromArgb(255, 179, 181);
+        _status.TextAlign = ContentAlignment.MiddleLeft;
+        _status.BackColor = Color.Transparent;
 
-        var reset = MakeButton("Reset", "SkillsReset", false);
-        var save = MakeButton("Save", "SkillsSave", true);
+        SkillChromeButton Button(string label, string name, string icon,
+            bool primary) => new(icon, primary)
+        {
+            Name = name,
+            Text = label,
+            Enabled = _canEdit,
+            AccessibleName = label
+        };
+        var balance = Button("Auto Balance", "SkillsAutoBalance", "balance", false);
+        var reset = Button("Reset", "SkillsReset", "reset", false);
+        var save = Button("Save", "SkillsSave", "save", true);
+        balance.Click += (_, _) => AutoBalance();
         reset.Click += (_, _) => ResetToLoadedValues();
         save.Click += (_, _) =>
         {
-            var invalidRow = _rows.Values
-                .Select(row => row.ValidateNumber())
-                .FirstOrDefault(result => result is not null);
-            if (invalidRow is not null)
-            {
-                _status.Text = invalidRow;
+            if (!ValidateBeforeLeaving())
                 return;
-            }
             if (_invalid.Count > 0)
             {
-                _status.Text = "Correct the invalid numerical ratings before saving.";
+                _status.Text = "Correct the invalid ratings before saving.";
                 return;
             }
             _save();
         };
-        strip.Controls.Add(reset, 1, 0);
-        strip.Controls.Add(save, 2, 0);
-        action.Controls.Add(strip);
-        return action;
+
+        var tips = new ToolTip
+        {
+            AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 100
+        };
+        tips.SetToolTip(balance,
+            "Normalize the average of populated ratings to 50, keeping " +
+            "relative differences and leaving unset skills untouched. " +
+            "Review before Save.");
+        tips.SetToolTip(reset,
+            "Restore all 36 skills to their values when the worker was opened.");
+        tips.SetToolTip(_preset,
+            "Apply a named 36-skill template. Changes are not saved automatically.");
+        tips.SetToolTip(save, "Commit staged worker skills to the active database.");
+
+        footer.Controls.Add(presetLabel);
+        footer.Controls.Add(_preset);
+        footer.Controls.Add(_status);
+        footer.Controls.Add(balance);
+        footer.Controls.Add(reset);
+        footer.Controls.Add(save);
+        void Arrange()
+        {
+            int w = footer.ClientSize.Width;
+            int h = footer.ClientSize.Height;
+            if (w < 450 || h < 20) return;
+            int buttonH = Math.Min(53, h - 12);
+            int top = (h - buttonH) / 2;
+            int gap = Math.Clamp(w / 120, 8, 13);
+            int saveWidth = Math.Clamp((int)(w * .125), 120, 200);
+            int resetWidth = Math.Clamp((int)(w * .117), 105, 187);
+            int balanceWidth = Math.Clamp((int)(w * .138), 135, 219);
+            int right = w - 11;
+
+            save.Bounds = new Rectangle(right - saveWidth, top,
+                saveWidth, buttonH);
+            right = save.Left - gap;
+            reset.Bounds = new Rectangle(right - resetWidth, top,
+                resetWidth, buttonH);
+            right = reset.Left - gap;
+            balance.Bounds = new Rectangle(right - balanceWidth, top,
+                balanceWidth, buttonH);
+
+            int labelWidth = Math.Clamp((int)(w * .06), 64, 95);
+            presetLabel.Bounds = new Rectangle(17, top, labelWidth, buttonH);
+            int presetX = presetLabel.Right + 5;
+            int presetWidth = Math.Clamp((int)(w * .156), 145, 250);
+            _preset.Bounds = new Rectangle(presetX, top + 5,
+                presetWidth, buttonH - 10);
+            _status.Bounds = new Rectangle(_preset.Right + 12, top,
+                Math.Max(0, balance.Left - _preset.Right - 20), buttonH);
+        }
+        footer.SizeChanged += (_, _) => Arrange();
+        Arrange();
+        return footer;
     }
 
     // In-memory test seam. A native MDB write must happen only on Save.
@@ -372,6 +416,82 @@ internal sealed class WorkerSkillsEditor : UserControl
     }
 
     internal void ResetForSmoke() => ResetToLoadedValues();
+
+    private void ApplyPreset(string name)
+    {
+        if (name == "None" || !_canEdit) return;
+        if (!ValidateBeforeLeaving())
+        {
+            _preset?.SelectValue("None");
+            return;
+        }
+
+        string message = "Apply the \"" + name + "\" template to all 36 " +
+            "skills? This replaces current and unset ratings with defined " +
+            "values. Changes will remain unsaved until you press Save.";
+        if (MessageBox.Show(FindForm(), message,
+            "Apply Skills Preset", MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
+            != DialogResult.Yes)
+        {
+            _preset?.SelectValue("None");
+            return;
+        }
+
+        for (int i = 0; i < Groups.Count; i++)
+        {
+            int groupValue = name == "Balanced (50)"
+                ? 50 : name switch
+                {
+                    "In-Ring Specialist" when i == 0 => 75,
+                    "Entertainment Specialist" when i == 1 => 75,
+                    "Physical Specialist" when i == 2 => 75,
+                    "Commentary Specialist" when i == 3 => 75,
+                    _ => 45
+                };
+            foreach (var skill in Groups[i].Skills)
+                SetRatingForSmoke(skill.Column, groupValue);
+        }
+        _status.Text = "Preset applied. Review ratings before saving.";
+    }
+
+    private void AutoBalance()
+    {
+        if (!_canEdit || !ValidateBeforeLeaving()) return;
+        var populated = _rows
+            .Select(pair => (pair.Key, Value: pair.Value.CurrentRating))
+            .Where(pair => pair.Value.HasValue)
+            .ToArray();
+        if (populated.Length == 0)
+        {
+            _status.Text = "Enter at least one rating to balance.";
+            return;
+        }
+
+        double average = populated.Average(item => item.Value!.Value);
+        int adjustment = (int)Math.Round(50 - average,
+            MidpointRounding.AwayFromZero);
+        if (adjustment == 0)
+        {
+            _status.Text = "Populated skill ratings already average 50.";
+            return;
+        }
+        if (MessageBox.Show(FindForm(),
+            "Shift populated skill ratings by " +
+            adjustment.ToString("+0;-0", CultureInfo.InvariantCulture) +
+            " points toward an average of 50? Differences remain " +
+            "proportional where possible, ratings stay within 0-100, " +
+            "and unset skills are unchanged. This is not saved until Save.",
+            "Auto Balance Skills", MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
+            != DialogResult.Yes)
+            return;
+
+        foreach (var (field, value) in populated)
+            SetRatingForSmoke(field, Math.Clamp(value!.Value + adjustment, 0, 100));
+        _preset?.SelectValue("None");
+        _status.Text = "Balance applied. Review ratings before saving.";
+    }
 
     private void UpdateSkill(string field, int? rating)
     {
@@ -454,210 +574,87 @@ internal sealed class WorkerSkillsEditor : UserControl
                 view.SetRating(rating);
             }
             _invalid.Clear();
+            _preset?.SelectValue("None");
             _status.Text = "";
         }
         finally { _resetting = false; }
     }
 
-    /// <summary>Paints the cyan bordered, dark blue sports-management cards.</summary>
-    private sealed class SkillPanel : Panel
-    {
-        internal SkillPanel()
-        {
-            DoubleBuffered = true;
-            BackColor = PanelInk;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            var rect = ClientRectangle;
-            if (rect.Width < 3 || rect.Height < 3) return;
-            using var border = new Pen(Edge, 1.2f);
-            e.Graphics.DrawRectangle(border, 1, 1, rect.Width - 3, rect.Height - 3);
-        }
-    }
-
-    private sealed class SkillPanelHeader : Panel
-    {
-        internal SkillPanelHeader()
-        {
-            DoubleBuffered = true;
-            BackColor = Color.FromArgb(18, 60, 103);
-        }
-
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            var rect = ClientRectangle;
-            if (rect.Width < 2 || rect.Height < 2) return;
-            using var brush = new LinearGradientBrush(rect,
-                Color.FromArgb(33, 102, 164), Color.FromArgb(9, 34, 65),
-                LinearGradientMode.Horizontal);
-            e.Graphics.FillRectangle(brush, rect);
-            using var line = new Pen(Edge);
-            e.Graphics.DrawLine(line, 0, Height - 1, Width, Height - 1);
-        }
-    }
-
-    private sealed class SkillActionButton : Button
-    {
-        private readonly bool _primary;
-        private bool _hover;
-
-        internal SkillActionButton(bool primary)
-        {
-            _primary = primary;
-            SetStyle(ControlStyles.UserPaint |
-                     ControlStyles.AllPaintingInWmPaint |
-                     ControlStyles.OptimizedDoubleBuffer, true);
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
-        }
-
-        protected override void OnMouseEnter(EventArgs e)
-        {
-            base.OnMouseEnter(e);
-            _hover = true;
-            Invalidate();
-        }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-            _hover = false;
-            Invalidate();
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            var rect = ClientRectangle;
-            if (rect.Width < 5 || rect.Height < 5) return;
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color top = _primary
-                ? _hover ? Color.FromArgb(44, 179, 237)
-                         : Color.FromArgb(33, 147, 222)
-                : _hover ? Color.FromArgb(38, 97, 155)
-                         : Color.FromArgb(26, 63, 103);
-            Color bottom = _primary
-                ? Color.FromArgb(5, 86, 160)
-                : Color.FromArgb(10, 30, 56);
-            using var fill = new LinearGradientBrush(rect, top, bottom,
-                LinearGradientMode.Vertical);
-            e.Graphics.FillRectangle(fill, rect);
-            using var outline = new Pen(
-                _primary ? Edge : Color.FromArgb(124, 174, 217),
-                _primary ? 2f : 1f);
-            e.Graphics.DrawRectangle(outline, 1, 1,
-                rect.Width - 3, rect.Height - 3);
-            TextRenderer.DrawText(e.Graphics, Text, Font, rect,
-                Enabled ? Color.White : Color.FromArgb(156, 177, 197),
-                TextFormatFlags.HorizontalCenter |
-                TextFormatFlags.VerticalCenter |
-                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-        }
-    }
-
     private sealed class SkillRatingRow : UserControl
     {
-        private readonly SkillRatingSlider _slider;
-        private readonly TextBox _number;
+        private readonly SkillGlowSlider _slider;
+        private readonly SkillNumberSpinner _spinner;
         private readonly Action<int?> _changed;
         private bool _syncing;
+
+        internal int? CurrentRating => _slider.Rating;
 
         internal SkillRatingRow(string label, string field,
             int? rating, bool enabled, Action<int?> changed)
         {
             _changed = changed;
             Name = "Skill_" + field;
-            BackColor = Color.Transparent;
+            BackColor = SkillChrome.Ink;
             Enabled = enabled;
-            Height = 23;
-            var table = new TableLayoutPanel
+            Height = 27;
+
+            var columns = new TableLayoutPanel
             {
-                Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1,
-                Padding = Padding.Empty, Margin = Padding.Empty,
-                BackColor = Color.Transparent
+                Dock = DockStyle.Fill,
+                ColumnCount = 3, RowCount = 1,
+                Margin = Padding.Empty, Padding = Padding.Empty,
+                BackColor = SkillChrome.Ink
             };
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 67));
-            table.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            // The screenshot's rhythm is label / wide illuminated rail /
+            // metal number spinner, with a real 15px gap before the spinner.
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
+            columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
             var title = new Label
             {
-                Name = "SkillLabel_" + field, Text = label,
-                Dock = DockStyle.Fill, AutoEllipsis = false,
-                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                ForeColor = Color.White, Margin = Padding.Empty,
+                Name = "SkillLabel_" + field,
+                Text = label, UseMnemonic = false,
+                Dock = DockStyle.Fill, AutoEllipsis = true,
+                Font = new Font("Segoe UI", 10.65f, FontStyle.Bold),
+                ForeColor = SkillChrome.White,
+                BackColor = Color.Transparent,
+                Margin = Padding.Empty,
                 TextAlign = ContentAlignment.MiddleLeft
             };
-            _slider = new SkillRatingSlider
+            _slider = new SkillGlowSlider
             {
                 Name = "SkillSlider_" + field,
                 Dock = DockStyle.Fill,
-                Margin = new Padding(1, 0, 7, 0)
+                AccessibleName = label + " slider",
+                Margin = new Padding(0, 0, 13, 0)
             };
             _slider.SetValue(rating);
+            _spinner = new SkillNumberSpinner(field, rating, enabled)
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 1, 4, 1)
+            };
             _slider.RatingChanged += (_, _) =>
             {
                 if (_syncing) return;
                 SetRating(_slider.Rating);
                 _changed(_slider.Rating);
             };
-
-            _number = new TextBox
-            {
-                Name = "SkillNumber_" + field,
-                Dock = DockStyle.Fill,
-                TextAlign = HorizontalAlignment.Center,
-                BorderStyle = BorderStyle.FixedSingle,
-                Margin = new Padding(1, 1, 1, 1),
-                Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(16, 40, 66)
-            };
-            _number.Text = rating?.ToString(CultureInfo.InvariantCulture) ?? "";
-            _number.KeyPress += (_, e) =>
-            {
-                if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
-                    e.Handled = true;
-            };
-            _number.TextChanged += (_, _) =>
+            _spinner.RatingChanged += number =>
             {
                 if (_syncing) return;
-                if (string.IsNullOrWhiteSpace(_number.Text))
-                {
-                    _slider.SetValue(null);
-                    _changed(null);
-                }
-                else if (int.TryParse(_number.Text,
-                    NumberStyles.None, CultureInfo.InvariantCulture, out int parsed) &&
-                    parsed is >= 0 and <= 100)
-                {
-                    _slider.SetValue(parsed);
-                    _changed(parsed);
-                }
-                else
-                {
-                    _number.BackColor = Color.FromArgb(95, 33, 44);
-                }
+                _slider.SetValue(number);
+                _changed(number);
             };
-
-            table.Controls.Add(title, 0, 0);
-            table.Controls.Add(_slider, 1, 0);
-            table.Controls.Add(_number, 2, 0);
-            Controls.Add(table);
+            columns.Controls.Add(title, 0, 0);
+            columns.Controls.Add(_slider, 1, 0);
+            columns.Controls.Add(_spinner, 2, 0);
+            Controls.Add(columns);
         }
 
-        internal string? ValidateNumber()
-        {
-            string value = _number.Text.Trim();
-            if (value.Length == 0) return null;
-            return int.TryParse(value, NumberStyles.None,
-                       CultureInfo.InvariantCulture, out int number) &&
-                   number is >= 0 and <= 100
-                ? null : "Skill ratings must be whole numbers between 0 and 100.";
-        }
+        internal string? ValidateNumber() => _spinner.ValidateNumber();
 
         internal void SetRating(int? rating)
         {
@@ -665,110 +662,9 @@ internal sealed class WorkerSkillsEditor : UserControl
             try
             {
                 _slider.SetValue(rating);
-                _number.Text = rating?.ToString(CultureInfo.InvariantCulture) ?? "";
-                _number.BackColor = Color.FromArgb(16, 40, 66);
+                _spinner.SetRating(rating);
             }
             finally { _syncing = false; }
-        }
-    }
-
-    private sealed class SkillRatingSlider : Control
-    {
-        internal event EventHandler? RatingChanged;
-        internal int? Rating { get; private set; }
-        private bool _dragging;
-
-        internal SkillRatingSlider()
-        {
-            DoubleBuffered = true;
-            SetStyle(ControlStyles.UserPaint | ControlStyles.Selectable |
-                     ControlStyles.AllPaintingInWmPaint |
-                     ControlStyles.OptimizedDoubleBuffer, true);
-            Cursor = Cursors.Hand;
-            BackColor = PanelInk;
-            TabStop = true;
-        }
-
-        internal void SetValue(int? value)
-        {
-            Rating = value;
-            Invalidate();
-        }
-
-        private void DragTo(int x)
-        {
-            int length = Math.Max(1, Width - 16);
-            int rating = (int)Math.Round(100d *
-                Math.Clamp(x - 8, 0, length) / length);
-            if (Rating == rating) return;
-            Rating = rating;
-            Invalidate();
-            RatingChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        protected override void OnMouseDown(MouseEventArgs e)
-        {
-            base.OnMouseDown(e);
-            if (e.Button != MouseButtons.Left || !Enabled) return;
-            _dragging = true;
-            Capture = true;
-            DragTo(e.X);
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            if (_dragging) DragTo(e.X);
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            base.OnMouseUp(e);
-            _dragging = false;
-            Capture = false;
-        }
-
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-            if (e.KeyCode is not (Keys.Left or Keys.Right)) return;
-            int next = Math.Clamp((Rating ?? 0) +
-                (e.KeyCode == Keys.Right ? 1 : -1), 0, 100);
-            if (Rating != next)
-            {
-                Rating = next;
-                Invalidate();
-                RatingChanged?.Invoke(this, EventArgs.Empty);
-            }
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.Clear(PanelInk);
-            if (Width < 22 || Height < 12) return;
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            int x = 8, width = Width - 16, y = Height / 2;
-            using var rail = new Pen(Color.FromArgb(95, 148, 186), 4f)
-            { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            e.Graphics.DrawLine(rail, x, y, x + width, y);
-            if (Rating.HasValue)
-            {
-                int end = x + (int)(width * Rating.Value / 100f);
-                using var fill = new Pen(Edge, 4f)
-                { StartCap = LineCap.Round, EndCap = LineCap.Round };
-                e.Graphics.DrawLine(fill, x, y, end, y);
-                using var glow = new SolidBrush(Color.FromArgb(224, 245, 255));
-                using var outline = new Pen(Color.FromArgb(40, 153, 217), 1.6f);
-                e.Graphics.FillEllipse(glow, end - 7, y - 7, 14, 14);
-                e.Graphics.DrawEllipse(outline, end - 7, y - 7, 14, 14);
-            }
-            else
-            {
-                using var outline = new Pen(Color.FromArgb(110, 145, 174), 1.5f);
-                e.Graphics.DrawEllipse(outline, x - 6, y - 6, 12, 12);
-            }
         }
     }
 }
