@@ -28,16 +28,35 @@ internal static class WorkerFieldRules
     internal static bool IsDate(string field) => Dates.Contains(field);
     internal static bool IsLanguage(string field) =>
         field.StartsWith("Language", StringComparison.OrdinalIgnoreCase);
+    private static readonly HashSet<string> Categorical = new(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "BiographyType", "Regenerates", "GenderID", "Pronouns",
+        "Sexuality", "Relationship", "Race", "Nationality", "BasedIn",
+        "GameStatus", "InRingStatus", "Celebrity", "Style", "BodyType",
+        "LoyaltyWorkerUID", "LoyaltyType", "Freelance", "UserCharacter",
+        "CompetesVs", "DefaultMoveSet", "FaceGimmickBasis",
+        "HeelGimmickBasis", "Mask", "Hair", "CareerGoal"
+    };
+
     internal static bool IsManual(string field, DataColumn? column)
     {
         if (Dates.Contains(field) || ManualNumbers.Contains(field) ||
             field is "FaceGimmick" or "HeelGimmick")
             return true;
-        if (IsLanguage(field) || field is "CompetesVs" or "LoyaltyWorkerUID")
+        if (IsLanguage(field) || Categorical.Contains(field) ||
+            field.StartsWith("Role", StringComparison.OrdinalIgnoreCase) ||
+            field.StartsWith("Active", StringComparison.OrdinalIgnoreCase))
             return false;
-        return column is not null && (column.DataType == typeof(DateTime) ||
-            (column.DataType.IsPrimitive && column.DataType != typeof(bool)) ||
-            column.DataType == typeof(decimal));
+        // Numbers in supplementary skill, reputation and business detail
+        // tables are typed directly. Numeric category IDs in tblWorker are
+        // not automatically mistaken for editable numerical ratings.
+        return column is not null &&
+            !column.Table.TableName.Equals("tblWorker",
+                StringComparison.OrdinalIgnoreCase) &&
+            (column.DataType == typeof(DateTime) ||
+             (column.DataType.IsPrimitive && column.DataType != typeof(bool)) ||
+             column.DataType == typeof(decimal));
     }
 
     internal static string Display(DataRow row, string field)
