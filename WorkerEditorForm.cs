@@ -76,6 +76,14 @@ internal sealed class WorkerEditorForm : UserControl
             ShowSection("General");
             return;
         }
+        if (_active == "Contracts")
+        {
+            var contractScreen = _content.Controls.OfType<ContractsWorkspaceView>()
+                .FirstOrDefault();
+            if (contractScreen?.ReturnToList() == true) return;
+            ShowSection("General");
+            return;
+        }
         if (HasPendingChanges() &&
             MessageBox.Show(FindForm(),
                 "Discard unsaved worker changes and return to the Database Editor?",
@@ -927,13 +935,16 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         var timer = System.Diagnostics.Stopwatch.StartNew();
 
-        bool skills = _active == "Skills";
+        bool skills = _active is "Skills" or "Contracts";
         _identityBiography.Visible = !skills;
         _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
         long topTime = timer.ElapsedMilliseconds;
 
-        int generalY = skills ? 7 : 165;
-        int generalHeight = skills
+        // Contract screens occupy the exact viewport below the 56px shared header.
+        // Skills retains its existing 7px inset; General retains its original layout.
+        bool contracts = _active == "Contracts";
+        int generalY = contracts ? 0 : skills ? 7 : 165;
+        int generalHeight = contracts ? height : skills
             ? Math.Max(300, height - generalY - 7)
             : Math.Max(340, Math.Min(520, height - generalY - 12));
 
@@ -1651,6 +1662,18 @@ else
             ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
             return;
 
+        // Contract saves reload the current worker from the database. Never
+        // discard unrelated, not-yet-saved worker edits during that refresh.
+        if (section == "Contracts" && _active != "Contracts" &&
+            HasPendingChanges())
+        {
+            MessageBox.Show(FindForm(),
+                "Save or discard your pending worker changes before opening Contracts.",
+                "Unsaved Worker Changes", MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
         var timer = System.Diagnostics.Stopwatch.StartNew();
         bool existingPage = _sectionViews.TryGetValue(section, out var target) &&
             !target.IsDisposed;
@@ -1693,13 +1716,14 @@ else
             {
                 if (section == "General") BuildGeneral();
                 else if (section == "Skills") BuildSkills();
+                else if (section == "Contracts") BuildContracts();
                 else BuildSecondary(section);
                 var rendered = _content.Controls.Cast<Control>().Single();
                 _sectionViews[section] = rendered;
                 SectionViewBuildCount++;
             }
 
-            SetImmersiveSkillsLayout(section == "Skills");
+            SetImmersiveSkillsLayout(section is "Skills" or "Contracts");
         }
         finally
         {
@@ -1763,6 +1787,27 @@ else
         _sectionNavigation.Visible = !skills;
         _workerPage.ColumnStyles[0].Width = skills ? 0 : 158;
         _workerPage.ResumeLayout(true);
+    }
+
+    private void BuildContracts()
+    {
+        var view = new ContractsWorkspaceView(_paths, _palette, _profile,
+            _databaseFile, _password,
+            editor => (FindForm() as LauncherForm)?.SetWorkerSectionChrome(
+                editor ? "Contract Editor" : "Contracts"),
+            () =>
+            {
+                if (_databaseFile is null || !IsHandleCreated) return;
+                BeginInvoke(new Action(() =>
+                {
+                    if (IsDisposed || _active != "Contracts") return;
+                    var refreshed = PrwWorkerRepository.Load(
+                        _databaseFile, _profile.Identity.Uid, _password);
+                    LoadProfile(refreshed);
+                    ShowSection("Contracts");
+                }));
+            });
+        _content.Controls.Add(view);
     }
 
     private void BuildSkills()
