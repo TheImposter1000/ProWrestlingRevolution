@@ -695,9 +695,21 @@ internal static class Program
                     string skillPreview = Path.Combine(
                         Path.GetDirectoryName(previewPath)!,
                         "worker-skills-preview.png");
+                    // Preview editable skill controls, not disabled placeholders
+                    // from the deliberately read-only Worker Editor fixture.
+                    using var editableSkillsPreview = new WorkerSkillsEditor(
+                        profile, true, () => { })
+                    {
+                        Size = new System.Drawing.Size(
+                            SkinArt.WindowWidth - 158, SkinArt.WindowHeight - 18)
+                    };
+                    editableSkillsPreview.CreateControl();
+                    editableSkillsPreview.PerformLayout();
+                    Application.DoEvents();
                     using var skillImage = new System.Drawing.Bitmap(
-                        workerEditor.ClientSize.Width, workerEditor.ClientSize.Height);
-                    workerEditor.DrawToBitmap(skillImage,
+                        editableSkillsPreview.ClientSize.Width,
+                        editableSkillsPreview.ClientSize.Height);
+                    editableSkillsPreview.DrawToBitmap(skillImage,
                         new System.Drawing.Rectangle(
                             System.Drawing.Point.Empty, skillImage.Size));
                     skillImage.Save(skillPreview,
