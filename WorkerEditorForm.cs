@@ -31,7 +31,6 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly string? _password;
     private sealed record WorkerFieldBinding(DataRow? Row, string Field, string? Table = null);
     private string _initialValueSnapshot = "";
-    private Dictionary<string, object> _loadedSkillValues = new(StringComparer.Ordinal);
     private readonly Label _saveStatus = new()
     {
         Name = "WorkerSaveStatus", Location = new Point(8, 510),
@@ -44,9 +43,16 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
     private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty, BackColor = Color.Transparent };
     private TableLayoutPanel? _workerPage;
+    private readonly Dictionary<string, Control> _sectionViews =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _sectionRecordIndices =
+        new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, object> _loadedSkillValues = new(StringComparer.Ordinal);
+
+    internal int CachedSectionCount => _sectionViews.Count;
+    internal int SectionViewBuildCount { get; private set; }
+    internal long LastSectionSwitchMilliseconds { get; private set; }
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
-    private readonly Dictionary<TextBox, WorkerFieldBinding> _manualEditors = new();
-    private readonly HashSet<TextBox> _invalidManualEditors = new();
     private string _active = "General";
     private int _recordIndex;
     private readonly Font _railNormal = new("Segoe UI", 10f);
@@ -59,15 +65,12 @@ internal sealed class WorkerEditorForm : UserControl
     internal ContextMenuStrip? FieldMenuForSmoke => _fieldMenu;
 
     internal string? RequestedNavigation { get; private set; }
-    internal event EventHandler? CloseRequested;
-    internal event Action<string>? SectionChanged;
     internal string ActiveSection => _active;
+    internal event Action<string>? SectionChanged;
+    internal event EventHandler? CloseRequested;
 
     internal void Close()
     {
-        // The reference Skills tab is a nested, full-screen workspace.
-        // The existing Back/Escape action returns to General first.
-        // Saving from Skills still returns directly to the Database Editor.
         if (_active == "Skills")
         {
             ShowSection("General");
@@ -82,22 +85,6 @@ internal sealed class WorkerEditorForm : UserControl
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private static Dictionary<string, object> CaptureSkillValues(PrwWorkerProfile profile)
-    {
-        var result = new Dictionary<string, object>(StringComparer.Ordinal);
-        var row = profile.Sections.FirstOrDefault(section =>
-            section.Table == "tblWorkerSkills")?.Records.Rows
-                .Cast<DataRow>().FirstOrDefault();
-        foreach (string field in PrwSchema.Tables.Single(x =>
-            x.Name == "tblWorkerSkills").Columns.Where(x => x != "WorkerUID"))
-            result[field] = row is not null && row.Table.Columns.Contains(field)
-                ? row[field] : DBNull.Value;
-        return result;
-    }
-
-    private WorkerSkillsEditor? ActiveSkillsEditor() =>
-        _content.Controls.OfType<WorkerSkillsEditor>().FirstOrDefault();
-
     private static string SnapshotValues(PrwWorkerProfile profile) =>
         string.Join("\u001e", profile.Sections.SelectMany(section =>
             section.Records.Rows.Cast<DataRow>().Select(row =>
@@ -109,7 +96,6 @@ internal sealed class WorkerEditorForm : UserControl
     private bool HasPendingChanges() =>
         !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
             StringComparison.Ordinal) ||
-        _invalidManualEditors.Any(input => !input.IsDisposed) ||
         ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true;
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
@@ -153,6 +139,9 @@ internal sealed class WorkerEditorForm : UserControl
             $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
         Disposed += (_, _) =>
         {
+            foreach (var view in _sectionViews.Values)
+                if (!view.IsDisposed) view.Dispose();
+            _sectionViews.Clear();
             _fieldMenu?.Dispose();
             _tips.Dispose();
             _railNormal.Dispose();
@@ -172,6 +161,9 @@ internal sealed class WorkerEditorForm : UserControl
 
     internal void LoadProfile(PrwWorkerProfile profile)
     {
+        // All cached controls hold DataRows from the previous worker. Discard
+        // them before swapping profiles so no changes can leak across workers.
+        InvalidateSectionViews();
         _profile = profile;
         _loadedSkillValues = CaptureSkillValues(profile);
         RequestedNavigation = null;
@@ -690,6 +682,23 @@ internal sealed class WorkerEditorForm : UserControl
         return Convert.ToString(raw) ?? "";
     }
 
+    private static Dictionary<string, object> CaptureSkillValues(
+        PrwWorkerProfile profile)
+    {
+        var originals = new Dictionary<string, object>(StringComparer.Ordinal);
+        var record = profile.Sections.FirstOrDefault(section =>
+                section.Table == "tblWorkerSkills")?.Records.Rows
+            .Cast<DataRow>().FirstOrDefault();
+        foreach (var field in PrwSchema.Tables.Single(t =>
+                     t.Name == "tblWorkerSkills").Columns.Where(t => t != "WorkerUID"))
+            originals[field] = record is not null && record.Table.Columns.Contains(field)
+                ? record[field] : DBNull.Value;
+        return originals;
+    }
+
+    private WorkerSkillsEditor? ActiveSkillsEditor() =>
+        _content.Controls.OfType<WorkerSkillsEditor>().FirstOrDefault();
+
     private DataRow? First(string table) =>
         _profile.Sections.FirstOrDefault(s => s.Table.Equals(table, StringComparison.OrdinalIgnoreCase))
             ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
@@ -1023,9 +1032,25 @@ internal sealed class WorkerEditorForm : UserControl
         };
         card.Controls.Add(portrait);
 
-        // Picture type is not a worker-image property in the native MDB.
-        // BiographyType is retained in the data model, but it must never be
-        // mislabeled or displayed as "Picture Type".
+        // Picture Type belongs alongside the portrait, not in the
+        // biography panel. This matches the reference editor grouping.
+        var pictureTypeLabel = new Label
+        {
+            Name = "WorkerPictureTypeLabel",
+            Text = "Picture Type",
+            Location = new Point(205, 62),
+            Size = new Size(138, 20),
+            ForeColor = Color.White, BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 8.8f, FontStyle.Bold)
+        };
+        var pictureType = ValueBox(Display(worker, "BiographyType"),
+            "WorkerField_BiographyType", true);
+        pictureType.Dock = DockStyle.None;
+        pictureType.Location = new Point(205, 85);
+        pictureType.Size = new Size(132, 23);
+        Bind(pictureType, worker, "BiographyType");
+        card.Controls.Add(pictureTypeLabel);
+        card.Controls.Add(pictureType);
         string picture = Display(worker, "Picture");
         string safeName = Path.GetFileName(picture);
 
@@ -1098,7 +1123,8 @@ internal sealed class WorkerEditorForm : UserControl
             int valueWidth = Math.Max(100, card.ClientSize.Width - 107);
             first.Width = valueWidth;
             second.Width = valueWidth;
-
+            pictureType.Width = Math.Max(80,
+                card.ClientSize.Width - pictureType.Left - 7);
         };
     }
 
@@ -1237,73 +1263,7 @@ internal sealed class WorkerEditorForm : UserControl
     /// Neither textboxes nor checkboxes may be compressed below the legible
     /// height used by the original mockup.
     /// </summary>
-
-    private TextBox MakeManualInput(DataRow? source, string field, string? table)
-    {
-        var binding = new WorkerFieldBinding(source, field,
-            source?.Table.TableName ?? table);
-        var input = new TextBox
-        {
-            Name = "WorkerField_" + field,
-            Text = source is null ? "" : WorkerFieldRules.Display(source, field),
-            Dock = DockStyle.Fill, Margin = new Padding(2, 1, 5, 1),
-            BackColor = FieldInk, ForeColor = Ink,
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
-            ReadOnly = _databaseFile is null,
-            TabStop = _databaseFile is not null,
-            AccessibleName = field + " manual entry"
-        };
-        _manualEditors[input] = binding;
-        input.TextChanged += (_, _) =>
-        {
-            if (input.IsDisposed || _databaseFile is null) return;
-            var row = binding.Row;
-            if (row is null && binding.Table == "tblWorkerPhysical" &&
-                !string.IsNullOrWhiteSpace(input.Text))
-                row = ResolveRow(binding);
-            if (row is null) return;
-            if (WorkerFieldRules.TryManualValue(row, field, input.Text,
-                    out var value, out var error))
-            {
-                try
-                {
-                    if (!Equals(row[field], value)) row[field] = value;
-                    _invalidManualEditors.Remove(input);
-                    input.BackColor = FieldInk;
-                    _saveStatus.Text = "";
-                }
-                catch (Exception ex) when (ex is ArgumentException or ConstraintException)
-                {
-                    _invalidManualEditors.Add(input);
-                    _saveStatus.Text = field + ": " + ex.Message;
-                    input.BackColor = Color.FromArgb(255, 219, 219);
-                }
-            }
-            else
-            {
-                _invalidManualEditors.Add(input);
-                _saveStatus.Text = field + ": " + error;
-                input.BackColor = Color.FromArgb(255, 219, 219);
-            }
-        };
-        return input;
-    }
-
-    private bool ValidateManualEditors()
-    {
-        foreach (var input in _invalidManualEditors.ToArray())
-            if (input.IsDisposed || !_manualEditors.ContainsKey(input))
-                _invalidManualEditors.Remove(input);
-        if (_invalidManualEditors.Count == 0) return true;
-        var first = _invalidManualEditors.First();
-        _saveStatus.Text = "Correct " + _manualEditors[first].Field +
-            " before saving or navigating away.";
-        first.Focus();
-        return false;
-    }
-
-    private TableLayoutPanel MakeRows(Panel card,
+    private static TableLayoutPanel MakeRows(Panel card,
         IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
         int rowHeight = 22, float labelShare = 39f, int topPad = 2)
     {
@@ -1322,29 +1282,69 @@ internal sealed class WorkerEditorForm : UserControl
         {
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             grid.Controls.Add(TextLabel(fields[i].Label), 0, i);
-            string field = fields[i].Field;
-            DataColumn? column = source?.Table.Columns.Contains(field) == true
-                ? source.Table.Columns[field] : null;
-            if (WorkerFieldRules.IsManual(field, column))
-            {
-                var input = MakeManualInput(source, field,
-                    card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
-                if (field.Contains("Weight", StringComparison.OrdinalIgnoreCase))
-                {
-                    input.Dock = DockStyle.Left;
-                    input.Width = 104;
-                }
-                grid.Controls.Add(input, 1, i);
-            }
-            else
-            {
-                var value = ValueBox(source is null ? "" :
-                    WorkerFieldRules.Display(source, field),
-                    "WorkerField_" + field);
-                Bind(value, source, field,
-                    card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
-                grid.Controls.Add(value, 1, i);
-            }
+            bool isWeight = fields[i].Field.Contains("Weight", StringComparison.OrdinalIgnoreCase);
+            bool isDate = fields[i].Field.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
+                          fields[i].Field is "Born" or "SetToDebut";
+            var value = ValueBox(Display(source, fields[i].Field),
+                "WorkerField_" + fields[i].Field, !isWeight && !isDate);
+            Bind(value, source, fields[i].Field,
+                card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
+            
+value.CalendarIndicator = false;
+value.SpinnerIndicator = isWeight;
+
+if (isDate)
+{
+    var dateRow = new TableLayoutPanel
+    {
+        Dock = DockStyle.Fill,
+        ColumnCount = 2,
+        RowCount = 1,
+        Margin = Padding.Empty,
+        Padding = Padding.Empty,
+        BackColor = Color.Transparent
+    };
+
+    dateRow.ColumnStyles.Add(
+        new ColumnStyle(SizeType.Percent, 100));
+
+    dateRow.ColumnStyles.Add(
+        new ColumnStyle(SizeType.Absolute, 32));
+
+    value.Dock = DockStyle.Fill;
+    value.Margin = new Padding(2, 1, 4, 1);
+
+    var calendarButton = new Button
+    {
+        Text = "▦",
+        Dock = DockStyle.Fill,
+        Margin = new Padding(0, 1, 2, 1),
+        FlatStyle = FlatStyle.Flat,
+        BackColor = Color.FromArgb(235, 242, 248),
+        ForeColor = Color.FromArgb(15, 35, 53),
+        Font = new Font("Segoe UI Symbol", 9f),
+        TabStop = false
+    };
+
+    calendarButton.FlatAppearance.BorderColor =
+        Color.FromArgb(110, 145, 170);
+
+    dateRow.Controls.Add(value, 0, 0);
+    calendarButton.Click += (_, _) => value.Edit();
+    dateRow.Controls.Add(calendarButton, 1, 0);
+
+    grid.Controls.Add(dateRow, 1, i);
+}
+else
+{
+    if (isWeight)
+    {
+        value.Dock = DockStyle.Left;
+        value.Width = 98;
+    }
+
+    grid.Controls.Add(value, 1, i);
+}
 
         }
         card.Controls.Add(grid);
@@ -1499,29 +1499,15 @@ internal sealed class WorkerEditorForm : UserControl
 
         var loyalty = Card("", "WorkerLoyalty");
         MakeRows(loyalty, [
-            ("Company Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
+            ("Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
             ("Freelance", "Freelance"), ("User Character", "UserCharacter")
         ], worker, labelShare: 48f);
-        if (_databaseFile is not null && worker is not null)
-        {
-            var loyaltyControl = loyalty.Controls.Find(
-                "WorkerField_LoyaltyWorkerUID", true)
-                .OfType<WorkerValue>().FirstOrDefault();
-            if (loyaltyControl is not null)
-            {
-                var selected = PrwWorkerFieldOptions.Get(
-                    _paths, _databaseFile, _password, worker, "LoyaltyWorkerUID")
-                    .FirstOrDefault(choice => Equals(choice.Value, worker["LoyaltyWorkerUID"]));
-                if (selected is not null)
-                    loyaltyControl.Text = selected.Label;
-            }
-        }
         var roles = Card("Roles", "WorkerRoles");
         var roleChecks = MakeChecks(roles, [
-            ("Wrestler", "RoleWrestler"), ("Part-Time Wrestler", "RolePartTimeWrestler"),
-            ("Manager", "RoleManager"), ("On Screen Personality", "RoleOnScreenPersonality"),
-            ("Play by Play Commentator", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
-            ("Referee", "RoleReferee"), ("Producer", "RoleProducer")
+            ("Wrestler", "RoleWrestler"), ("Occasional Wrestler", "RolePartTimeWrestler"),
+            ("Manager", "RoleManager"), ("On-Screen Personality", "RoleOnScreenPersonality"),
+            ("Play By Play", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
+            ("Referee", "RoleReferee"), ("Road Agent", "RoleProducer")
         ], worker, rowHeight: 20);
         var roleBoxes = roleChecks.Controls
     .OfType<CheckBox>()
@@ -1551,18 +1537,18 @@ internal sealed class WorkerEditorForm : UserControl
             Padding = new Padding(3, 3, 4, 2)
         };
 
-        var competitorLabel = TextLabel("Competing Division");
+        var competitorLabel = TextLabel("Competes Vs.");
         competitorLabel.Dock = DockStyle.None;
         competitorLabel.Location = new Point(-3,32);
-        competitorLabel.Size = new Size(132, 22);
+        competitorLabel.Size = new Size(90, 22);
 
         var competitorValue = ValueBox(
-            worker is null ? "" : WorkerFieldRules.Display(worker, "CompetesVs"),
+            Display(worker, "CompetesVs"),
             "WorkerField_CompetesVs");
 
         competitorValue.Dock = DockStyle.None;
-        competitorValue.Location = new Point(136, 32);
-        competitorValue.Size = new Size(130, 25);
+        competitorValue.Location = new Point(102, 32);
+        competitorValue.Size = new Size(160, 25);
 
         roles.Controls.Add(competitorLabel);
         Bind(competitorValue, worker, "CompetesVs");
@@ -1643,20 +1629,29 @@ internal sealed class WorkerEditorForm : UserControl
         _content.Controls.Add(grid);
     }
 
+    /// <summary>
+    /// Tab views are built once per worker, then detached and reattached
+    /// without destroying hundreds of WinForms controls on every visit.
+    /// Caches are invalidated whenever a different worker is loaded.
+    /// </summary>
     private void ShowSection(string section)
     {
-        if (_manualEditors.Count > 0 && !ValidateManualEditors())
+        if (section == _active && _sectionViews.TryGetValue(section, out var displayed) &&
+            displayed.Parent == _content)
             return;
-        if (ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
+
+        if (_active == "Skills" &&
+            ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
             return;
+
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        _sectionRecordIndices[_active] = _recordIndex;
         _active = section;
-        _recordIndex = 0;
-        SetImmersiveSkillsLayout(section == "Skills");
+        _recordIndex = _sectionRecordIndices.GetValueOrDefault(section, 0);
+
         foreach (var (name, button) in _tabs)
         {
-            // The approved General composition uses Alter Ego as the
-            // highlighted section in its reference image. Retain that
-            // visual until the user explicitly selects another section.
+            // Preserve the exact v0.6.2 General tab highlight behavior.
             bool selected = section == "General"
                 ? name == "Alter Ego"
                 : name.Equals(section, StringComparison.OrdinalIgnoreCase);
@@ -1666,30 +1661,93 @@ internal sealed class WorkerEditorForm : UserControl
                 tab.Invalidate();
             }
         }
-        _manualEditors.Clear();
-        _invalidManualEditors.Clear();
-        _content.SuspendLayout();
-        if (_actionArea.Parent is Control oldParent)
-            oldParent.Controls.Remove(_actionArea);
 
-        foreach (Control old in _content.Controls.Cast<Control>().ToArray())
+        _body.SuspendLayout();
+        _content.SuspendLayout();
+        try
         {
-            _content.Controls.Remove(old);
-            old.Dispose();
+            // _actionArea is shared by General and secondary sections. It
+            // must never be disposed with a tab, or the Save action vanishes.
+            if (_actionArea.Parent is Control actionParent)
+                actionParent.Controls.Remove(_actionArea);
+
+            foreach (Control previous in _content.Controls.Cast<Control>().ToArray())
+                _content.Controls.Remove(previous);
+
+            if (_sectionViews.TryGetValue(section, out var cached) &&
+                !cached.IsDisposed)
+            {
+                _content.Controls.Add(cached);
+                RestoreCachedActions(cached, section);
+            }
+            else
+            {
+                if (section == "General") BuildGeneral();
+                else if (section == "Skills") BuildSkills();
+                else BuildSecondary(section);
+                var rendered = _content.Controls.Cast<Control>().Single();
+                _sectionViews[section] = rendered;
+                SectionViewBuildCount++;
+            }
+
+            SetImmersiveSkillsLayout(section == "Skills");
         }
-        if (section == "General") BuildGeneral();
-        else if (section == "Skills") BuildSkills();
-        else BuildSecondary(section);
+        finally
+        {
+            _content.ResumeLayout(true);
+            _body.ResumeLayout(true);
+        }
         LayoutWorkerCanvas();
-        _content.ResumeLayout();
+        LastSectionSwitchMilliseconds = timer.ElapsedMilliseconds;
+        System.Diagnostics.Trace.WriteLine(
+            $"Worker tab '{section}': {LastSectionSwitchMilliseconds} ms; " +
+            $"cached={_sectionViews.Count}, builds={SectionViewBuildCount}");
         SectionChanged?.Invoke(section);
+    }
+
+    private void RestoreCachedActions(Control view, string section)
+    {
+        if (section == "Skills") return;
+        if (section == "General" && view is TableLayoutPanel general)
+        {
+            _actionArea.Dock = DockStyle.Fill;
+            _actionArea.Margin = Padding.Empty;
+            _actionArea.Padding = new Padding(8, 26, 3, 3);
+            general.Controls.Add(_actionArea, 2, 1);
+            general.SetColumnSpan(_actionArea, 2);
+        }
+        else if (view.Controls.Find("WorkerSecondaryActionsHost", true)
+                     .OfType<Panel>().FirstOrDefault() is Panel footer)
+        {
+            _actionArea.Dock = DockStyle.Right;
+            _actionArea.Width = 574;
+            _actionArea.Padding = Padding.Empty;
+            footer.Controls.Add(_actionArea);
+        }
+    }
+
+    private void InvalidateSectionViews()
+    {
+        if (_actionArea.Parent is Control parent)
+            parent.Controls.Remove(_actionArea);
+
+        _content.SuspendLayout();
+        try
+        {
+            foreach (Control previous in _content.Controls.Cast<Control>().ToArray())
+                _content.Controls.Remove(previous);
+            foreach (var view in _sectionViews.Values)
+                if (!view.IsDisposed) view.Dispose();
+            _sectionViews.Clear();
+            _sectionRecordIndices.Clear();
+            _recordIndex = 0;
+        }
+        finally { _content.ResumeLayout(false); }
     }
 
     private void SetImmersiveSkillsLayout(bool skills)
     {
         if (_workerPage is null || _workerPage.IsDisposed) return;
-        // No Worker tab strip may consume width on the reference Skills page.
-        // Keep its controls allocated for instantaneous restoration on Back.
         _workerPage.SuspendLayout();
         _sectionNavigation.Visible = !skills;
         _workerPage.ColumnStyles[0].Width = skills ? 0 : 158;
@@ -1698,11 +1756,8 @@ internal sealed class WorkerEditorForm : UserControl
 
     private void BuildSkills()
     {
-        // Skills are a dedicated editor over the current profile. Do not
-        // repeat the identity, biography, portrait, or generic action strip.
-        var skills = new WorkerSkillsEditor(_profile,
-            _databaseFile is not null, SaveWorker, _loadedSkillValues);
-        _content.Controls.Add(skills);
+        _content.Controls.Add(new WorkerSkillsEditor(_profile,
+            _databaseFile is not null, SaveWorker, _loadedSkillValues));
     }
 
     private static string? SectionTable(string section) => section switch
@@ -1816,7 +1871,7 @@ internal sealed class WorkerEditorForm : UserControl
         header.BringToFront();
     }
 
-    private void RenderSecondaryFields(Panel parent, DataRow record, string section)
+    private static void RenderSecondaryFields(Panel parent, DataRow record, string section)
     {
         Control? previous = parent.Controls.Find("WorkerSecondaryFields", false).FirstOrDefault();
         if (previous is not null)
@@ -1994,13 +2049,13 @@ internal sealed class WorkerEditorForm : UserControl
     }
 
     private void ApplyValue(WorkerValue control, DataRow row,
-        string field, object? candidate, string? visibleLabel = null)
+        string field, object? candidate)
     {
         if (Equals(row[field], candidate)) return;
         try
         {
             row[field] = candidate ?? DBNull.Value;
-            control.Text = visibleLabel ?? WorkerFieldRules.Display(row, field);
+            control.Text = Display(row, field);
             control.Invalidate();
             _saveStatus.Text = "";
         }
@@ -2110,7 +2165,7 @@ internal sealed class WorkerEditorForm : UserControl
             };
             item.Click += (_, _) =>
                 AfterMenuInteraction(control, () =>
-                    ApplyValue(control, row, field, selectedValue, choice.Label));
+                    ApplyValue(control, row, field, selectedValue));
             menu.Items.Add(item);
         }
         if (choices.Count > 0) menu.Items.Add(new ToolStripSeparator());
@@ -2127,8 +2182,7 @@ internal sealed class WorkerEditorForm : UserControl
                     ApplyValue(control, row, field, DBNull.Value));
             menu.Items.Add(clear);
         }
-        if (field != "LoyaltyWorkerUID" && field != "CompetesVs" &&
-            !WorkerFieldRules.IsLanguage(field))
+        if (field != "LoyaltyWorkerUID")
         {
             var manual = new ToolStripMenuItem("Enter a custom value...")
             {
@@ -2358,7 +2412,7 @@ internal sealed class WorkerEditorForm : UserControl
 
     private void SaveWorker()
     {
-        if (_databaseFile is null || !ValidateManualEditors()) return;
+        if (_databaseFile is null) return;
         try
         {
             PrwWorkerEditorService.Save(_databaseFile, _profile, _password);

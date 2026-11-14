@@ -277,8 +277,12 @@ internal sealed class WorkerSkillsEditor : UserControl
                         skillRow.Width = availableWidth;
                     if (skillRow.Height != availableHeight)
                         skillRow.Height = availableHeight;
-                    if (i == 3 && skillRow is SkillRatingRow longRow)
-                        longRow.SetLabelShare(compact ? 46f : 37.6f);
+                    if (skillRow is SkillRatingRow rating)
+                    {
+                        rating.SetDensity(compact);
+                        if (i == 3)
+                            rating.SetLabelShare(compact ? 46f : 37.6f);
+                    }
                 }
                 ratings.ResumeLayout(true);
             }
@@ -371,8 +375,12 @@ internal sealed class WorkerSkillsEditor : UserControl
             {
                 if (rating.Width != width) rating.Width = width;
                 if (rating.Height != height) rating.Height = height;
-                if (groupIndex == 3 && rating is SkillRatingRow skillRow)
-                    skillRow.SetLabelShare(Height < 790 ? 46f : 37.6f);
+                if (rating is SkillRatingRow skillRow)
+                {
+                    skillRow.SetDensity(Height < 790);
+                    if (groupIndex == 3)
+                        skillRow.SetLabelShare(Height < 790 ? 46f : 37.6f);
+                }
             }
         }
         rows.Resize += (_, _) => PlaceRows();
@@ -432,10 +440,8 @@ internal sealed class WorkerSkillsEditor : UserControl
             Enabled = _canEdit,
             AccessibleName = label
         };
-        var balance = Button("Auto Balance", "SkillsAutoBalance", "balance", false);
         var reset = Button("Reset", "SkillsReset", "reset", false);
         var save = Button("Save", "SkillsSave", "save", true);
-        balance.Click += (_, _) => AutoBalance();
         reset.Click += (_, _) => ResetToLoadedValues();
         save.Click += (_, _) =>
         {
@@ -454,10 +460,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 100
         };
         footer.Disposed += (_, _) => tips.Dispose();
-        tips.SetToolTip(balance,
-            "Normalize the average of populated ratings to 50, keeping " +
-            "relative differences and leaving unset skills untouched. " +
-            "Review before Save.");
         tips.SetToolTip(reset,
             "Restore all 36 skills to their values when the worker was opened.");
         tips.SetToolTip(_preset,
@@ -467,7 +469,6 @@ internal sealed class WorkerSkillsEditor : UserControl
         footer.Controls.Add(presetLabel);
         footer.Controls.Add(_preset);
         footer.Controls.Add(_status);
-        footer.Controls.Add(balance);
         footer.Controls.Add(reset);
         footer.Controls.Add(save);
         void Arrange()
@@ -480,7 +481,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             int gap = w >= 1400 ? 18 : Math.Clamp(w / 120, 8, 13);
             int saveWidth = Math.Clamp((int)(w * .128), 120, 205);
             int resetWidth = Math.Clamp((int)(w * .120), 105, 192);
-            int balanceWidth = Math.Clamp((int)(w * .138), 135, 219);
             int right = w - 14;
 
             save.Bounds = new Rectangle(right - saveWidth, top,
@@ -488,9 +488,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             right = save.Left - gap;
             reset.Bounds = new Rectangle(right - resetWidth, top,
                 resetWidth, buttonH);
-            right = reset.Left - gap;
-            balance.Bounds = new Rectangle(right - balanceWidth, top,
-                balanceWidth, buttonH);
 
             int labelWidth = Math.Clamp((int)(w * .06), 64, 95);
             presetLabel.Bounds = new Rectangle(33, top,
@@ -500,7 +497,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             _preset.Bounds = new Rectangle(presetX, top + 5,
                 presetWidth, buttonH - 10);
             _status.Bounds = new Rectangle(_preset.Right + 12, top,
-                Math.Max(0, balance.Left - _preset.Right - 20), buttonH);
+                Math.Max(0, reset.Left - _preset.Right - 20), buttonH);
         }
         footer.SizeChanged += (_, _) => Arrange();
         Arrange();
@@ -554,43 +551,6 @@ internal sealed class WorkerSkillsEditor : UserControl
         _status.Text = "Preset applied. Review ratings before saving.";
     }
 
-    private void AutoBalance()
-    {
-        if (!_canEdit || !ValidateBeforeLeaving()) return;
-        var populated = _rows
-            .Select(pair => (pair.Key, Value: pair.Value.CurrentRating))
-            .Where(pair => pair.Value.HasValue)
-            .ToArray();
-        if (populated.Length == 0)
-        {
-            _status.Text = "Enter at least one rating to balance.";
-            return;
-        }
-
-        double average = populated.Average(item => item.Value!.Value);
-        int adjustment = (int)Math.Round(50 - average,
-            MidpointRounding.AwayFromZero);
-        if (adjustment == 0)
-        {
-            _status.Text = "Populated skill ratings already average 50.";
-            return;
-        }
-        if (MessageBox.Show(FindForm(),
-            "Shift populated skill ratings by " +
-            adjustment.ToString("+0;-0", CultureInfo.InvariantCulture) +
-            " points toward an average of 50? Differences remain " +
-            "proportional where possible, ratings stay within 0-100, " +
-            "and unset skills are unchanged. This is not saved until Save.",
-            "Auto Balance Skills", MessageBoxButtons.YesNo,
-            MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
-            != DialogResult.Yes)
-            return;
-
-        foreach (var (field, value) in populated)
-            SetRatingForSmoke(field, Math.Clamp(value!.Value + adjustment, 0, 100));
-        _preset?.SelectValue("None");
-        _status.Text = "Balance applied. Review ratings before saving.";
-    }
 
     private void UpdateSkill(string field, int? rating)
     {
@@ -681,6 +641,11 @@ internal sealed class WorkerSkillsEditor : UserControl
 
     private sealed class SkillRatingRow : UserControl
     {
+        private static readonly Font WideLabelFont =
+            new("Segoe UI", 12.7f, FontStyle.Bold);
+        private static readonly Font CompactLabelFont =
+            new("Segoe UI", 10.2f, FontStyle.Bold);
+        private readonly Label _label;
         private readonly SkillGlowSlider _slider;
         private readonly SkillNumberSpinner _spinner;
         private readonly TableLayoutPanel _columns;
@@ -714,12 +679,12 @@ internal sealed class WorkerSkillsEditor : UserControl
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
             columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            var title = new Label
+            _label = new Label
             {
                 Name = "SkillLabel_" + field,
                 Text = label, UseMnemonic = false,
                 Dock = DockStyle.Fill, AutoEllipsis = true,
-                Font = new Font("Segoe UI", 12.7f, FontStyle.Bold),
+                Font = WideLabelFont,
                 ForeColor = SkillChrome.White,
                 BackColor = Color.Transparent,
                 Margin = Padding.Empty,
@@ -736,7 +701,9 @@ internal sealed class WorkerSkillsEditor : UserControl
             _spinner = new SkillNumberSpinner(field, rating, enabled)
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(0, 1, 4, 1)
+                // A 2px vertical gutter keeps adjacent numeric editors from
+                // forming one continuous column at PWR's compact resolution.
+                Margin = new Padding(0, 2, 4, 2)
             };
             _slider.RatingChanged += (_, _) =>
             {
@@ -750,10 +717,17 @@ internal sealed class WorkerSkillsEditor : UserControl
                 _slider.SetValue(number);
                 _changed(number);
             };
-            columns.Controls.Add(title, 0, 0);
+            columns.Controls.Add(_label, 0, 0);
             columns.Controls.Add(_slider, 1, 0);
             columns.Controls.Add(_spinner, 2, 0);
             Controls.Add(columns);
+        }
+
+        internal void SetDensity(bool compact)
+        {
+            var target = compact ? CompactLabelFont : WideLabelFont;
+            if (!ReferenceEquals(_label.Font, target))
+                _label.Font = target;
         }
 
         internal void SetLabelShare(float percent)

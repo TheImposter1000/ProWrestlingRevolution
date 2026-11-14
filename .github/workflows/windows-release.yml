@@ -41,7 +41,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.3 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.4 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor and Skills visual verification previews
         if: always()
@@ -98,7 +98,7 @@ jobs:
           mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
           if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
 
-      - name: Assemble the Version 0.6.3 complete game ZIP
+      - name: Assemble the Version 0.6.4 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -122,7 +122,7 @@ jobs:
         run: |
           Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
           if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.3.0") {
+          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.4.0") {
             throw "Standalone EXE file version does not match this release"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -153,54 +153,47 @@ jobs:
       - name: Publish standalone EXE update and complete game
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.6.3
-          name: Pro Wrestling Revolution 0.6.3 - Worker Dropdown and Visual Stability
+          tag_name: v0.6.4
+          name: Pro Wrestling Revolution 0.6.4 - Classic Worker Editor and Faster Tabs
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: true
           fail_on_unmatched_files: true
           body: |
-            PWR v0.6.3 introduces the full-width, reference-matched
-            Worker Skills Editor and corrects Worker Editor MDB field types.
+            PWR v0.6.4 restores the full v0.6.2 Worker Editor identity,
+            general-field, dropdown, date/weight and secondary-page behavior.
+            This intentionally rolls back the v0.6.3 Worker General input
+            and loyalty/division/language UI changes because a redesigned
+            native universe database is being developed.
 
-            SKILLS EDITOR
-            All 36 original tblWorkerSkills ratings are presented in four
-            navy/cyan, illustrated panels, with lit 0-100 sliders and
-            synchronized metallic numeric spinners. Unset and zero remain
-            separate. The dedicated PWR Skills title plaque, original
-            category icons, glossy borders, blue faceted headers, and
-            Preset / Auto Balance / Reset / Save action strip follow the
-            approved screenshot. Presets and Auto Balance only stage
-            changes. Save commits via the existing worker transaction.
-            The actual Skills viewport hides the two navigation rails;
-            Back restores the regular Worker Editor. Compact 1366x712
-            window layout keeps all 36 rows and labels visible.
+            Faster tab navigation:
+            Existing Worker tabs are now cached once for each open worker.
+            The app no longer discards and rebuilds dozens of controls
+            every time you revisit Contracts, Popularity, Attributes,
+            Business Skills, Job History, Business History, Legacy or
+            Alter Ego. Cached controls, selected record state and their
+            pending field values remain attached to the current profile.
+            Selecting another worker disposes every cached page to prevent
+            cross-worker data or UI state leakage. The background remains
+            process-cached. Windows smoke checks time initial and repeated
+            tab visits using a populated native 40-column contract.
 
-            WORKER FIELD CORRECTIONS
-            Removed the mistaken Picture Type input that was connected to
-            BiographyType. Birth/debut/death dates, weights, height, physical
-            conditions and face/heel gimmick names are now typed directly
-            with validation. Worker roles use the intended eight names.
-            Company Loyalty references companies in tblFed, not workers.
-            Languages support None, Passable, Basic and Fluent.
-            Competing Division uses Men's, Women's, or Both, independent
-            of gender identity, while preserving original MDB stored values.
-            Existing native Access schema and player databases are unchanged.
+            Dedicated Skills:
+            The separate v0.6.3 36-rating Skills workspace is retained.
+            Auto Balance has been removed. The four section-header icons
+            have been removed while retaining the navy/cyan panel treatment.
+            Numeric spinners use consistent vertical gutters, compact
+            typography and bounded text so fields cannot protrude into
+            adjacent rows. The top-right sound, help, minimize and close
+            glyphs are vertically centered in the tall Skills header.
 
-            VALIDATION
-            Windows CI compiles, exercises Worker and Skills UI controls,
-            checks 36 MDB field mappings, background caching, full-width
-            Back navigation, responsive overflow and rendered previews.
-            A read-only native MDB schema inspection also passes.
-            Actual worker MDB writes require the Microsoft Access ACE OLE DB
-            provider. GitHub's hosted Windows runner may skip the optional
-            live write test when that provider is absent.
-
-            INSTALLATION
-            Check for Updates downloads only ProWrestlingRevolution.exe.
-            Universes, saves, pictures, skins and settings are not replaced.
-            The full-game ZIP is provided separately for new installations.
+            Database schema, universe files, save games, pictures, skins,
+            and settings are not migrated or overwritten. The updater
+            downloads only ProWrestlingRevolution.exe. The separate ZIP is
+            for a clean installation. This patch's WinForms checks pass
+            on Windows, while actual ACE-backed MDB writes still require
+            the Access provider on the player's PC.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip

@@ -1,5 +1,17 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.4: v0.6.2 Worker Editor restoration and fast tabs
+
+The **Worker Editor General page and all generic profile sections** have been restored to their complete v0.6.2 input controls, formatting, labels, dropdown choices, and underlying edit/save behavior. The v0.6.3-only worker field conversion rules have been removed because the native MDB is being redesigned. The modern full-width **Skills workspace is retained** as a separate screen; it is not part of the reverted General page.
+
+The previous tab switch deleted and recreated the entire WinForms control tree on each selection. Tabs are now built once per worker and cached. Returning to a tab restores its controls and staged values without reconstructing the page. Loading a different worker invalidates and disposes the cache. The shared Save actions are reattached when changing sections so they remain functional, and Back from Skills restores the v0.6.2 Worker Editor.
+
+The Skills footer no longer includes Auto Balance; Preset, Reset and Save remain. Category-header pictograms are removed without changing the four-panel layout. Numeric spinners have vertical spacing and compact fonts that stay inside their row bounds. Sound/help/minimize/close icons are centered in the taller Skills top bar. The rest of the original blue/cyan styling is retained.
+
+Windows smoke tests profile a populated 40-column contract and repeated navigation through ten worker sections. On the test runner, the first Contracts switch took 17 ms and the cached visit took 1 ms. Those measurements are from an in-memory test fixture rather than your actual universe or hardware and are not guaranteed on all installations. Native MDB table definitions have not changed.
+
+The standard updater installs **only the EXE**; no saves, databases, skins, artwork, or settings are overwritten. Real Access MDB write tests require Microsoft ACE OLE DB, which is unavailable on the GitHub-hosted runner.
+
 ## Version 0.6.3: full Worker Skills Editor and MDB field corrections
 
 Version 0.6.3 includes the reference-matched, full-width Worker Skills Editor and revised Worker Editor input rules. Check for Updates installs the standalone Windows EXE; it does not replace existing database or skin files.

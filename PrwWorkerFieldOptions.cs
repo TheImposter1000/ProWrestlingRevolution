@@ -25,24 +25,9 @@ internal static class PrwWorkerFieldOptions
             t.Columns.Contains(field, StringComparer.OrdinalIgnoreCase)))
             return [];
         var targetType = record.Table.Columns[field]!.DataType;
-        // Loyalty refers to the company a worker is loyal to. The original
-        // PRW MDB unfortunately calls the physical column LoyaltyWorkerUID.
-        // Preserve that name for compatibility, but resolve it against tblFed.
         if (field.Equals("LoyaltyWorkerUID", StringComparison.OrdinalIgnoreCase))
-            return CompanyChoices(selectedDatabase, password,
+            return WorkerChoices(selectedDatabase, password,
                 record.Table.Columns[field]!);
-
-        if (WorkerFieldRules.IsLanguage(field) || field == "CompetesVs")
-        {
-            var labels = WorkerFieldRules.IsLanguage(field)
-                ? WorkerFieldRules.LanguageLevels : WorkerFieldRules.Divisions;
-            return labels.Select((label, index) =>
-                new Choice(label, WorkerFieldRules.ChoiceValue(
-                    record.Table.Columns[field]!, field, label, index))).ToArray();
-        }
-
-        if (WorkerFieldRules.IsManual(field, record.Table.Columns[field]))
-            return [];
 
         var results = new Dictionary<string, Choice>(StringComparer.OrdinalIgnoreCase);
         void Add(object raw)
@@ -121,7 +106,7 @@ internal static class PrwWorkerFieldOptions
         }
     }
 
-    private static IReadOnlyList<Choice> CompanyChoices(
+    private static IReadOnlyList<Choice> WorkerChoices(
         string database, string? password, DataColumn column)
     {
         Type targetType = column.DataType;
@@ -134,14 +119,14 @@ internal static class PrwWorkerFieldOptions
         {
             using var connection = AccessDatabase.Open(database, password);
             using var command = new OleDbCommand(
-                "SELECT [UID], [Name] FROM [tblFed] ORDER BY [Name]", connection);
+                "SELECT [UID], [Name] FROM [tblWorker] ORDER BY [Name]", connection);
             using var reader = command.ExecuteReader();
             while (reader?.Read() == true && choices.Count < 500)
             {
                 var value = Convert.ChangeType(reader.GetValue(0), targetType,
                     CultureInfo.InvariantCulture);
                 var label = Convert.ToString(reader.GetValue(1)) ?? "";
-                choices.Add(new Choice(label, value));
+                choices.Add(new Choice(label + " (" + value + ")", value));
             }
         }
         catch (Exception ex) when (ex is OleDbException or InvalidDataException
