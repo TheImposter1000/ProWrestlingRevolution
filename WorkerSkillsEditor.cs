@@ -41,7 +41,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             new("Power", "Power"), new("Toughness", "Toughness"),
             new("Resilience", "Resilience")
         ]),
-        new("Commentary / Officiating / Potential",
+        new("Commentary, Officiating & Potential",
             "Broadcasting, officiating, and development potential.", "▤",
         [
             new("Play By Play", "PlayByPlay"), new("Colour", "Colour"),
