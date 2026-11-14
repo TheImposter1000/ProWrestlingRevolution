@@ -30,7 +30,8 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly string? _databaseFile;
     private readonly string? _password;
     private sealed record WorkerFieldBinding(DataRow? Row, string Field, string? Table = null);
-    private string _initialValueSnapshot = "";
+    private readonly Dictionary<string, string> _savedSectionSnapshots =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Label _saveStatus = new()
     {
         Name = "WorkerSaveStatus", Location = new Point(8, 510),
@@ -87,18 +88,31 @@ internal sealed class WorkerEditorForm : UserControl
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private static string SnapshotValues(PrwWorkerProfile profile) =>
-        string.Join("\u001e", profile.Sections.SelectMany(section =>
-            section.Records.Rows.Cast<DataRow>().Select(row =>
-                section.Table + ":" + string.Join("\u001f",
-                    row.ItemArray.Select(value =>
-                        value is DBNull ? "<null>" :
-                        Convert.ToString(value, CultureInfo.InvariantCulture) ?? "")))));
-    
+    private static string SnapshotSection(PrwProfileSection section) =>
+        string.Join("\u001e", section.Records.Rows.Cast<DataRow>()
+            .Where(row => row.RowState != DataRowState.Deleted)
+            .Select(row => string.Join("\u001f", row.ItemArray.Select(value =>
+                value is DBNull ? "<null>" :
+                Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""))));
+
+    private void MarkSavedSections(params string[] names)
+    {
+        foreach (var section in _profile.Sections)
+        {
+            if (names.Length > 0 &&
+                !names.Contains(section.Table, StringComparer.OrdinalIgnoreCase))
+                continue;
+            _savedSectionSnapshots[section.Table] = SnapshotSection(section);
+        }
+    }
+
     private bool HasPendingChanges() =>
-        !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
-            StringComparison.Ordinal) ||
-        ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true;
+        _profile.Sections.Any(section =>
+            !_savedSectionSnapshots.TryGetValue(section.Table, out string? snapshot) ||
+            !string.Equals(snapshot, SnapshotSection(section),
+                StringComparison.Ordinal)) ||
+        ActiveSkillsEditor()?.HasUncommittedInvalidInput() == true ||
+        ActiveContractsEditor()?.ValidateBeforeLeaving() == false;
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
         PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
@@ -135,7 +149,7 @@ internal sealed class WorkerEditorForm : UserControl
         timer.Restart();
 
         ShowSection("General");
-        _initialValueSnapshot = SnapshotValues(_profile);
+        MarkSavedSections();
 
         System.Diagnostics.Debug.WriteLine(
             $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
@@ -166,6 +180,7 @@ internal sealed class WorkerEditorForm : UserControl
         // All cached controls hold DataRows from the previous worker. Discard
         // them before swapping profiles so no changes can leak across workers.
         InvalidateSectionViews();
+        _savedSectionSnapshots.Clear();
         _profile = profile;
         _loadedSkillValues = CaptureSkillValues(profile);
         RequestedNavigation = null;
@@ -195,7 +210,7 @@ internal sealed class WorkerEditorForm : UserControl
 
         ShowSection("General");
         _saveStatus.Text = "";
-        _initialValueSnapshot = SnapshotValues(_profile);
+        MarkSavedSections();
     }
 
     private void RequestMainMenu(string key)
@@ -1789,7 +1804,7 @@ else
             {
                 // A contract Save should return to its list, not close the
                 // Worker Editor or commit unrelated unsaved worker fields.
-                _initialValueSnapshot = SnapshotValues(_profile);
+                MarkSavedSections("tblContract", "tblContractBio");
                 _saveStatus.Text = "";
             }));
     }
@@ -2457,7 +2472,7 @@ else
         try
         {
             PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
-            _initialValueSnapshot = SnapshotValues(_profile);
+            MarkSavedSections();
             _saveStatus.Text = "";
             // Save closes the overlay directly. The Database Editor refreshes
             // its worker list in the existing CloseRequested handler.
