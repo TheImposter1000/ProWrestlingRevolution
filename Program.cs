@@ -467,8 +467,23 @@ internal static class Program
                 skillsTable.Columns.Add(field, typeof(int));
             var sampleSkills = skillsTable.NewRow();
             sampleSkills["WorkerUID"] = 1;
+            // Visual smoke values mirror the approved reference screenshot.
+            // They are in-memory examples, never changes to a universe.
             sampleSkills["Brawling"] = 60;
+            sampleSkills["Puroresu"] = 40;
+            sampleSkills["Technical"] = 55;
+            sampleSkills["Psychology"] = 68;
             sampleSkills["Charisma"] = 72;
+            sampleSkills["Microphone"] = 70;
+            sampleSkills["Basics"] = 65;
+            sampleSkills["Selling"] = 67;
+            sampleSkills["Safety"] = 75;
+            sampleSkills["Stamina"] = 77;
+            sampleSkills["PotentialPrimary"] = 70;
+            sampleSkills["PotentialMental"] = 72;
+            sampleSkills["PotentialPerformance"] = 80;
+            sampleSkills["PotentialFundamentals"] = 76;
+            sampleSkills["PotentialPhysical"] = 75;
             skillsTable.Rows.Add(sampleSkills);
             skillsTable.AcceptChanges();
 
@@ -625,7 +640,7 @@ internal static class Program
                     skillsEditor.SetRatingForSmoke("Aerial", 0);
                     if (!Equals(sampleSkills["Brawling"], 80) ||
                         !Equals(sampleSkills["Aerial"], 0) ||
-                        sampleSkills["Technical"] is not DBNull)
+                        !Equals(sampleSkills["Technical"], 55))
                         throw new Exception("Skills changes must preserve unset versus zero.");
                     skillsEditor.ResetForSmoke();
                     if (!Equals(sampleSkills["Brawling"], 60) ||
