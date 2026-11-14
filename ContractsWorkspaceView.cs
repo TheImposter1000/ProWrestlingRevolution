@@ -85,7 +85,8 @@ internal sealed class ContractsWorkspaceView : UserControl
         _employers = file is null ? [] : PrwContractStore.Employers(file, password);
         var identity = profile.Sections.First(s => s.Table == "tblWorker")
             .Records.Rows.Cast<DataRow>().FirstOrDefault();
-        _portrait = Picture(Read(identity, "Picture", ""), _workerName, "Workers");
+        _portrait = WorkerEditorTheme.LoadWorkerPortrait(_paths,
+            Read(identity, "Picture", ""), _workerName);
         foreach (var employer in _employers)
             _logos.TryAdd(employer.Initials,
                 Picture(employer.Logo, employer.Initials, "Logos"));
