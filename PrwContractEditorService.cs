@@ -23,6 +23,28 @@ internal static class PrwContractEditorService
         public override string ToString() => WorkerName + "  |  " + EmployerInitials;
     }
 
+    internal sealed record WorkerChoice(object Uid, string Name)
+    {
+        public override string ToString() => Name;
+    }
+
+    internal static IReadOnlyList<WorkerChoice> LoadWorkers(string file, string? password)
+    {
+        if (!File.Exists(file)) return [];
+        using var connection = AccessDatabase.Open(file, password);
+        using var command = new OleDbCommand(
+            "SELECT [UID], [Name] FROM [tblWorker] ORDER BY [Name]", connection);
+        using var reader = command.ExecuteReader();
+        var people = new List<WorkerChoice>();
+        while (reader?.Read() == true && people.Count < 10000)
+        {
+            if (reader["UID"] is DBNull) continue;
+            people.Add(new WorkerChoice(reader["UID"],
+                Convert.ToString(reader["Name"]) ?? ""));
+        }
+        return people;
+    }
+
     internal static IReadOnlyList<Company> LoadCompanies(string file, string? password)
     {
         if (!File.Exists(file)) return [];
@@ -230,6 +252,7 @@ internal static class PrwContractEditorService
                 throw new InvalidDataException("A contract must belong to this worker.");
             if (row.RowState == DataRowState.Added &&
                 (row["FedUID"] is DBNull ||
+                 Convert.ToInt64(row["FedUID"], CultureInfo.InvariantCulture) <= 0 ||
                  string.IsNullOrWhiteSpace(Convert.ToString(row["Name"]))))
                 throw new InvalidDataException(
                     "Choose an employer and enter a contract name before saving.");
@@ -239,6 +262,12 @@ internal static class PrwContractEditorService
         if (!PrwSchema.Inspect(connection, requireExpandedTables: false).IsValid)
             throw new InvalidDataException("This is not a compatible native PWR database.");
         using var transaction = connection.BeginTransaction();
+        var draftKeys = changedContracts
+            .Where(row => row.RowState == DataRowState.Added)
+            .ToDictionary(row => row, row => row["UID"]);
+        var bioDraftKeys = changedBios
+            .Where(row => row.RowState == DataRowState.Added)
+            .ToDictionary(row => row, row => row["ContractUID"]);
         try
         {
             foreach (DataRow row in changedContracts.Where(row =>
@@ -312,6 +341,14 @@ internal static class PrwContractEditorService
         catch
         {
             transaction.Rollback();
+            // An INSERT may fail after temporary IDs are translated to
+            // actual MAX(UID)+1 values. Restore the staged keys so the
+            // player can correct the error and retry without broken links.
+            foreach (var (row, original) in draftKeys)
+                if (row.RowState == DataRowState.Added) row["UID"] = original;
+            foreach (var (row, original) in bioDraftKeys)
+                if (row.RowState == DataRowState.Added)
+                    row["ContractUID"] = original;
             throw;
         }
 
