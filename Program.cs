@@ -390,6 +390,43 @@ internal static class Program
                     skillsHeader.Right > orderedChrome[0].Left ||
                     controls.Any(button => button.Height != 56))
                     throw new Exception("Skills header lost its reference proportions or obscured utilities.");
+                // Render the actual composed parent and all four interactive
+                // child buttons. An isolated brand preview cannot detect
+                // the visible seam between the plaque and the utility cluster.
+                topbar.CreateControl();
+                topbar.PerformLayout();
+                Application.DoEvents();
+                using (var composed = new System.Drawing.Bitmap(
+                    topbar.Width, topbar.Height))
+                {
+                    topbar.DrawToBitmap(composed,
+                        new System.Drawing.Rectangle(0, 0,
+                            composed.Width, composed.Height));
+                    int border = orderedChrome[0].Left;
+                    var leftPixel = composed.GetPixel(border - 4, 3);
+                    var rightPixel = composed.GetPixel(border + 4, 3);
+                    int seamDifference =
+                        Math.Abs(leftPixel.R - rightPixel.R) +
+                        Math.Abs(leftPixel.G - rightPixel.G) +
+                        Math.Abs(leftPixel.B - rightPixel.B);
+                    if (seamDifference > 72)
+                        throw new Exception(
+                            "Skills header has a mismatched background at the utility boundary.");
+
+                    string? workerPreview =
+                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                    if (!string.IsNullOrWhiteSpace(workerPreview))
+                    {
+                        string composedPath = Path.Combine(
+                            Path.GetDirectoryName(workerPreview)!,
+                            "worker-skills-composed-header-preview.png");
+                        composed.Save(composedPath,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Composed Skills header saved to " +
+                            composedPath);
+                    }
+                }
+
                 launcher.SetWorkerSectionChrome(null);
                 if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
                     controls.Any(button => button.Height != 40))
