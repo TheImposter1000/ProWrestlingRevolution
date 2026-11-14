@@ -389,7 +389,7 @@ internal static class Program
                     throw new Exception("PWR utility controls must occupy one aligned sharedHeader.");
                 if (sharedHeader.Left != 0 || sharedHeader.Top != 0 ||
                     sharedHeader.Height != 56 || sharedHeader.Right != orderedChrome[0].Left)
-                    throw new Exception("Shared PWR sharedHeader must meet its utility cluster exactly.");
+                    throw new Exception("Shared PWR header must meet its utility cluster exactly.");
 
                 // Capture a real visible launcher. Compare each section's
                 // composed sharedHeader, not an isolated, transparent title control.
@@ -401,12 +401,12 @@ internal static class Program
 
                 foreach (var (section, expectedTitle, expectedDetail, previewName) in new[]
                 {
-                    ("General", "Worker Editor", "Edit Worker", "pwr-sharedHeader-worker.png"),
-                    ("Skills", "Skills", "Worker Skill Editor", "pwr-sharedHeader-skills.png"),
-                    ("Contracts", "Contracts", "Worker Contracts", "pwr-sharedHeader-contracts.png"),
-                    ("Popularity", "Popularity", "Worker Popularity", "pwr-sharedHeader-popularity.png"),
+                    ("General", "Worker Editor", "Edit Worker", "pwr-header-worker.png"),
+                    ("Skills", "Skills", "Worker Skill Editor", "pwr-header-skills.png"),
+                    ("Contracts", "Contracts", "Worker Contracts", "pwr-header-contracts.png"),
+                    ("Popularity", "Popularity", "Worker Popularity", "pwr-header-popularity.png"),
                     ("Business Skills", "Business Skills", "Worker Business Skills",
-                        "pwr-sharedHeader-business-skills.png")
+                        "pwr-header-business-skills.png")
                 })
                 {
                     launcher.SetWorkerSectionChrome(section);
@@ -422,7 +422,7 @@ internal static class Program
                         controls.Any(button => button.Height != 56) ||
                         launcher.SkillsImmersiveMode != (section == "Skills"))
                         throw new Exception(
-                            "Page sharedHeader changes style or context unexpectedly: " + section);
+                            "Page header changes style or context unexpectedly: " + section);
 
                     using var composed = new System.Drawing.Bitmap(
                         topbar.Width, topbar.Height);
@@ -442,7 +442,7 @@ internal static class Program
                     }
                     if (referenceBackdrop is not null &&
                         !referenceBackdrop.SequenceEqual(backdrop))
-                        throw new Exception("The sharedHeader background changes between worker tabs.");
+                        throw new Exception("The header background changes between worker tabs.");
                     referenceBackdrop ??= backdrop;
 
                     int boundary = orderedChrome[0].Left;
@@ -453,7 +453,7 @@ internal static class Program
                         Math.Abs(leftPixel.G - rightPixel.G) +
                         Math.Abs(leftPixel.B - rightPixel.B);
                     if (seamDifference > 72)
-                        throw new Exception("PWR sharedHeader background has a utility seam.");
+                        throw new Exception("PWR header background has a utility seam.");
 
                     int textPixels = 0;
                     for (int y = 9; y < Math.Min(46, composed.Height); y++)
@@ -465,7 +465,7 @@ internal static class Program
                         }
                     if (textPixels < 60)
                         throw new Exception(
-                            "The composed PWR sharedHeader title is not visible: " + section);
+                            "The composed PWR header title is not visible: " + section);
 
                     if (!string.IsNullOrWhiteSpace(workerPreview))
                     {
@@ -477,21 +477,21 @@ internal static class Program
                         {
                             composed.Save(Path.Combine(
                                 Path.GetDirectoryName(workerPreview)!,
-                                "worker-skills-sharedHeader-preview.png"),
+                                "worker-skills-header-preview.png"),
                                 System.Drawing.Imaging.ImageFormat.Png);
                             composed.Save(Path.Combine(
                                 Path.GetDirectoryName(workerPreview)!,
-                                "worker-skills-composed-sharedHeader-preview.png"),
+                                "worker-skills-composed-header-preview.png"),
                                 System.Drawing.Imaging.ImageFormat.Png);
                         }
-                        Console.WriteLine("PWR shared sharedHeader preview: " + screenshot);
+                        Console.WriteLine("PWR shared header preview: " + screenshot);
                     }
                 }
 
                 launcher.SetWorkerSectionChrome(null);
                 if (topbar.Height != 56 || launcher.SkillsImmersiveMode ||
                     controls.Any(button => button.Height != 56))
-                    throw new Exception("Leaving Skills must retain the same PWR sharedHeader.");
+                    throw new Exception("Leaving Skills must retain the same PWR header.");
                 // The editor is a full-width directory. The name of the MDB is
                 // the central heading and the mass-edit dropdown stays beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
