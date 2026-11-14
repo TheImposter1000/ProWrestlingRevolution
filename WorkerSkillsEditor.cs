@@ -186,7 +186,7 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             Name = "SkillsSectionHeading", Dock = DockStyle.Fill,
             Text = "Skills    /    Worker Skill Editor",
-            Font = new Font("Segoe UI", 13.5f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 15f, FontStyle.Bold),
             ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft,
             BackColor = Color.Transparent
         };
@@ -254,13 +254,13 @@ internal sealed class WorkerSkillsEditor : UserControl
         words.Controls.Add(new Label
         {
             Dock = DockStyle.Fill, AutoEllipsis = true,
-            Text = group.Title, Font = new Font("Segoe UI", 11.2f, FontStyle.Bold),
+            Text = group.Title, Font = new Font("Segoe UI", 12.4f, FontStyle.Bold),
             ForeColor = Color.White, TextAlign = ContentAlignment.BottomLeft
         }, 0, 0);
         words.Controls.Add(new Label
         {
             Dock = DockStyle.Fill, AutoEllipsis = true,
-            Text = group.Description, Font = new Font("Segoe UI", 8.2f, FontStyle.Italic),
+            Text = group.Description, Font = new Font("Segoe UI", 9f, FontStyle.Italic),
             ForeColor = Color.FromArgb(199, 222, 239),
             TextAlign = ContentAlignment.TopLeft
         }, 0, 1);
@@ -278,6 +278,8 @@ internal sealed class WorkerSkillsEditor : UserControl
             Padding = new Padding(8, 3, 8, 3), Margin = Padding.Empty,
             BackColor = Color.Transparent, AutoScroll = true
         };
+        int rowHeight = group.Skills.Count <= 8 ? 29 :
+            group.Skills.Count == 9 ? 27 : 23;
         for (int skillIndex = 0; skillIndex < group.Skills.Count; skillIndex++)
         {
             var skill = group.Skills[skillIndex];
@@ -285,7 +287,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                 InitialRating(skill.Column), _canEdit,
                 value => UpdateSkill(skill.Column, value))
             {
-                Height = 23, Margin = Padding.Empty
+                Height = rowHeight, Margin = Padding.Empty
             };
             rating.Width = Math.Max(200, rows.ClientSize.Width - 20);
             rows.Controls.Add(rating);
@@ -584,7 +586,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             {
                 Name = "SkillLabel_" + field, Text = label,
                 Dock = DockStyle.Fill, AutoEllipsis = false,
-                Font = new Font("Segoe UI", 8.6f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.White, Margin = Padding.Empty,
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -609,7 +611,7 @@ internal sealed class WorkerSkillsEditor : UserControl
                 TextAlign = HorizontalAlignment.Center,
                 BorderStyle = BorderStyle.FixedSingle,
                 Margin = new Padding(1, 1, 1, 1),
-                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(16, 40, 66)
             };
