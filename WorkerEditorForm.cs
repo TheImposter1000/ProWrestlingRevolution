@@ -43,6 +43,8 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
     private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty, BackColor = Color.Transparent };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
+    private readonly Dictionary<TextBox, WorkerFieldBinding> _manualEditors = new();
+    private readonly HashSet<TextBox> _invalidManualEditors = new();
     private string _active = "General";
     private int _recordIndex;
     private readonly Font _railNormal = new("Segoe UI", 10f);
@@ -78,7 +80,8 @@ internal sealed class WorkerEditorForm : UserControl
     
     private bool HasPendingChanges() =>
         !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
-            StringComparison.Ordinal);
+            StringComparison.Ordinal) ||
+        _invalidManualEditors.Any(input => !input.IsDisposed);
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
         PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
@@ -876,11 +879,15 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         var timer = System.Diagnostics.Stopwatch.StartNew();
 
+        bool skills = _active == "Skills";
+        _identityBiography.Visible = !skills;
         _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
         long topTime = timer.ElapsedMilliseconds;
 
-        int generalY = 165;
-        int generalHeight = Math.Max(340, Math.Min(520, height - generalY - 12));
+        int generalY = skills ? 7 : 165;
+        int generalHeight = skills
+            ? Math.Max(300, height - generalY - 7)
+            : Math.Max(340, Math.Min(520, height - generalY - 12));
 
         _mainArea.Bounds = new Rectangle(contentX, generalY, width, generalHeight);
         long mainTime = timer.ElapsedMilliseconds;
@@ -1198,7 +1205,73 @@ internal sealed class WorkerEditorForm : UserControl
     /// Neither textboxes nor checkboxes may be compressed below the legible
     /// height used by the original mockup.
     /// </summary>
-    private static TableLayoutPanel MakeRows(Panel card,
+
+    private TextBox MakeManualInput(DataRow? source, string field, string? table)
+    {
+        var binding = new WorkerFieldBinding(source, field,
+            source?.Table.TableName ?? table);
+        var input = new TextBox
+        {
+            Name = "WorkerField_" + field,
+            Text = source is null ? "" : WorkerFieldRules.Display(source, field),
+            Dock = DockStyle.Fill, Margin = new Padding(2, 1, 5, 1),
+            BackColor = FieldInk, ForeColor = Ink,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Segoe UI", 9.1f, FontStyle.Bold),
+            ReadOnly = _databaseFile is null,
+            TabStop = _databaseFile is not null,
+            AccessibleName = field + " manual entry"
+        };
+        _manualEditors[input] = binding;
+        input.TextChanged += (_, _) =>
+        {
+            if (input.IsDisposed || _databaseFile is null) return;
+            var row = binding.Row;
+            if (row is null && binding.Table == "tblWorkerPhysical" &&
+                !string.IsNullOrWhiteSpace(input.Text))
+                row = ResolveRow(binding);
+            if (row is null) return;
+            if (WorkerFieldRules.TryManualValue(row, field, input.Text,
+                    out var value, out var error))
+            {
+                try
+                {
+                    if (!Equals(row[field], value)) row[field] = value;
+                    _invalidManualEditors.Remove(input);
+                    input.BackColor = FieldInk;
+                    _saveStatus.Text = "";
+                }
+                catch (Exception ex) when (ex is ArgumentException or ConstraintException)
+                {
+                    _invalidManualEditors.Add(input);
+                    _saveStatus.Text = field + ": " + ex.Message;
+                    input.BackColor = Color.FromArgb(255, 219, 219);
+                }
+            }
+            else
+            {
+                _invalidManualEditors.Add(input);
+                _saveStatus.Text = field + ": " + error;
+                input.BackColor = Color.FromArgb(255, 219, 219);
+            }
+        };
+        return input;
+    }
+
+    private bool ValidateManualEditors()
+    {
+        foreach (var input in _invalidManualEditors.ToArray())
+            if (input.IsDisposed || !_manualEditors.ContainsKey(input))
+                _invalidManualEditors.Remove(input);
+        if (_invalidManualEditors.Count == 0) return true;
+        var first = _invalidManualEditors.First();
+        _saveStatus.Text = "Correct " + _manualEditors[first].Field +
+            " before saving or navigating away.";
+        first.Focus();
+        return false;
+    }
+
+    private TableLayoutPanel MakeRows(Panel card,
         IReadOnlyList<(string Label, string Field)> fields, DataRow? source,
         int rowHeight = 22, float labelShare = 39f, int topPad = 2)
     {
@@ -1217,69 +1290,29 @@ internal sealed class WorkerEditorForm : UserControl
         {
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             grid.Controls.Add(TextLabel(fields[i].Label), 0, i);
-            bool isWeight = fields[i].Field.Contains("Weight", StringComparison.OrdinalIgnoreCase);
-            bool isDate = fields[i].Field.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
-                          fields[i].Field is "Born" or "SetToDebut";
-            var value = ValueBox(Display(source, fields[i].Field),
-                "WorkerField_" + fields[i].Field, !isWeight && !isDate);
-            Bind(value, source, fields[i].Field,
-                card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
-            
-value.CalendarIndicator = false;
-value.SpinnerIndicator = isWeight;
-
-if (isDate)
-{
-    var dateRow = new TableLayoutPanel
-    {
-        Dock = DockStyle.Fill,
-        ColumnCount = 2,
-        RowCount = 1,
-        Margin = Padding.Empty,
-        Padding = Padding.Empty,
-        BackColor = Color.Transparent
-    };
-
-    dateRow.ColumnStyles.Add(
-        new ColumnStyle(SizeType.Percent, 100));
-
-    dateRow.ColumnStyles.Add(
-        new ColumnStyle(SizeType.Absolute, 32));
-
-    value.Dock = DockStyle.Fill;
-    value.Margin = new Padding(2, 1, 4, 1);
-
-    var calendarButton = new Button
-    {
-        Text = "▦",
-        Dock = DockStyle.Fill,
-        Margin = new Padding(0, 1, 2, 1),
-        FlatStyle = FlatStyle.Flat,
-        BackColor = Color.FromArgb(235, 242, 248),
-        ForeColor = Color.FromArgb(15, 35, 53),
-        Font = new Font("Segoe UI Symbol", 9f),
-        TabStop = false
-    };
-
-    calendarButton.FlatAppearance.BorderColor =
-        Color.FromArgb(110, 145, 170);
-
-    dateRow.Controls.Add(value, 0, 0);
-    calendarButton.Click += (_, _) => value.Edit();
-    dateRow.Controls.Add(calendarButton, 1, 0);
-
-    grid.Controls.Add(dateRow, 1, i);
-}
-else
-{
-    if (isWeight)
-    {
-        value.Dock = DockStyle.Left;
-        value.Width = 98;
-    }
-
-    grid.Controls.Add(value, 1, i);
-}
+            string field = fields[i].Field;
+            DataColumn? column = source?.Table.Columns.Contains(field) == true
+                ? source.Table.Columns[field] : null;
+            if (WorkerFieldRules.IsManual(field, column))
+            {
+                var input = MakeManualInput(source, field,
+                    card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
+                if (field.Contains("Weight", StringComparison.OrdinalIgnoreCase))
+                {
+                    input.Dock = DockStyle.Left;
+                    input.Width = 104;
+                }
+                grid.Controls.Add(input, 1, i);
+            }
+            else
+            {
+                var value = ValueBox(source is null ? "" :
+                    WorkerFieldRules.Display(source, field),
+                    "WorkerField_" + field);
+                Bind(value, source, field,
+                    card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
+                grid.Controls.Add(value, 1, i);
+            }
 
         }
         card.Controls.Add(grid);
@@ -1582,6 +1615,10 @@ else
                 tab.Invalidate();
             }
         }
+        if (_manualEditors.Count > 0 && !ValidateManualEditors())
+            return;
+        _manualEditors.Clear();
+        _invalidManualEditors.Clear();
         _content.SuspendLayout();
         if (_actionArea.Parent is Control oldParent)
             oldParent.Controls.Remove(_actionArea);
@@ -1592,8 +1629,18 @@ else
             old.Dispose();
         }
         if (section == "General") BuildGeneral();
+        else if (section == "Skills") BuildSkills();
         else BuildSecondary(section);
+        LayoutWorkerCanvas();
         _content.ResumeLayout();
+    }
+
+    private void BuildSkills()
+    {
+        // Skills are a dedicated editor over the current profile. Do not
+        // repeat the identity, biography, portrait, or generic action strip.
+        var skills = new WorkerSkillsEditor(_profile, _databaseFile is not null, SaveWorker);
+        _content.Controls.Add(skills);
     }
 
     private static string? SectionTable(string section) => section switch
@@ -1707,7 +1754,7 @@ else
         header.BringToFront();
     }
 
-    private static void RenderSecondaryFields(Panel parent, DataRow record, string section)
+    private void RenderSecondaryFields(Panel parent, DataRow record, string section)
     {
         Control? previous = parent.Controls.Find("WorkerSecondaryFields", false).FirstOrDefault();
         if (previous is not null)
@@ -2248,7 +2295,7 @@ else
 
     private void SaveWorker()
     {
-        if (_databaseFile is null) return;
+        if (_databaseFile is null || !ValidateManualEditors()) return;
         try
         {
             PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
