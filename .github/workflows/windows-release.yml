@@ -8,8 +8,6 @@ on:
 permissions:
   contents: write
 
-# Serialize publication runs. A second main-branch push cannot replace an
-# already published EXE under the same version tag.
 concurrency:
   group: pwr-release-main
   cancel-in-progress: false
@@ -27,13 +25,30 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Determine release tag from the application version
+      - name: Determine release tag from application version
         id: release
         shell: pwsh
         run: |
-          [xml]$project = Get-Content "ProWrestlingRevolution.csproj"
+          [xml]$project = Get-Content "ProWrestlingRevolution.csproj" -Raw
           $version = [string]$project.Project.PropertyGroup.Version
-          if ($version -notmatch '^\\d+\\.\\d+\\.\\d+
+          if ($version -notmatch '^[0-9]+[.][0-9]+[.][0-9]+$') {
+            throw "The project version must be major.minor.patch"
+          }
+          $tag = "v$version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            "publish=false" >> $env:GITHUB_OUTPUT
+            Write-Host "$tag already exists; skipping a duplicate release."
+          }
+          elseif ($LASTEXITCODE -eq 2) {
+            "publish=true" >> $env:GITHUB_OUTPUT
+          }
+          else {
+            throw "Could not verify remote release tags."
+          }
+
       - name: Install Java for independent Jet MDB generation
         uses: actions/setup-java@v4
         with:
@@ -184,250 +199,36 @@ jobs:
           fail_on_unmatched_files: true
           body: |
             PWR v0.6.7 introduces the dedicated Worker Contracts selection
-            screen and Contract Editor based on the supplied PWR references.
+            screen and four-panel Contract Editor based on the supplied layout.
 
-            WORKER CONTRACTS
-            The new full-width Contracts page provides the six requested
-            columns, employer artwork, searchable and sortable records,
-            an active/expired filter, a highlighted selection, and
-            Remove, Open and Add Contract actions.
-
-            CONTRACT EDITOR
-            The contract page has the portrait and biography strip, four
-            Basic, Roster, Terms and Roles panels, alter ego import,
-            terms-copy actions, Reset and Save. Contract edits use native
-            tblContract and tblContractBio with transactional writes.
-            Fields missing from the native MDB remain visible and read-only
-            rather than appearing to save unsupported values.
-            The visual implementation is an ongoing iteration against
-            the supplied reference screenshots, not an exact art match.
-
-            AUTOMATIC RELEASE UPDATES
-            Starting with v0.6.7, installed games check the latest
-            stable GitHub Release on startup and automatically verify,
-            download and install a newer EXE while the title screen is
-            still active. The game restarts after the update. If the player
-            enters an editor during a download, the automatic install is
-            deferred to the next startup to avoid interrupting editing.
-            Check for Updates remains available for manual use.
-            Automatic installation can be turned off on the Skins screen.
-            Developer builds are not overwritten by the release updater.
-
-            The installer backs up and replaces only
-            ProWrestlingRevolution.exe. Existing game universes, saved
-            careers, databases, skins, images and settings stay in place.
-            The complete Windows ZIP is also included for fresh installs.
-
-            Windows build and smoke tests are required to pass before
-            the release is published.
-          files: |
-            ProWrestlingRevolution.exe
-            ProWrestlingRevolution-Windows-x64.zip
-) {
-            throw "The project version must be major.minor.patch"
-          }
-          $tag = "v$version"
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          # New versions publish. A later merge without a version bump still
-          # builds and tests, but cannot silently replace a tagged release.
-          git ls-remote --exit-code --tags origin "refs/tags/$tag" | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            "publish=false" >> $env:GITHUB_OUTPUT
-            Write-Host "$tag is already published; skipping duplicate release."
-          }
-          elseif ($LASTEXITCODE -eq 2) {
-            "publish=true" >> $env:GITHUB_OUTPUT
-          }
-          else {
-            throw "Could not verify remote release tags."
-          }
-
-      - name: Install Java for independent Jet MDB generation
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Build dedicated PRW editor metadata MDB
-        shell: pwsh
-        run: |
-          python Tools/EditorMdbGenerator/build_editor_manifest.py
-          if ($LASTEXITCODE -ne 0) { throw "Editor manifest generation failed" }
-          mvn -q -f Tools/EditorMdbGenerator/pom.xml compile exec:java
-          if ($LASTEXITCODE -ne 0) { throw "PRWEditor.mdb generation failed" }
-          if (-not (Test-Path "System/PRWEditor.mdb")) { throw "Generated MDB not found" }
-
-      - name: Verify the menu, skins, folder layout and MDB file-management routines
-        shell: pwsh
-        run: |
-          $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
-          dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.7 smoke test failed: $LASTEXITCODE" }
-
-      - name: Upload Worker Editor and Skills visual verification previews
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Worker-Editor-and-Skills-Visual-Previews
-          path: |
-            worker-editor-preview.png
-            worker-skills-preview.png
-            worker-skills-compact-preview.png
-            worker-skills-header-preview.png
-            pwr-header-worker.png
-            pwr-header-skills.png
-            pwr-header-contracts.png
-            pwr-header-popularity.png
-            pwr-header-business-skills.png
-            pwr-header-database.png
-            worker-contract-list-preview.png
-            worker-contract-editor-preview.png
-          if-no-files-found: warn
-
-      - name: Build a self-contained Windows x64 desktop executable
-        shell: pwsh
-        run: |
-          dotnet publish ProWrestlingRevolution.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o publish
-          if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
-
-      - name: Run real packaged Windows EXE smoke tests
-        shell: pwsh
-        run: |
-          $exe = (Resolve-Path "publish/ProWrestlingRevolution.exe").Path
-          $verify = Start-Process -FilePath $exe -ArgumentList "--smoke" -PassThru -Wait
-          if ($verify.ExitCode -ne 0) { throw "Standalone Windows EXE failed smoke tests: $($verify.ExitCode)" }
-
-      - name: Generate assets in the published application directory
-        shell: pwsh
-        run: |
-          # WinExe launches asynchronously under PowerShell; explicitly wait.
-          $initialized = Start-Process -FilePath (Resolve-Path "publish/ProWrestlingRevolution.exe") -ArgumentList "--generate-assets" -Wait -PassThru
-          if ($initialized.ExitCode -ne 0) { throw "Runtime asset generation failed: $($initialized.ExitCode)" }
-          foreach ($skin in @("Obsidian", "Steel")) {
-            foreach ($category in @("Backgrounds","Buttons","Graphics","Loading_NoProfile","Loading_Profile","LowerBars","SideBars","TopBars")) {
-              if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $category))) { throw "Missing published skin category: $skin/$category" }
-            }
-            foreach ($file in @("Backgrounds/Title_Screen.jpg", "SideBars/Title_Screen.jpg",
-                                "SideBars/Title_Screen_Alt.jpg", "TopBars/Title_Screen_On.jpg",
-                                "TopBars/Title_Screen_Off.jpg", "LowerBars/Title_Screen.jpg")) {
-              if (-not (Test-Path ("publish/Skins/" + $skin + "/" + $file))) { throw "Missing published skin: $skin/$file" }
-            }
-          }
-          if (-not (Test-Path "publish/System/PRWEditor.mdb")) { throw "Editor metadata MDB was not bundled" }
-          if ((Get-Item "publish/System/PRWEditor.mdb").Length -lt 4096) { throw "Editor metadata MDB too small" }
-          if (-not (Test-Path "publish/System/PRWDefault.mdb")) { throw "Local default template was not installed" }
-          if ((Get-Item "publish/System/PRWDefault.mdb").Length -ne 434176) { throw "Default template size is incorrect" }
-          if ((Get-FileHash "publish/System/PRWDefault.mdb" -Algorithm SHA256).Hash -ne "E59C723D3919DA1A9BB6927FEA27D712FEAA17815735AE29FAA23B5087267A38") {
-            throw "Bundled default template checksum did not match PRWDefault.mdb"
-          }
-
-      - name: Verify native MDB field types
-        shell: pwsh
-        run: |
-          mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
-          if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
-
-      - name: Assemble the Version 0.6.7 complete game ZIP
-        shell: pwsh
-        run: |
-          foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
-            if (-not (Test-Path ("publish/" + $folder))) {
-              Copy-Item $folder ("publish/" + $folder) -Recurse -Force
-            }
-          }
-          if (-not (Test-Path "publish/ProWrestlingRevolution.exe")) { throw "Executable missing" }
-          if (-not (Test-Path "publish/Skins/Obsidian/SideBars/Title_Screen.jpg")) { throw "Obsidian sidebar missing" }
-          if (-not (Test-Path "publish/Skins/Steel/Backgrounds/Title_Screen.jpg")) { throw "Steel title art missing" }
-          if (-not (Test-Path "publish/Databases/README.txt")) { throw "Databases folder missing" }
-          if (Test-Path "publish/Data/Scenarios/Genesis.json") { throw "Legacy JSON scenario accidentally included" }
-          Get-ChildItem publish -Filter *.pdb | Remove-Item -Force
-          # This is the COMPLETE game package. Keep its historical ZIP filename
-          # so pre-0.5.20 updaters can still extract ONLY the EXE automatically.
-          Compress-Archive -Path "publish/*" -DestinationPath "ProWrestlingRevolution-Windows-x64.zip" -Force
-          if (-not (Test-Path "ProWrestlingRevolution-Windows-x64.zip")) { throw "ZIP not produced" }
-
-      - name: Verify direct EXE update matches the complete game
-        shell: pwsh
-        run: |
-          Copy-Item "publish/ProWrestlingRevolution.exe" "ProWrestlingRevolution.exe" -Force
-          if (-not (Test-Path "ProWrestlingRevolution.exe")) { throw "Standalone EXE missing" }
-          if ((Get-Item "ProWrestlingRevolution.exe").VersionInfo.FileVersion -ne "0.6.7.0") {
-            throw "Standalone EXE file version does not match this release"
-          }
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [System.IO.Compression.ZipFile]::OpenRead("ProWrestlingRevolution-Windows-x64.zip")
-          $extracted = "pwr-verify-complete-exe.exe"
-          try {
-            $entry = $archive.GetEntry("ProWrestlingRevolution.exe")
-            if ($null -eq $entry) { throw "Complete game ZIP is missing the application EXE" }
-            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $extracted)
-            $zipHash = (Get-FileHash $extracted -Algorithm SHA256).Hash
-            $exeHash = (Get-FileHash "ProWrestlingRevolution.exe" -Algorithm SHA256).Hash
-            if ($zipHash -ne $exeHash) { throw "Standalone EXE differs from complete game EXE" }
-          }
-          finally {
-            $archive.Dispose()
-            Remove-Item $extracted -ErrorAction SilentlyContinue
-          }
-
-      - name: Upload standalone update EXE and complete game ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: ProWrestlingRevolution-Release
-          path: |
-            ProWrestlingRevolution.exe
-            ProWrestlingRevolution-Windows-x64.zip
-          retention-days: 90
-
-      - name: Publish standalone EXE update and complete game
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v0.6.7
-          name: Pro Wrestling Revolution 0.6.7 - Contracts and Automatic Updates
-          target_commitish: main
-          prerelease: false
-          make_latest: true
-          overwrite_files: true
-          fail_on_unmatched_files: true
-          body: |
-            PWR v0.6.7 introduces the dedicated Worker Contracts selection
-            screen and Contract Editor based on the supplied PWR references.
-
-            WORKER CONTRACTS
-            The new full-width Contracts page provides the six requested
-            columns, employer artwork, searchable and sortable records,
-            an active/expired filter, a highlighted selection, and
-            Remove, Open and Add Contract actions.
+            CONTRACT LIST
+            View and search native worker contracts in six columns, filter
+            Active or Expired records, sort, select, Open, Remove, or Add.
+            Company artwork comes from the selected picture pack when present.
 
             CONTRACT EDITOR
-            The contract page has the portrait and biography strip, four
-            Basic, Roster, Terms and Roles panels, alter ego import,
-            terms-copy actions, Reset and Save. Contract edits use native
-            tblContract and tblContractBio with transactional writes.
-            Fields missing from the native MDB remain visible and read-only
-            rather than appearing to save unsupported values.
-            The visual implementation is an ongoing iteration against
-            the supplied reference screenshots, not an exact art match.
+            The identity and biography strip, Basic Details, Roster Details,
+            Terms, Perks & Bonuses, Roles, alter ego import, copy terms,
+            Reset and Save follow the supplied information hierarchy.
+            Native tblContract and tblContractBio updates are transactional.
+            Fields missing from the current MDB schema are displayed but
+            disabled until that schema can support them. The reference
+            artwork is still being refined, not declared pixel-identical.
 
-            AUTOMATIC RELEASE UPDATES
-            Starting with v0.6.7, installed games check the latest
-            stable GitHub Release on startup and automatically verify,
-            download and install a newer EXE while the title screen is
-            still active. The game restarts after the update. If the player
-            enters an editor during a download, the automatic install is
-            deferred to the next startup to avoid interrupting editing.
-            Check for Updates remains available for manual use.
-            Automatic installation can be turned off on the Skins screen.
-            Developer builds are not overwritten by the release updater.
+            AUTOMATIC UPDATES
+            Starting in v0.6.7, installed games check for newer stable
+            GitHub releases on startup. Updates are verified against GitHub
+            SHA-256 metadata, replace only the executable using a helper,
+            back up the previous EXE, and restart the game. Auto-install
+            skips sessions where the player has left the title screen.
+            The Skins page contains an on/off preference; Check for Updates
+            remains available manually. Developer builds are excluded.
 
-            The installer backs up and replaces only
-            ProWrestlingRevolution.exe. Existing game universes, saved
-            careers, databases, skins, images and settings stay in place.
-            The complete Windows ZIP is also included for fresh installs.
+            Saved games, databases, universes, pictures, custom skins,
+            and settings are preserved. The complete ZIP is provided for
+            new installs. Only the standalone EXE is used during updates.
 
-            Windows build and smoke tests are required to pass before
-            the release is published.
+            Publish only after Windows build, smoke and package checks pass.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
