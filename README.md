@@ -1,5 +1,11 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.7: Worker Contracts and automatic release installation
+
+The Contracts tab now uses the supplied Worker Contracts selection and four-panel Contract Editor layout with actual native MDB records. It supports search, sorting, status filtering, Open, Add Contract, Remove, transactional contract and biography saves, role checkboxes, Reset, alter ego import and terms copy. Schema fields that do not yet exist in the native database remain visible but read-only. The two user-provided references remain the visual acceptance criteria, and the design continues to be refined against them. See CONTRACT_VISUAL_REFERENCE.md.
+
+**Automatic updates:** Published Windows installations of v0.6.7 and later check the latest stable GitHub Release once when the game opens. If a newer release is found, the application downloads and verifies the standalone executable, installs it through a separate helper, preserves the previous executable as a backup, and restarts. It does not install after the player leaves the main title screen, avoiding loss of unsaved work. Automatic installation is enabled by default and can be switched off under Skins. Manual **Check for Updates** remains available. Visual Studio builds never install released binaries over source output. Players using v0.6.6 must use the existing manual Check for Updates button once to receive v0.6.7; an already-installed version cannot gain an automatic startup check retroactively. Only the executable is changed; the user folders are retained.
+
 ## Version 0.6.6: one consistent PWR application header
 
 The launcher and all Worker Editor sections now share a single **PwrSharedHeader** component and one full-width **MetalTopBar**. The header follows the supplied reference design: blue-metal gradients, a PWR logo and two-line wordmark, cyan separator and lower rule, contextual page title and italic subtitle, with the four existing live sound/help/minimize/close controls. It is 56 pixels tall and identically styled on all interior pages. The version-only red-slash title bar and Skills-specific title artwork have been retired.
