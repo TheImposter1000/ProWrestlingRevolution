@@ -358,6 +358,20 @@ internal static class Program
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
                     throw new Exception("Top utility controls must be flush with the header.");
                 
+                // Skills alone receives the tall PWR-branded 56px plaque.
+                // The four utility buttons remain in their real launcher bar.
+                launcher.SetWorkerSectionChrome("Skills");
+                if (topbar.Height != 56 ||
+                    topbar.Controls.Find("WorkerSkillsTopChrome", false)
+                        .SingleOrDefault() is not WorkerSkillsTopChrome skillsHeader ||
+                    skillsHeader.Height != 56 ||
+                    skillsHeader.Right > orderedChrome[0].Left ||
+                    controls.Any(button => button.Height != 56))
+                    throw new Exception("Skills header lost its reference proportions or obscured utilities.");
+                launcher.SetWorkerSectionChrome(null);
+                if (topbar.Height != 40 || controls.Any(button => button.Height != 40))
+                    throw new Exception("Leaving Skills did not restore the original header.");
+
                 // The editor is a full-width directory. The name of the MDB is the
                 // central heading, and the mass-edit dropdown sits beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
@@ -749,6 +763,24 @@ internal static class Program
                     skillImage.Save(skillPreview,
                         System.Drawing.Imaging.ImageFormat.Png);
                     Console.WriteLine("Skills preview saved to " + skillPreview);
+
+                    using (var skillBar = new WorkerSkillsTopChrome
+                    {
+                        Size = new System.Drawing.Size(1672, 56)
+                    })
+                    {
+                        skillBar.CreateControl();
+                        using var barImage = new System.Drawing.Bitmap(1672, 56);
+                        skillBar.DrawToBitmap(barImage,
+                            new System.Drawing.Rectangle(0, 0, 1672, 56));
+                        string headerPreview = Path.Combine(
+                            Path.GetDirectoryName(previewPath)!,
+                            "worker-skills-header-preview.png");
+                        barImage.Save(headerPreview,
+                            System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("Skills header preview saved to " +
+                            headerPreview);
+                    }
                 }
             }
 
