@@ -29,7 +29,15 @@ internal sealed class WorkerEditorForm : UserControl
     private PrwWorkerProfile _profile;
     private readonly string? _databaseFile;
     private readonly string? _password;
-    private sealed record WorkerFieldBinding(DataRow Row, string Field);
+    private sealed record WorkerFieldBinding(DataRow? Row, string Field, string? Table = null);
+    private string _initialValueSnapshot = "";
+    private readonly Label _saveStatus = new()
+    {
+        Name = "WorkerSaveStatus", Location = new Point(8, 510),
+        Size = new Size(142, 120), ForeColor = Color.FromArgb(255, 160, 152),
+        BackColor = Color.Transparent, Font = new Font("Segoe UI", 8f),
+        AutoEllipsis = true
+    };
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Color.Transparent };
     private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
@@ -58,9 +66,17 @@ internal sealed class WorkerEditorForm : UserControl
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private bool HasPendingChanges() => _profile.Sections.Any(section =>
-        section.Records.Rows.Cast<DataRow>().Any(row =>
-            row.RowState is DataRowState.Modified or DataRowState.Added));
+    private static string SnapshotValues(PrwWorkerProfile profile) =>
+        string.Join("\u001e", profile.Sections.SelectMany(section =>
+            section.Records.Rows.Cast<DataRow>().Select(row =>
+                section.Table + ":" + string.Join("\u001f",
+                    row.ItemArray.Select(value =>
+                        value is DBNull ? "<null>" :
+                        Convert.ToString(value, CultureInfo.InvariantCulture) ?? "")))));
+    
+    private bool HasPendingChanges() =>
+        !string.Equals(SnapshotValues(_profile), _initialValueSnapshot,
+            StringComparison.Ordinal);
 
     internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
         PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
@@ -96,6 +112,7 @@ internal sealed class WorkerEditorForm : UserControl
         timer.Restart();
 
         ShowSection("General");
+        _initialValueSnapshot = SnapshotValues(_profile);
 
         System.Diagnostics.Debug.WriteLine(
             $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
@@ -146,6 +163,8 @@ internal sealed class WorkerEditorForm : UserControl
         }
 
         ShowSection("General");
+        _saveStatus.Text = "";
+        _initialValueSnapshot = SnapshotValues(_profile);
     }
 
     private void RequestMainMenu(string key)
@@ -486,7 +505,12 @@ internal sealed class WorkerEditorForm : UserControl
                 current = current.Parent;
             if (current is WorkerEditorForm editor &&
                 Tag is WorkerFieldBinding binding)
-                editor.EditField(this, binding);
+            {
+                if (DropDownIndicator)
+                    editor.OpenFieldChoices(this, binding);
+                else
+                    editor.EditField(this, binding);
+            }
         }
 
         protected override void OnClick(EventArgs e)
@@ -600,10 +624,13 @@ internal sealed class WorkerEditorForm : UserControl
         TabStop = true
     };
 
-    private static void Bind(WorkerValue value, DataRow? row, string field)
+    private static void Bind(WorkerValue value, DataRow? row, string field,
+        string? fallbackTable = null)
     {
         if (row is not null && row.Table.Columns.Contains(field))
-            value.Tag = new WorkerFieldBinding(row, field);
+            value.Tag = new WorkerFieldBinding(row, field, row.Table.TableName);
+        else if (row is null && fallbackTable is not null)
+            value.Tag = new WorkerFieldBinding(null, field, fallbackTable);
     }
 
     private static bool IsTrue(object? value)
@@ -689,15 +716,7 @@ internal sealed class WorkerEditorForm : UserControl
             _tabs[section] = button;
             _sectionNavigation.Controls.Add(button);
         }
-        var backToDatabase = new WorkerSectionButton
-        {
-            Name = "WorkerBackToDatabase",
-            Text = "Back to Database",
-            Location = new Point(8, 450),
-            Size = new Size(142, 39)
-        };
-        backToDatabase.Click += (_, _) => Close();
-        _sectionNavigation.Controls.Add(backToDatabase);
+        _sectionNavigation.Controls.Add(_saveStatus);
         page.Controls.Add(_sectionNavigation, 0, 0);
 
         _body.Paint += (_, e) =>
@@ -1205,7 +1224,8 @@ internal sealed class WorkerEditorForm : UserControl
                           fields[i].Field is "Born" or "SetToDebut";
             var value = ValueBox(Display(source, fields[i].Field),
                 "WorkerField_" + fields[i].Field, !isWeight && !isDate);
-            Bind(value, source, fields[i].Field);
+            Bind(value, source, fields[i].Field,
+                card.Name == "WorkerPhysical" ? "tblWorkerPhysical" : null);
             
 value.CalendarIndicator = false;
 value.SpinnerIndicator = isWeight;
@@ -1848,12 +1868,110 @@ else
     }
 
 
+
+    private DataRow? ResolveRow(WorkerFieldBinding binding)
+    {
+        if (binding.Row is not null) return binding.Row;
+        if (_databaseFile is null || binding.Table != "tblWorkerPhysical")
+            return null;
+        var section = _profile.Sections.FirstOrDefault(x =>
+            x.Table.Equals(binding.Table, StringComparison.OrdinalIgnoreCase));
+        if (section is null || !section.Records.Columns.Contains(binding.Field))
+            return null;
+        DataRow? row = section.Records.Rows.Cast<DataRow>().FirstOrDefault();
+        if (row is not null) return row;
+        row = section.Records.NewRow();
+        row["WorkerUID"] = _profile.Identity.Uid;
+        section.Records.Rows.Add(row);
+        return row;
+    }
+
+    private void ApplyValue(WorkerValue control, DataRow row,
+        string field, object? candidate)
+    {
+        if (Equals(row[field], candidate)) return;
+        try
+        {
+            row[field] = candidate ?? DBNull.Value;
+            control.Text = Display(row, field);
+            control.Invalidate();
+            _saveStatus.Text = "";
+        }
+        catch (Exception ex) when (ex is ArgumentException or ConstraintException ||
+                                   ex is NoNullAllowedException)
+        {
+            _saveStatus.Text = "Invalid " + field + ": " + ex.Message;
+        }
+    }
+
+    private void OpenFieldChoices(WorkerValue control, WorkerFieldBinding binding)
+    {
+        if (_databaseFile is null) return;
+        var row = binding.Row ?? ResolveRow(binding);
+        if (row is null) return;
+        string field = binding.Field;
+        var table = PrwSchema.Tables.FirstOrDefault(t =>
+            t.Name.Equals(row.Table.TableName, StringComparison.OrdinalIgnoreCase));
+        if (table is null || table.KeyColumns.Contains(field,
+                StringComparer.OrdinalIgnoreCase) ||
+            (field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) &&
+             field != "LoyaltyWorkerUID"))
+        {
+            _saveStatus.Text = field + " is a protected record identifier.";
+            return;
+        }
+
+        var choices = PrwWorkerFieldOptions.Get(
+            _paths, _databaseFile, _password, row, field);
+        var menu = new ContextMenuStrip
+        {
+            ShowImageMargin = false,
+            MaximumSize = new Size(380, 390),
+            Font = new Font("Segoe UI", 9f)
+        };
+        menu.Closed += (_, _) => menu.Dispose();
+        foreach (var choice in choices)
+        {
+            var item = new ToolStripMenuItem(choice.Label)
+            {
+                Checked = Equals(row[field], choice.Value),
+                AutoSize = true
+            };
+            item.Click += (_, _) => ApplyValue(control, row, field, choice.Value);
+            menu.Items.Add(item);
+        }
+        if (choices.Count > 0) menu.Items.Add(new ToolStripSeparator());
+        var column = row.Table.Columns[field]!;
+        if (column.AllowDBNull)
+        {
+            var clear = new ToolStripMenuItem("(Clear)");
+            clear.Click += (_, _) => ApplyValue(control, row, field, DBNull.Value);
+            menu.Items.Add(clear);
+        }
+        if (field != "LoyaltyWorkerUID")
+        {
+            var manual = new ToolStripMenuItem("Enter a custom value...");
+            manual.Click += (_, _) => EditField(control,
+                new WorkerFieldBinding(row, field, row.Table.TableName));
+            menu.Items.Add(manual);
+        }
+        if (menu.Items.Count == 0)
+        {
+            _saveStatus.Text = "No selectable values are available for " + field + ".";
+            menu.Dispose();
+            return;
+        }
+        menu.Show(control, new Point(0, control.Height));
+    }
+
     private void EditField(WorkerValue control, WorkerFieldBinding binding)
     {
         if (_databaseFile is null) return;
-        var row = binding.Row;
+        var row = ResolveRow(binding);
+        if (row is null) return;
         var field = binding.Field;
-        if (field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) ||
+        if ((field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) &&
+             field != "LoyaltyWorkerUID") ||
             PrwSchema.Tables.FirstOrDefault(t => t.Name == row.Table.TableName)?
                 .KeyColumns.Contains(field, StringComparer.OrdinalIgnoreCase) == true)
         {
@@ -1924,18 +2042,7 @@ else
             }
         }
 
-        if (Equals(row[field], candidate)) return;
-        try
-        {
-            row[field] = candidate ?? DBNull.Value;
-            control.Text = Display(row, field);
-            control.Invalidate();
-        }
-        catch (Exception ex) when (ex is ArgumentException or ConstraintException)
-        {
-            MessageBox.Show(FindForm(), ex.Message, "Invalid Worker Field",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
+        ApplyValue(control, row, field, candidate);
     }
 
     private string? PromptText(string title, string prompt, string initial)
@@ -2062,23 +2169,19 @@ else
         if (_databaseFile is null) return;
         try
         {
-            string backup = PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
-            if (backup.Length == 0)
-            {
-                MessageBox.Show(FindForm(), "No changes to save.",
-                    "Worker Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            var refreshed = PrwWorkerRepository.Load(_databaseFile,
-                _profile.Identity.Uid, _password);
-            LoadProfile(refreshed);
-            MessageBox.Show(FindForm(), "Worker changes were saved. Backup created at:\n" +
-                backup, "Worker Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
+            _initialValueSnapshot = SnapshotValues(_profile);
+            _saveStatus.Text = "";
+            // Save closes the overlay directly. The Database Editor refreshes
+            // its worker list in the existing CloseRequested handler.
+            CloseRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(FindForm(), "Worker changes were not saved.\n\n" + ex.Message,
-                "Worker Save Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            // Keep the editor open with the unsaved inputs intact. No modal
+            // success/failure popup interrupts the desired workflow.
+            _saveStatus.Text = "Save failed: " + ex.Message;
+            _tips.SetToolTip(_saveStatus, ex.Message);
         }
     }
 
