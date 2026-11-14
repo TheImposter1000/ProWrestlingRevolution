@@ -594,15 +594,32 @@ internal static class Program
                     if (skillsEditor.Controls.Find("SkillsFourPanels", true)
                             .SingleOrDefault() is not TableLayoutPanel groups ||
                         groups.ColumnCount != 2 || groups.RowCount != 2 ||
-                        skillsEditor.Controls.Find("SkillSlider_Brawling", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillSlider_Brawling", true)
+                            .SingleOrDefault() is not SkillGlowSlider ||
+                        skillsEditor.Controls.Find("SkillSpinner_Brawling", true)
+                            .SingleOrDefault() is not SkillNumberSpinner ||
                         skillsEditor.Controls.Find("SkillNumber_PotentialRefereeing", true)
-                            .Length != 1 ||
+                            .SingleOrDefault() is not TextBox ||
+                        skillsEditor.Controls.Find("SkillPanel_In-Ring", true)
+                            .SingleOrDefault() is not SkillGlassPanel ||
                         skillsEditor.Controls.Find("SkillNumber_", true).Length != 0 ||
-                        skillsEditor.Controls.Find("SkillsReset", true).Length != 1 ||
-                        skillsEditor.Controls.Find("SkillsSave", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillsPreset", true)
+                            .SingleOrDefault() is not SkillChromePreset ||
+                        skillsEditor.Controls.Find("SkillsAutoBalance", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
+                        skillsEditor.Controls.Find("SkillsReset", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
+                        skillsEditor.Controls.Find("SkillsSave", true)
+                            .SingleOrDefault() is not SkillChromeButton ||
                         skillsEditor.Controls.Find("WorkerBiography", true).Length != 0 ||
                         skillsEditor.Controls.Find("WorkerPicture", true).Length != 0)
-                        throw new Exception("The 36-field dedicated Skills Editor layout is incomplete.");
+                        throw new Exception(
+                            "The illustrated four-panel Skills layout or real footer controls are incomplete.");
+
+                    if (groups.Controls.Cast<Control>().OfType<SkillGlassPanel>().Count() != 4 ||
+                        skillsEditor.Controls.Find("SkillsHeader_0", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillsHeader_3", true).Length != 1)
+                        throw new Exception("The four custom painted Skills headers are missing.");
 
                     skillsEditor.SetRatingForSmoke("Brawling", 80);
                     skillsEditor.SetRatingForSmoke("Aerial", 0);
@@ -700,8 +717,10 @@ internal static class Program
                     using var editableSkillsPreview = new WorkerSkillsEditor(
                         profile, true, () => { })
                     {
-                        Size = new System.Drawing.Size(
-                            SkinArt.WindowWidth - 158, SkinArt.WindowHeight - 18)
+                        // Reference comparison is authored for a 1650x928
+                        // desktop; render a wide editor viewport separately
+                        // from the actual 1366px in-game smoke layout.
+                        Size = new System.Drawing.Size(1590, 820)
                     };
                     editableSkillsPreview.CreateControl();
                     editableSkillsPreview.PerformLayout();
