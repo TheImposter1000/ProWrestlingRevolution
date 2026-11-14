@@ -71,7 +71,7 @@ jobs:
         run: |
           $env:PWR_WORKER_PREVIEW = Join-Path $PWD "worker-editor-preview.png"
           dotnet run --project ProWrestlingRevolution.csproj -c Release -- --smoke
-          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.8 smoke test failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.6.9 smoke test failed: $LASTEXITCODE" }
 
       - name: Upload Worker Editor and Skills visual verification previews
         if: always()
@@ -136,7 +136,7 @@ jobs:
           mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java "-Dpwr.mainClass=PrwDefaultInspector" "-Dexec.args=publish/System/PRWDefault.mdb"
           if ($LASTEXITCODE -ne 0) { throw "Native MDB schema verification failed" }
 
-      - name: Assemble the Version 0.6.8 complete game ZIP
+      - name: Assemble the Version 0.6.9 complete game ZIP
         shell: pwsh
         run: |
           foreach ($folder in @("Databases", "Pictures", "Skins", "System")) {
@@ -193,46 +193,51 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: Pro Wrestling Revolution ${{ steps.release.outputs.version }} - Contract Editor Glass and Unified Inputs
+          name: Pro Wrestling Revolution ${{ steps.release.outputs.version }} - Shared Worker Editor Design
           target_commitish: main
           prerelease: false
           make_latest: true
           overwrite_files: false
           fail_on_unmatched_files: true
           body: |
-            PWR v0.6.8 corrects the Contracts layout to match the rest
-            of the Worker Editor instead of using a separate opaque UI.
+            PWR v0.6.9 makes the General Worker Editor the visual
+            source of truth for all worker sections.
 
-            MATCHING WORKER EDITOR BACKGROUND
-            Contracts now uses the selected skin's Worker_Editor.jpg with
-            the same Obsidian fallback and cached artwork behavior.
-            Contract frames use restrained translucent navy glass, rather
-            than painting their own opaque dark arena over that image.
+            ONE SHARED WORKER EDITOR DESIGN
+            The General Worker Editor and Contracts now use a common
+            WorkerEditorTheme component for the precise silver-white
+            input gradient, steel-blue outline, glass cards, metallic
+            header, portrait, biography editor and action buttons.
+            Contracts keeps its full-width, four-column information
+            layout, with no sidebar, while its controls inherit
+            the same visual language as General.
 
-            UNIFIED EDITABLE FIELDS
-            Name, Short Name, Wage, Downside, Contract Begin and every
-            schema-backed contract field use the same polished editor
-            control. Players can type directly, including in fields
-            offering a dropdown of database-provided options. Date and
-            numeric values are validated before saving.
+            MATCHING WORKER IDENTITY
+            The worker picture uses the same 91 by 91 pixel photo box,
+            border, zoom mode, missing image text and picture-pack
+            search paths. Name and Short Name fields share the light
+            General Worker style. The biography is the same light
+            editor with dark text and the same blue border.
 
-            SIMPLER INTERFACE
-            The section headers show only their titles. Decorative
-            section descriptions and icons are removed. Buttons are
-            subtle, text-only and consistently sized, including Reset,
-            Apply and Save. Role checkboxes no longer sit over opaque
-            black row backgrounds. Contract data, navigation, and
-            layout groups are preserved.
+            MATCHING FIELDS AND ACTIONS
+            All supported contract values use the General's pale
+            gradient instead of blue-on-blue inset boxes. Direct
+            typing and optional dropdown menus remain available.
+            Contract role checkboxes use the General's native
+            checkbox appearance. Panels and text-only action
+            buttons use the shared glass and gradient treatments.
 
-            The underlying tblContract and tblContractBio transactional
-            save paths are retained. Native schema fields that do not
-            exist remain read-only instead of pretending to save.
-            Automatic stable release installation remains available
-            from v0.6.7, with a manual updater fallback and opt-out.
+            REGRESSION PROTECTION
+            The General Worker Editor render was pixel-identical
+            at 1366 by 768 after shared-component extraction.
+            The Windows smoke tests verify actual shared portrait,
+            biography, checkbox and field surfaces in Contracts.
 
-            The updater replaces only ProWrestlingRevolution.exe.
-            Databases, saves, skins, custom pictures and settings are
-            left untouched. A full Windows ZIP is also provided.
+            No changes are made to native contract or worker schema.
+            Transactions and type validation remain intact. Missing
+            fields remain read-only. Release updates replace only
+            the executable, preserving saved games, databases,
+            skins, pictures and settings.
           files: |
             ProWrestlingRevolution.exe
             ProWrestlingRevolution-Windows-x64.zip
