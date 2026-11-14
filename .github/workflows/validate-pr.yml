@@ -53,11 +53,17 @@ jobs:
             throw "Published replacement template is not the uploaded MDB"
           }
 
+      - name: Inspect native PRW field types and sample values
+        shell: pwsh
+        run: |
+          mvn -q -f Tools/EditorMdbGenerator/pom.xml exec:java -Dexec.mainClass=PrwDefaultInspector -Dexec.args=publish/System/PRWDefault.mdb
+          if ($LASTEXITCODE -ne 0) { throw "Native MDB field inspection failed" }
+
       - name: Upload standalone Windows test EXE
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PWR-v0.6.2-WorkerEditor-Test
+          name: PWR-Unreleased-Worker-Skills-Draft
           path: publish/ProWrestlingRevolution.exe
           if-no-files-found: error
           retention-days: 30
