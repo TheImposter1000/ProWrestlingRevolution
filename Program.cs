@@ -335,14 +335,21 @@ internal static class Program
 
             }
 
-            // Fixed Worker Editor layout can be verified using in-memory workers.
-            // screenshot-based layout using in-memory worker records. It
-            // must not need the Access provider for UI construction.
+            // Verify the Worker Editor's fixed layout using in-memory worker data.
+            // UI checks do not need a database provider.
             var workerTable = new System.Data.DataTable("tblWorker");
             workerTable.Columns.Add("UID", typeof(int));
             workerTable.Columns.Add("Name", typeof(string));
             workerTable.Columns.Add("ShortName", typeof(string));
-            workerTable.Rows.Add(1, "Sample Worker", "Sample");
+            workerTable.Columns.Add("Freelance", typeof(bool));
+            workerTable.Rows.Add(1, "Sample Worker", "Sample", false);
+            var boolChoices = PrwWorkerFieldOptions.Get(paths,
+                Path.Combine(root, "not-a-real-mdb.mdb"), null,
+                workerTable.Rows[0], "Freelance");
+            if (boolChoices.Count != 2 ||
+                !boolChoices.Any(choice => Equals(choice.Value, false)) ||
+                !boolChoices.Any(choice => Equals(choice.Value, true)))
+                throw new Exception("Native Boolean worker dropdowns must offer Yes and No.");
             var biographyTable = new System.Data.DataTable("tblWorkerBio");
             biographyTable.Columns.Add("Biography", typeof(string));
             biographyTable.Rows.Add("An example worker biography.");
@@ -377,6 +384,8 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerPage", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
+                if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
+                    throw new Exception("Worker Editor must not add an extra Back to Database button.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
