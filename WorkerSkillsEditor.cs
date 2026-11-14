@@ -79,7 +79,8 @@ internal sealed class WorkerSkillsEditor : UserControl
     private bool _createdRow;
     private bool _resetting;
 
-    internal WorkerSkillsEditor(PrwWorkerProfile profile, bool canEdit, Action save)
+    internal WorkerSkillsEditor(PrwWorkerProfile profile, bool canEdit, Action save,
+        IReadOnlyDictionary<string, object>? loadedValues = null)
     {
         _profile = profile;
         _save = save;
@@ -99,7 +100,9 @@ internal sealed class WorkerSkillsEditor : UserControl
         {
             if (_original.ContainsKey(skill.Column))
                 throw new InvalidDataException("Duplicate worker skill: " + skill.Column);
-            _original.Add(skill.Column, GetStoredValue(skill.Column));
+            _original.Add(skill.Column,
+                loadedValues?.TryGetValue(skill.Column, out object? original) == true
+                    ? original ?? DBNull.Value : GetOriginalValue(skill.Column));
         }
 
         Build();
@@ -122,6 +125,30 @@ internal sealed class WorkerSkillsEditor : UserControl
             !actual.ToHashSet(StringComparer.Ordinal).SetEquals(expected))
             throw new InvalidDataException(
                 "Skills UI must preserve all 36 native MDB columns without renaming.");
+    }
+
+    private object GetOriginalValue(string field)
+    {
+        if (_currentRow is null || !_currentRow.Table.Columns.Contains(field))
+            return DBNull.Value;
+        if (_currentRow.HasVersion(DataRowVersion.Original))
+            return _currentRow[field, DataRowVersion.Original];
+        return GetStoredValue(field);
+    }
+
+    internal void ShowSaveError(string message) =>
+        _status.Text = "Save failed: " + message;
+
+    internal bool HasUncommittedInvalidInput() =>
+        _rows.Values.Any(row => row.ValidateNumber() is not null);
+
+    internal bool ValidateBeforeLeaving()
+    {
+        var invalid = _rows.Values.Select(row => row.ValidateNumber())
+            .FirstOrDefault(result => result is not null);
+        if (invalid is null) return true;
+        _status.Text = invalid;
+        return false;
     }
 
     private int? InitialRating(string field)
