@@ -37,16 +37,18 @@ jobs:
           $tag = "v$version"
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
-          git ls-remote --exit-code --tags origin "refs/tags/$tag" | Out-Null
-          if ($LASTEXITCODE -eq 0) {
+          # Without --exit-code, an absent tag returns a normal empty
+          # result instead of a native-command failure in PowerShell 7.
+          $matchingTag = git ls-remote --tags origin "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not verify remote release tags."
+          }
+          if ($matchingTag) {
             "publish=false" >> $env:GITHUB_OUTPUT
             Write-Host "$tag already exists; skipping a duplicate release."
           }
-          elseif ($LASTEXITCODE -eq 2) {
-            "publish=true" >> $env:GITHUB_OUTPUT
-          }
           else {
-            throw "Could not verify remote release tags."
+            "publish=true" >> $env:GITHUB_OUTPUT
           }
 
       - name: Install Java for independent Jet MDB generation
