@@ -284,9 +284,14 @@ internal static class Program
                 }
                 if (controls.Any(button => button.Width != 50 || button.Height != 40))
                     throw new Exception("Top utility controls must match the 50 x 40 reference.");
-                if (controls.OrderBy(button => button.Left).First().Left !=
-                    SkinArt.WindowWidth - 200)
-                    throw new Exception("Top controls are incorrectly aligned.");
+                var orderedChrome = controls.OrderBy(button => button.Left).ToArray();
+                if (orderedChrome[0].Left != topbar.ClientSize.Width - 200 ||
+                    orderedChrome[^1].Right != topbar.ClientSize.Width ||
+                    orderedChrome.Any(button => button.Top != 0 ||
+                        button.Bottom != topbar.ClientSize.Height) ||
+                    orderedChrome.Zip(orderedChrome.Skip(1),
+                        (left, right) => left.Right == right.Left).Any(touch => !touch))
+                    throw new Exception("Top utility controls must be flush with the header.");
                 
                 // The editor is a full-width directory. The name of the MDB is the
                 // central heading, and the mass-edit dropdown sits beneath its button.
