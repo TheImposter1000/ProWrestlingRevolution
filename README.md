@@ -1,5 +1,13 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.6: one consistent PWR application header
+
+The launcher and all Worker Editor sections now share a single **PwrSharedHeader** component and one full-width **MetalTopBar**. The header follows the supplied reference design: blue-metal gradients, a PWR logo and two-line wordmark, cyan separator and lower rule, contextual page title and italic subtitle, with the four existing live sound/help/minimize/close controls. It is 56 pixels tall and identically styled on all interior pages. The version-only red-slash title bar and Skills-specific title artwork have been retired.
+
+A page's header title changes through `SetWorkerSectionChrome` (Worker sections) or the normal launcher navigation flow (database and other pages). Future application pages should extend this shared context mapping, not create another independently painted title bar. The title-screen artwork, game controls, Skills ratings, MDB structure, save files and gameplay are unchanged.
+
+Windows CI captures the actual composed PWR header in Worker Editor, Skills, Contracts, Popularity, Business Skills and Database Editor, verifies matching backgrounds, heights and functional utility controls, and tests the header context on Skins, Achievements, Credits and New Game. In-game Check for Updates installs the EXE only.
+
 ## Version 0.6.5: unified Skills title bar and significantly faster Worker rendering
 
 The Skills title plaque and sound/help/minimize/close controls now share one continuous metallic gradient and cyan baseline. The previously displaced Help question mark is fully vector drawn and stays centered at either bar height. The game's normal top bar remains unchanged outside Skills.

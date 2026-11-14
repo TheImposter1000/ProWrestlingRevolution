@@ -170,11 +170,10 @@ public sealed partial class LauncherForm : Form
 
     private Panel NewPage(string pageName, string description, out Panel content)
     {
-        SetWorkerSectionChrome(null);
         _currentPage = pageName;
+        SetWorkerSectionChrome(null);
         _hoverIcon = null;
         // Interior pages need the regular navigation; the title hides it.
-        _editorPageTitle.Visible = false;
         _sidebar.Visible = true;
         _topbar.Visible = true;
         RenderSidebar();
@@ -287,11 +286,11 @@ public sealed partial class LauncherForm : Form
         // This is the simple directory screen, not a record editing form.
         // Main menu stays visible while the editor owns the content area.
         _currentPage = "DATABASE EDITOR";
+        SetWorkerSectionChrome(null);
         _hoverIcon = null;
         _sidebar.Visible = true;
         RenderSidebar();
         _topbar.Visible = true;
-        _editorPageTitle.Visible = false;
         ClearPageContent();
         _page.BackColor = Color.FromArgb(7, 18, 30);
         _page.Controls.Add(new DatabaseEditorWorkspace(_paths, _skin, ShowHome, Navigate));

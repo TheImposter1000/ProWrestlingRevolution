@@ -352,14 +352,24 @@ internal static class Program
                     !row.IconOnly || row.Width != SkinArt.SidebarWidth))
                     throw new Exception("Navigation buttons must be accessible, compact and icon-only.");
                 var topbar = launcher.Controls.OfType<MetalTopBar>().SingleOrDefault();
-                if (topbar is null || topbar.Height != 40)
-                    throw new Exception("The metallic utility bar must be 36 pixels high.");
+                if (topbar is null || topbar.Height != 56)
+                    throw new Exception("All interior pages must use the same 56px PWR header.");
+
+                var sharedHeader = topbar.Controls.OfType<PwrSharedHeader>().SingleOrDefault()
+                    ?? throw new Exception("Shared PWR title plaque is missing.");
+                if (topbar.Controls.OfType<PwrSharedHeader>().Count() != 1 ||
+                    topbar.Controls.Find("WorkerSkillsTopChrome", false).Length != 0 ||
+                    topbar.Controls.OfType<Label>().Any())
+                    throw new Exception(
+                        "Legacy separate logo, version or Skills sharedHeader is still attached.");
+
                 var controls = topbar.Controls.OfType<TopUtilityButton>().ToList();
-                if (controls.Count != 4 ||
-                    controls.Any(button => button.AccessibleRole != AccessibleRole.PushButton))
-                    throw new Exception("Four accessible top utility buttons are required.");
+                if (controls.Count != 4 || controls.Any(button =>
+                    button.AccessibleRole != AccessibleRole.PushButton ||
+                    button.Width != 50 || button.Height != 56))
+                    throw new Exception("Every interior page must use uniform active utility buttons.");
                 if (topbar.Controls.OfType<PictureBox>().Any())
-                    throw new Exception("The old raster top utility strip must not be displayed.");
+                    throw new Exception("Old raster top utility strip should not appear.");
 
                 foreach (var (key, _, y) in SkinArt.MenuIcons)
                 {
@@ -368,8 +378,7 @@ internal static class Program
                         icon.Width != SkinArt.SidebarWidth || icon.Height != 54)
                         throw new Exception("Incorrect compact icon position for " + key);
                 }
-                if (controls.Any(button => button.Width != 50 || button.Height != 40))
-                    throw new Exception("Top utility controls must match the 50 x 40 reference.");
+
                 var orderedChrome = controls.OrderBy(button => button.Left).ToArray();
                 if (orderedChrome[0].Left != topbar.ClientSize.Width - 200 ||
                     orderedChrome[^1].Right != topbar.ClientSize.Width ||
@@ -377,98 +386,135 @@ internal static class Program
                         button.Bottom != topbar.ClientSize.Height) ||
                     orderedChrome.Zip(orderedChrome.Skip(1),
                         (left, right) => left.Right == right.Left).Any(touch => !touch))
-                    throw new Exception("Top utility controls must be flush with the header.");
-                
-                // Earlier screenshots were taken from a hidden launcher.
-                // Transparent child controls do not composite into an
-                // offscreen parent bitmap reliably. Exercise the real
-                // visible Form so the branding and four utility controls
-                // must actually be painted together.
+                    throw new Exception("PWR utility controls must occupy one aligned sharedHeader.");
+                if (sharedHeader.Left != 0 || sharedHeader.Top != 0 ||
+                    sharedHeader.Height != 56 || sharedHeader.Right != orderedChrome[0].Left)
+                    throw new Exception("Shared PWR header must meet its utility cluster exactly.");
+
+                // Capture a real visible launcher. Compare each section's
+                // composed sharedHeader, not an isolated, transparent title control.
                 launcher.Show();
                 topbar.Visible = true;
                 Application.DoEvents();
-                // Skills alone receives the tall PWR-branded 56px plaque.
-                // The four utility buttons remain in their real launcher bar.
-                launcher.SetWorkerSectionChrome("Skills");
-                if (topbar.Height != 56 ||
-                    !launcher.SkillsImmersiveMode ||
-                    topbar.Controls.Find("WorkerSkillsTopChrome", false)
-                        .SingleOrDefault() is not WorkerSkillsTopChrome skillsHeader ||
-                    skillsHeader.Height != 56 ||
-                    skillsHeader.Right > orderedChrome[0].Left ||
-                    controls.Any(button => button.Height != 56))
-                    throw new Exception("Skills header lost its reference proportions or obscured utilities.");
-                // Render the actual composed parent and all four interactive
-                // child buttons. An isolated brand preview cannot detect
-                // the visible seam between the plaque and the utility cluster.
-                topbar.CreateControl();
-                topbar.PerformLayout();
-                Application.DoEvents();
-                using (var composed = new System.Drawing.Bitmap(
-                    topbar.Width, topbar.Height))
+                string? workerPreview = Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
+                byte[]? referenceBackdrop = null;
+
+                foreach (var (section, expectedTitle, expectedDetail, previewName) in new[]
                 {
+                    ("General", "Worker Editor", "Edit Worker", "pwr-header-worker.png"),
+                    ("Skills", "Skills", "Worker Skill Editor", "pwr-header-skills.png"),
+                    ("Contracts", "Contracts", "Worker Contracts", "pwr-header-contracts.png"),
+                    ("Popularity", "Popularity", "Worker Popularity", "pwr-header-popularity.png"),
+                    ("Business Skills", "Business Skills", "Worker Business Skills",
+                        "pwr-header-business-skills.png")
+                })
+                {
+                    launcher.SetWorkerSectionChrome(section);
+                    topbar.PerformLayout();
+                    topbar.Invalidate(true);
+                    topbar.Update();
+                    Application.DoEvents();
+
+                    if (sharedHeader.PageTitle != expectedTitle ||
+                        sharedHeader.PageDetail != expectedDetail ||
+                        topbar.Height != 56 ||
+                        sharedHeader.Right != orderedChrome[0].Left ||
+                        controls.Any(button => button.Height != 56) ||
+                        launcher.SkillsImmersiveMode != (section == "Skills"))
+                        throw new Exception(
+                            "Page header changes style or context unexpectedly: " + section);
+
+                    using var composed = new System.Drawing.Bitmap(
+                        topbar.Width, topbar.Height);
                     topbar.DrawToBitmap(composed,
-                        new System.Drawing.Rectangle(0, 0,
-                            composed.Width, composed.Height));
-                    int border = orderedChrome[0].Left;
-                    var leftPixel = composed.GetPixel(border - 4, 3);
-                    var rightPixel = composed.GetPixel(border + 4, 3);
+                        new System.Drawing.Rectangle(0, 0, composed.Width, composed.Height));
+
+                    // The top-left and right edges are outside the title
+                    // glyphs. Their colours should be invariant across tabs.
+                    byte[] backdrop = new byte[12];
+                    int bi = 0;
+                    foreach (int x in new[] { 8, 780, 1110, 1190 })
+                    {
+                        var pixel = composed.GetPixel(x, 2);
+                        backdrop[bi++] = pixel.R;
+                        backdrop[bi++] = pixel.G;
+                        backdrop[bi++] = pixel.B;
+                    }
+                    if (referenceBackdrop is not null &&
+                        !referenceBackdrop.SequenceEqual(backdrop))
+                        throw new Exception("The header background changes between worker tabs.");
+                    referenceBackdrop ??= backdrop;
+
+                    int boundary = orderedChrome[0].Left;
+                    var leftPixel = composed.GetPixel(boundary - 4, 3);
+                    var rightPixel = composed.GetPixel(boundary + 4, 3);
                     int seamDifference =
                         Math.Abs(leftPixel.R - rightPixel.R) +
                         Math.Abs(leftPixel.G - rightPixel.G) +
                         Math.Abs(leftPixel.B - rightPixel.B);
                     if (seamDifference > 72)
-                        throw new Exception(
-                            "Skills header has a mismatched background at the utility boundary.");
+                        throw new Exception("PWR header background has a utility seam.");
 
-                    int paintedLetterPixels = 0;
-                    for (int y = 8; y < Math.Min(45, composed.Height); y++)
-                        for (int x = 435; x < Math.Min(570, composed.Width); x++)
+                    int textPixels = 0;
+                    for (int y = 9; y < Math.Min(46, composed.Height); y++)
+                        for (int x = 368; x < Math.Min(635, composed.Width); x++)
                         {
                             var pixel = composed.GetPixel(x, y);
                             if (pixel.R > 155 && pixel.G > 155 && pixel.B > 155)
-                                paintedLetterPixels++;
+                                textPixels++;
                         }
-                    if (paintedLetterPixels < 80)
+                    if (textPixels < 60)
                         throw new Exception(
-                            "The composed Skills screenshot has no visible heading. " +
-                            "The test must capture actual child painting, not a bare parent gradient.");
+                            "The composed PWR header title is not visible: " + section);
 
-                    string? workerPreview =
-                        Environment.GetEnvironmentVariable("PWR_WORKER_PREVIEW");
                     if (!string.IsNullOrWhiteSpace(workerPreview))
                     {
-                        string composedPath = Path.Combine(
-                            Path.GetDirectoryName(workerPreview)!,
-                            "worker-skills-composed-header-preview.png");
-                        composed.Save(composedPath,
+                        var screenshot = Path.Combine(
+                            Path.GetDirectoryName(workerPreview)!, previewName);
+                        composed.Save(screenshot,
                             System.Drawing.Imaging.ImageFormat.Png);
-                        // The old detached title-only preview had a blank
-                        // white background because its transparency requires
-                        // a parent. Replace it with the actual combined
-                        // header and its functional utilities.
-                        composed.Save(Path.Combine(
-                            Path.GetDirectoryName(workerPreview)!,
-                            "worker-skills-header-preview.png"),
-                            System.Drawing.Imaging.ImageFormat.Png);
-                        Console.WriteLine("Composed Skills header saved to " +
-                            composedPath);
+                        if (section == "Skills")
+                        {
+                            composed.Save(Path.Combine(
+                                Path.GetDirectoryName(workerPreview)!,
+                                "worker-skills-header-preview.png"),
+                                System.Drawing.Imaging.ImageFormat.Png);
+                            composed.Save(Path.Combine(
+                                Path.GetDirectoryName(workerPreview)!,
+                                "worker-skills-composed-header-preview.png"),
+                                System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        Console.WriteLine("PWR shared header preview: " + screenshot);
                     }
                 }
 
                 launcher.SetWorkerSectionChrome(null);
-                topbar.Visible = false;
-                launcher.Hide();
-                if (topbar.Height != 40 || launcher.SkillsImmersiveMode ||
-                    controls.Any(button => button.Height != 40))
-                    throw new Exception(
-                        "Leaving Skills did not restore the original header and icon rail.");
-
-                // The editor is a full-width directory. The name of the MDB is the
-                // central heading, and the mass-edit dropdown sits beneath its button.
+                if (topbar.Height != 56 || launcher.SkillsImmersiveMode ||
+                    controls.Any(button => button.Height != 56))
+                    throw new Exception("Leaving Skills must retain the same PWR header.");
+                // The editor is a full-width directory. The name of the MDB is
+                // the central heading and the mass-edit dropdown stays beneath its button.
                 typeof(LauncherForm).GetMethod("ShowDatabaseEditor",
                     System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic)!.Invoke(launcher, null);
+                if (sharedHeader.PageTitle != "Database Editor" ||
+                    sharedHeader.PageDetail != "Database Management" ||
+                    topbar.Height != 56 ||
+                    topbar.Controls.OfType<PwrSharedHeader>().Count() != 1)
+                    throw new Exception(
+                        "Database Editor did not reuse the exact PWR header component.");
+                if (!string.IsNullOrWhiteSpace(workerPreview))
+                {
+                    using var composedDatabase = new System.Drawing.Bitmap(
+                        topbar.Width, topbar.Height);
+                    topbar.DrawToBitmap(composedDatabase,
+                        new System.Drawing.Rectangle(0, 0,
+                            composedDatabase.Width, composedDatabase.Height));
+                    composedDatabase.Save(Path.Combine(
+                        Path.GetDirectoryName(workerPreview)!,
+                        "pwr-header-database.png"),
+                        System.Drawing.Imaging.ImageFormat.Png);
+                }
                 var workspace = titleCanvas!.Controls
                     .OfType<DatabaseEditorWorkspace>().SingleOrDefault();
                 // The smoke test intentionally never shows the launcher.
@@ -504,6 +550,29 @@ internal static class Program
                 if (massButton is null || massField is null ||
                     massField.Top <= massButton.Top)
                     throw new Exception("Mass edit dropdown must be under the mass edit button.");
+
+                // The launcher screens share the same physical header,
+                // not copies of the Worker/Skills implementation.
+                foreach (var (method, expectedPage, expectedDetail) in new[]
+                {
+                    ("ShowSkins", "Skins", "Customize Appearance"),
+                    ("ShowAchievements", "Achievements", "Career Milestones"),
+                    ("ShowCredits", "Credits", "About PWR"),
+                    ("ShowNewGame", "New Game", "Create Career")
+                })
+                {
+                    typeof(LauncherForm).GetMethod(method,
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)!
+                        .Invoke(launcher, null);
+                    Application.DoEvents();
+                    if (sharedHeader.PageTitle != expectedPage ||
+                        sharedHeader.PageDetail != expectedDetail ||
+                        topbar.Height != 56 ||
+                        topbar.Controls.OfType<PwrSharedHeader>().Count() != 1)
+                        throw new Exception(
+                            "Launcher screen did not use the shared PWR header: " + method);
+                }
 
             }
 

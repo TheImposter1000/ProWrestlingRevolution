@@ -48,6 +48,12 @@ jobs:
             worker-skills-compact-preview.png
             worker-skills-header-preview.png
             worker-skills-composed-header-preview.png
+            pwr-header-worker.png
+            pwr-header-skills.png
+            pwr-header-contracts.png
+            pwr-header-popularity.png
+            pwr-header-business-skills.png
+            pwr-header-database.png
           if-no-files-found: warn
           retention-days: 30
       - name: Verify published runtime paths and base template
