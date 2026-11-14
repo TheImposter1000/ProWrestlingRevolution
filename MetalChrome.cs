@@ -128,7 +128,6 @@ internal sealed class TopUtilityButton : Control
         _kind = kind;
         _palette = palette;
         Size = new Size(50, 56);
-        BackColor = Color.Transparent;
         Cursor = Cursors.Hand;
         TabStop = true;
         AccessibleRole = AccessibleRole.PushButton;
@@ -143,6 +142,7 @@ internal sealed class TopUtilityButton : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
             ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable |
             ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
     }
 
     internal void UpdatePalette(SkinPalette palette)
