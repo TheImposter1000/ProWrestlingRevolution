@@ -401,6 +401,30 @@ internal static class Program
 
             }
 
+            WorkerSkillsEditor.AssertSchemaMapping();
+            if (WorkerFieldRules.LanguageLevels.Length != 4 ||
+                WorkerFieldRules.Divisions.Length != 3 ||
+                WorkerFieldRules.IsManual("LanguageFrench", null) ||
+                !WorkerFieldRules.IsManual("Born", null) ||
+                !WorkerFieldRules.IsManual("FaceGimmick", null) ||
+                !WorkerFieldRules.IsManual("WeightPounds", null) ||
+                !WorkerFieldRules.IsManual("HeadCondition", null))
+                throw new Exception("Worker field classifications diverged from design rules.");
+
+            var manualDates = new System.Data.DataTable("tblWorker");
+            manualDates.Columns.Add("Born", typeof(DateTime));
+            manualDates.Columns.Add("HeadCondition", typeof(int));
+            var datesRow = manualDates.Rows.Add(DBNull.Value, DBNull.Value);
+            if (!WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-11-14",
+                    out var parsedDate, out _) || parsedDate is not DateTime ||
+                WorkerFieldRules.TryManualValue(datesRow, "Born", "2026-22-14",
+                    out _, out _) ||
+                WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "145",
+                    out _, out _) ||
+                !WorkerFieldRules.TryManualValue(datesRow, "HeadCondition", "72",
+                    out var parsedCondition, out _) || !Equals(parsedCondition, 72))
+                throw new Exception("Manual date/physical numeric validation failed.");
+
             // Verify the Worker Editor's fixed layout using in-memory worker data.
             // UI checks do not need a database provider.
             var workerTable = new System.Data.DataTable("tblWorker");
@@ -416,6 +440,18 @@ internal static class Program
                 !boolChoices.Any(choice => Equals(choice.Value, false)) ||
                 !boolChoices.Any(choice => Equals(choice.Value, true)))
                 throw new Exception("Native Boolean worker dropdowns must offer Yes and No.");
+            var skillsTable = new System.Data.DataTable("tblWorkerSkills");
+            skillsTable.Columns.Add("WorkerUID", typeof(int));
+            foreach (var field in PrwSchema.Tables.Single(x => x.Name == "tblWorkerSkills")
+                         .Columns.Where(x => x != "WorkerUID"))
+                skillsTable.Columns.Add(field, typeof(int));
+            var sampleSkills = skillsTable.NewRow();
+            sampleSkills["WorkerUID"] = 1;
+            sampleSkills["Brawling"] = 60;
+            sampleSkills["Charisma"] = 72;
+            skillsTable.Rows.Add(sampleSkills);
+            skillsTable.AcceptChanges();
+
             var biographyTable = new System.Data.DataTable("tblWorkerBio");
             biographyTable.Columns.Add("Biography", typeof(string));
             biographyTable.Rows.Add("An example worker biography.");
@@ -423,7 +459,8 @@ internal static class Program
                 new PrwWorkerSummary(1, "Sample Worker", "Sample"),
                 [
                     new PrwProfileSection("tblWorker", workerTable),
-                    new PrwProfileSection("tblWorkerBio", biographyTable)
+                    new PrwProfileSection("tblWorkerBio", biographyTable),
+                    new PrwProfileSection("tblWorkerSkills", skillsTable)
                 ]);
             using (var workerEditor = new WorkerEditorForm(paths, skin, profile))
             using (var workerHost = new Panel
@@ -452,11 +489,9 @@ internal static class Program
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
                     throw new Exception("Worker Editor must not add an extra Back to Database button.");
-                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true)
-                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity" ||
-                    workerEditor.Controls.Find("WorkerField_BiographyType", true)
-                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity")
-                    throw new Exception("Picture Type must sit alongside the worker portrait.");
+                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 0 ||
+                    workerEditor.Controls.Find("WorkerField_BiographyType", true).Length != 0)
+                    throw new Exception("BiographyType must not be mislabeled as Picture Type.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
@@ -504,6 +539,39 @@ internal static class Program
                         again.Items.Count != 0 ||
                         again.BackColor == SystemColors.Control)
                         throw new Exception("Worker dropdown theme/lifetime regression.");
+                }
+
+                // Verify the new dedicated, database-bound Skills workspace
+                // without duplicating identity, biography or global navigation.
+                using (var skillsEditor = new WorkerSkillsEditor(profile, true, () => { }))
+                {
+                    skillsEditor.Size = new System.Drawing.Size(1150, 690);
+                    skillsEditor.CreateControl();
+                    skillsEditor.PerformLayout();
+                    if (skillsEditor.Controls.Find("SkillsFourPanels", true)
+                            .SingleOrDefault() is not TableLayoutPanel groups ||
+                        groups.ColumnCount != 2 || groups.RowCount != 2 ||
+                        skillsEditor.Controls.Find("SkillSlider_Brawling", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillNumber_PotentialRefereeing", true)
+                            .Length != 1 ||
+                        skillsEditor.Controls.Find("SkillNumber_", true).Length != 0 ||
+                        skillsEditor.Controls.Find("SkillsReset", true).Length != 1 ||
+                        skillsEditor.Controls.Find("SkillsSave", true).Length != 1 ||
+                        skillsEditor.Controls.Find("WorkerBiography", true).Length != 0 ||
+                        skillsEditor.Controls.Find("WorkerPicture", true).Length != 0)
+                        throw new Exception("The 36-field dedicated Skills Editor layout is incomplete.");
+
+                    skillsEditor.SetRatingForSmoke("Brawling", 80);
+                    skillsEditor.SetRatingForSmoke("Aerial", 0);
+                    if (!Equals(sampleSkills["Brawling"], 80) ||
+                        !Equals(sampleSkills["Aerial"], 0) ||
+                        sampleSkills["Technical"] is not DBNull)
+                        throw new Exception("Skills changes must preserve unset versus zero.");
+                    skillsEditor.ResetForSmoke();
+                    if (!Equals(sampleSkills["Brawling"], 60) ||
+                        sampleSkills["Aerial"] is not DBNull ||
+                        !Equals(sampleSkills["Charisma"], 72))
+                        throw new Exception("Skills Reset must restore original values.");
                 }
 
                 // The current Worker Editor has a single-column popup shell
