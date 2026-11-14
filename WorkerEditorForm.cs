@@ -1539,18 +1539,18 @@ internal sealed class WorkerEditorForm : UserControl
             Padding = new Padding(3, 3, 4, 2)
         };
 
-        var competitorLabel = TextLabel("Division");
+        var competitorLabel = TextLabel("Competing Division");
         competitorLabel.Dock = DockStyle.None;
         competitorLabel.Location = new Point(-3,32);
-        competitorLabel.Size = new Size(90, 22);
+        competitorLabel.Size = new Size(132, 22);
 
         var competitorValue = ValueBox(
             worker is null ? "" : WorkerFieldRules.Display(worker, "CompetesVs"),
             "WorkerField_CompetesVs");
 
         competitorValue.Dock = DockStyle.None;
-        competitorValue.Location = new Point(102, 32);
-        competitorValue.Size = new Size(160, 25);
+        competitorValue.Location = new Point(136, 32);
+        competitorValue.Size = new Size(130, 25);
 
         roles.Controls.Add(competitorLabel);
         Bind(competitorValue, worker, "CompetesVs");
