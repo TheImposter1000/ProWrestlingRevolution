@@ -432,10 +432,8 @@ internal sealed class WorkerSkillsEditor : UserControl
             Enabled = _canEdit,
             AccessibleName = label
         };
-        var balance = Button("Auto Balance", "SkillsAutoBalance", "balance", false);
         var reset = Button("Reset", "SkillsReset", "reset", false);
         var save = Button("Save", "SkillsSave", "save", true);
-        balance.Click += (_, _) => AutoBalance();
         reset.Click += (_, _) => ResetToLoadedValues();
         save.Click += (_, _) =>
         {
@@ -454,10 +452,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 100
         };
         footer.Disposed += (_, _) => tips.Dispose();
-        tips.SetToolTip(balance,
-            "Normalize the average of populated ratings to 50, keeping " +
-            "relative differences and leaving unset skills untouched. " +
-            "Review before Save.");
         tips.SetToolTip(reset,
             "Restore all 36 skills to their values when the worker was opened.");
         tips.SetToolTip(_preset,
@@ -467,7 +461,6 @@ internal sealed class WorkerSkillsEditor : UserControl
         footer.Controls.Add(presetLabel);
         footer.Controls.Add(_preset);
         footer.Controls.Add(_status);
-        footer.Controls.Add(balance);
         footer.Controls.Add(reset);
         footer.Controls.Add(save);
         void Arrange()
@@ -480,7 +473,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             int gap = w >= 1400 ? 18 : Math.Clamp(w / 120, 8, 13);
             int saveWidth = Math.Clamp((int)(w * .128), 120, 205);
             int resetWidth = Math.Clamp((int)(w * .120), 105, 192);
-            int balanceWidth = Math.Clamp((int)(w * .138), 135, 219);
             int right = w - 14;
 
             save.Bounds = new Rectangle(right - saveWidth, top,
@@ -488,9 +480,6 @@ internal sealed class WorkerSkillsEditor : UserControl
             right = save.Left - gap;
             reset.Bounds = new Rectangle(right - resetWidth, top,
                 resetWidth, buttonH);
-            right = reset.Left - gap;
-            balance.Bounds = new Rectangle(right - balanceWidth, top,
-                balanceWidth, buttonH);
 
             int labelWidth = Math.Clamp((int)(w * .06), 64, 95);
             presetLabel.Bounds = new Rectangle(33, top,
@@ -500,7 +489,7 @@ internal sealed class WorkerSkillsEditor : UserControl
             _preset.Bounds = new Rectangle(presetX, top + 5,
                 presetWidth, buttonH - 10);
             _status.Bounds = new Rectangle(_preset.Right + 12, top,
-                Math.Max(0, balance.Left - _preset.Right - 20), buttonH);
+                Math.Max(0, reset.Left - _preset.Right - 20), buttonH);
         }
         footer.SizeChanged += (_, _) => Arrange();
         Arrange();
@@ -554,43 +543,6 @@ internal sealed class WorkerSkillsEditor : UserControl
         _status.Text = "Preset applied. Review ratings before saving.";
     }
 
-    private void AutoBalance()
-    {
-        if (!_canEdit || !ValidateBeforeLeaving()) return;
-        var populated = _rows
-            .Select(pair => (pair.Key, Value: pair.Value.CurrentRating))
-            .Where(pair => pair.Value.HasValue)
-            .ToArray();
-        if (populated.Length == 0)
-        {
-            _status.Text = "Enter at least one rating to balance.";
-            return;
-        }
-
-        double average = populated.Average(item => item.Value!.Value);
-        int adjustment = (int)Math.Round(50 - average,
-            MidpointRounding.AwayFromZero);
-        if (adjustment == 0)
-        {
-            _status.Text = "Populated skill ratings already average 50.";
-            return;
-        }
-        if (MessageBox.Show(FindForm(),
-            "Shift populated skill ratings by " +
-            adjustment.ToString("+0;-0", CultureInfo.InvariantCulture) +
-            " points toward an average of 50? Differences remain " +
-            "proportional where possible, ratings stay within 0-100, " +
-            "and unset skills are unchanged. This is not saved until Save.",
-            "Auto Balance Skills", MessageBoxButtons.YesNo,
-            MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
-            != DialogResult.Yes)
-            return;
-
-        foreach (var (field, value) in populated)
-            SetRatingForSmoke(field, Math.Clamp(value!.Value + adjustment, 0, 100));
-        _preset?.SelectValue("None");
-        _status.Text = "Balance applied. Review ratings before saving.";
-    }
 
     private void UpdateSkill(string field, int? rating)
     {
