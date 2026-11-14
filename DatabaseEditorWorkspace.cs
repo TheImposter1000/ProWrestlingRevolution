@@ -1029,6 +1029,16 @@ return;
     /// approved Worker Editor screenshot. The database workspace and
     /// previously selected skin remain untouched underneath it.
     /// </summary>
+    /// <summary>Returns to the directory without leaving the editor page.</summary>
+    internal bool TryCloseWorkerProfile()
+    {
+        if (_workerOverlayCache is null || !_workerOverlayCache.Visible ||
+            _workerFormCache is null)
+            return false;
+        _workerFormCache.Close();
+        return true; // A declined discard prompt must not send the player home.
+    }
+
     private void OpenWorkerPopup(PrwWorkerProfile profile)
     {
         System.Diagnostics.Debug.WriteLine(
@@ -1078,7 +1088,8 @@ return;
             TabStop = true
         };
 
-        var worker = new WorkerEditorForm(_paths, _skin, profile);
+        var worker = new WorkerEditorForm(_paths, _skin, profile,
+            _universe?.MdbPath, _password);
 
         _workerOverlayCache = overlay;
         _workerFormCache = worker;
@@ -1090,6 +1101,9 @@ return;
             // Hide the editor instead of destroying it.
             if (!overlay.IsDisposed)
                 overlay.Hide();
+
+            if (destination is null && !IsDisposed)
+                LoadRecords();
 
             if (destination is not null)
             {
@@ -1117,11 +1131,10 @@ return;
                       System.Environment.StackTrace);
 
                 if (ReferenceEquals(_workerOverlayCache, overlay))
-                    if (ReferenceEquals(_workerOverlayCache, overlay))
-                    {
-                        _workerOverlayCache = null;
-                        _workerFormCache = null;
-                    }
+                {
+                    _workerOverlayCache = null;
+                    _workerFormCache = null;
+                }
             };
 
             var timer = System.Diagnostics.Stopwatch.StartNew();
