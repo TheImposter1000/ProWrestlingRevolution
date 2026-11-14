@@ -248,15 +248,15 @@ internal sealed class WorkerSkillsEditor : UserControl
             BackColor = Color.Transparent, AutoScroll = true
         };
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        foreach (var skill in group.Skills)
+        for (int skillIndex = 0; skillIndex < group.Skills.Count; skillIndex++)
         {
+            var skill = group.Skills[skillIndex];
             rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 23));
             var rating = new SkillRatingRow(skill.Label, skill.Column,
                 InitialRating(skill.Column), _canEdit,
                 value => UpdateSkill(skill.Column, value));
             rating.Dock = DockStyle.Fill;
-            rows.Controls.Add(rating, 0, rows.RowCount - group.Skills.Count +
-                _rows.Count(row => group.Skills.Any(x => x.Column == row.Key)));
+            rows.Controls.Add(rating, 0, skillIndex);
             _rows.Add(skill.Column, rating);
         }
         inner.Controls.Add(rows, 0, 1);
@@ -306,6 +306,14 @@ internal sealed class WorkerSkillsEditor : UserControl
         reset.Click += (_, _) => ResetToLoadedValues();
         save.Click += (_, _) =>
         {
+            var invalidRow = _rows.Values
+                .Select(row => row.ValidateNumber())
+                .FirstOrDefault(result => result is not null);
+            if (invalidRow is not null)
+            {
+                _status.Text = invalidRow;
+                return;
+            }
             if (_invalid.Count > 0)
             {
                 _status.Text = "Correct the invalid numerical ratings before saving.";
@@ -318,6 +326,15 @@ internal sealed class WorkerSkillsEditor : UserControl
         action.Controls.Add(strip);
         return action;
     }
+
+    // In-memory test seam. A native MDB write must happen only on Save.
+    internal void SetRatingForSmoke(string field, int? value)
+    {
+        UpdateSkill(field, value);
+        _rows[field].SetRating(value);
+    }
+
+    internal void ResetForSmoke() => ResetToLoadedValues();
 
     private void UpdateSkill(string field, int? rating)
     {
@@ -535,6 +552,16 @@ internal sealed class WorkerSkillsEditor : UserControl
             table.Controls.Add(_slider, 1, 0);
             table.Controls.Add(_number, 2, 0);
             Controls.Add(table);
+        }
+
+        internal string? ValidateNumber()
+        {
+            string value = _number.Text.Trim();
+            if (value.Length == 0) return null;
+            return int.TryParse(value, NumberStyles.None,
+                       CultureInfo.InvariantCulture, out int number) &&
+                   number is >= 0 and <= 100
+                ? null : "Skill ratings must be whole numbers between 0 and 100.";
         }
 
         internal void SetRating(int? rating)
