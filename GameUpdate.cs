@@ -60,9 +60,23 @@ internal static class GameUpdate
     private sealed record Release(Version Version, string Tag, Uri DownloadUrl,
         long Size, string Sha256);
 
-    internal static async Task CheckAndInstallAsync(Form owner, Button button)
+    internal static Task CheckAndInstallAsync(Form owner, Button button) =>
+        CheckAndInstallCoreAsync(owner, button, automatic: false, null);
+
+    /// <summary>
+    /// Called only from the real launcher after it becomes visible. Unattended
+    /// installation is permitted exclusively while the untouched title screen
+    /// is active. If a player navigates away during download, the pending
+    /// automatic install is skipped so no edits can be lost.
+    /// </summary>
+    internal static Task AutoInstallIfNewerAsync(
+        Form owner, Button button, Func<bool> stillOnTitleScreen) =>
+        CheckAndInstallCoreAsync(owner, button, automatic: true, stillOnTitleScreen);
+
+    private static async Task CheckAndInstallCoreAsync(
+        Form owner, Button button, bool automatic, Func<bool>? mayInstall)
     {
-        if (!button.Enabled) return;
+        if (owner.IsDisposed || button.IsDisposed || !button.Enabled) return;
         string priorLabel = button.Text;
         string? staging = null;
         bool handedOff = false;
@@ -70,19 +84,31 @@ internal static class GameUpdate
 
         try
         {
+            var runningExe = Environment.ProcessPath
+                ?? throw new InvalidOperationException("Cannot identify the running application.");
+            // Never overwrite the current Visual Studio output. Development
+            // builds update only from source control.
+            if (automatic && (IsSourceBuildOutput(runningExe) ||
+                !Path.GetFileName(runningExe).Equals(
+                    AssetName, StringComparison.OrdinalIgnoreCase)))
+                return;
+
             button.Text = "Checking...";
             var release = await FetchLatestAsync();
+            if (owner.IsDisposed || button.IsDisposed ||
+                (automatic && mayInstall?.Invoke() != true))
+                return;
+
             if (release.Version <= InstalledVersion)
             {
-                MessageBox.Show(owner,
-                    $"Pro Wrestling Revolution v{DisplayVersion} is up to date.",
-                    "Check for Updates", MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                if (!automatic)
+                    MessageBox.Show(owner,
+                        $"Pro Wrestling Revolution v{DisplayVersion} is up to date.",
+                        "Check for Updates", MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 return;
             }
 
-            var runningExe = Environment.ProcessPath
-                ?? throw new InvalidOperationException("Cannot identify the running application.");
             if (IsSourceBuildOutput(runningExe))
             {
                 MessageBox.Show(owner,
@@ -96,15 +122,18 @@ internal static class GameUpdate
                 return;
             }
 
-            var choice = MessageBox.Show(owner,
-                $"Installed version: v{DisplayVersion}\n" +
-                $"Available version: {release.Tag}\n\n" +
-                "Download and install this update now?\n\n" +
-                "The game will close and restart. Your databases, saved careers, " +
-                "skins, pictures, and system settings will not be changed.",
-                "Pro Wrestling Revolution Update",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (choice != DialogResult.Yes) return;
+            if (!automatic)
+            {
+                var choice = MessageBox.Show(owner,
+                    $"Installed version: v{DisplayVersion}\n" +
+                    $"Available version: {release.Tag}\n\n" +
+                    "Download and install this update now?\n\n" +
+                    "The game will close and restart. Your databases, saved careers, " +
+                    "skins, pictures, and system settings will not be changed.",
+                    "Pro Wrestling Revolution Update",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (choice != DialogResult.Yes) return;
+            }
 
             if (!Path.GetFileName(runningExe).Equals(
                 "ProWrestlingRevolution.exe", StringComparison.OrdinalIgnoreCase))
@@ -118,6 +147,11 @@ internal static class GameUpdate
             button.Text = "Downloading...";
             var candidate = Path.Combine(staging, "new-version.exe");
             await DownloadVerifiedAsync(release, candidate);
+            // Do not close an active player session just because an automatic
+            // download completed while the player was opening the editor.
+            if (owner.IsDisposed || button.IsDisposed ||
+                (automatic && mayInstall?.Invoke() != true))
+                return;
 
             button.Text = "Preparing...";
             ValidateApplication(candidate);
@@ -160,6 +194,8 @@ internal static class GameUpdate
             start.ArgumentList.Add(candidate);
             start.ArgumentList.Add(release.Tag);
 
+            if (automatic && mayInstall?.Invoke() != true)
+                return;
             if (Process.Start(start) is null)
                 throw new IOException("Could not start the update installer.");
 
@@ -169,16 +205,26 @@ internal static class GameUpdate
         }
         catch (Exception error)
         {
-            MessageBox.Show(owner,
-                "The update was not installed. Your existing game and saved files are unchanged.\n\n" +
-                error.Message,
-                "Update Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (automatic)
+            {
+                // An offline machine or temporary GitHub error must not prevent
+                // the title screen from opening. Manual Check for Updates still
+                // shows actionable diagnostics.
+                Trace.WriteLine("PWR automatic update was skipped: " + error);
+            }
+            else if (!owner.IsDisposed)
+            {
+                MessageBox.Show(owner,
+                    "The update was not installed. Your existing game and saved files are unchanged.\n\n" +
+                    error.Message,
+                    "Update Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
         finally
         {
             if (!handedOff && staging is not null)
                 TryDeleteDirectory(staging);
-            if (!owner.IsDisposed)
+            if (!owner.IsDisposed && !button.IsDisposed)
             {
                 button.Text = priorLabel;
                 button.Enabled = true;
