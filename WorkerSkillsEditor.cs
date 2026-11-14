@@ -310,23 +310,15 @@ internal sealed class WorkerSkillsEditor : UserControl
         strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142));
         strip.Controls.Add(_status, 0, 0);
 
-        Button MakeButton(string text, string name, bool primary)
-        {
-            var button = new Button
+        Button MakeButton(string text, string name, bool primary) =>
+            new SkillActionButton(primary)
             {
                 Name = name, Dock = DockStyle.Fill, Text = text,
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 Margin = new Padding(4, 0, 4, 0),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = primary ? Color.FromArgb(11, 112, 174) : Color.FromArgb(17, 42, 67),
                 ForeColor = Color.White, Cursor = Cursors.Hand,
                 Enabled = _canEdit
             };
-            button.FlatAppearance.BorderColor = Edge;
-            button.FlatAppearance.BorderSize = primary ? 2 : 1;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(21, 123, 188);
-            return button;
-        }
 
         var reset = MakeButton("Reset", "SkillsReset", false);
         var save = MakeButton("Save", "SkillsSave", true);
@@ -486,6 +478,64 @@ internal sealed class WorkerSkillsEditor : UserControl
             e.Graphics.FillRectangle(brush, rect);
             using var line = new Pen(Edge);
             e.Graphics.DrawLine(line, 0, Height - 1, Width, Height - 1);
+        }
+    }
+
+    private sealed class SkillActionButton : Button
+    {
+        private readonly bool _primary;
+        private bool _hover;
+
+        internal SkillActionButton(bool primary)
+        {
+            _primary = primary;
+            SetStyle(ControlStyles.UserPaint |
+                     ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hover = false;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var rect = ClientRectangle;
+            if (rect.Width < 5 || rect.Height < 5) return;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Color top = _primary
+                ? _hover ? Color.FromArgb(44, 179, 237)
+                         : Color.FromArgb(33, 147, 222)
+                : _hover ? Color.FromArgb(38, 97, 155)
+                         : Color.FromArgb(26, 63, 103);
+            Color bottom = _primary
+                ? Color.FromArgb(5, 86, 160)
+                : Color.FromArgb(10, 30, 56);
+            using var fill = new LinearGradientBrush(rect, top, bottom,
+                LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(fill, rect);
+            using var outline = new Pen(
+                _primary ? Edge : Color.FromArgb(124, 174, 217),
+                _primary ? 2f : 1f);
+            e.Graphics.DrawRectangle(outline, 1, 1,
+                rect.Width - 3, rect.Height - 3);
+            TextRenderer.DrawText(e.Graphics, Text, Font, rect,
+                Enabled ? Color.White : Color.FromArgb(156, 177, 197),
+                TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         }
     }
 
