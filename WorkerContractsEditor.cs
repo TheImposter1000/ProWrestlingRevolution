@@ -1069,9 +1069,9 @@ internal sealed class WorkerContractsEditor : UserControl
                     ? Unavailable(field.Label)
                     : Input(row, field.Field, field.Kind);
                 input.Bounds = new Rectangle(textWidth + 11, y,
-                    Math.Max(100, inner - textWidth), 27);
+                    Math.Max(100, inner - textWidth), 25);
                 body.Controls.Add(input);
-                y += 30;
+                y += 27;
             }
             body.AutoScrollMinSize = new Size(0, y + 3);
         }
