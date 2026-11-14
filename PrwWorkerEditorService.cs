@@ -84,7 +84,8 @@ internal static class PrwWorkerEditorService
 
     private static bool IsProtectedColumn(PrwSchema.Table table, string field) =>
         table.KeyColumns.Contains(field, StringComparer.OrdinalIgnoreCase) ||
-        field.EndsWith("UID", StringComparison.OrdinalIgnoreCase);
+        (field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) &&
+         field != "LoyaltyWorkerUID");
 
     private static string[] EditedFields(DataRow row)
     {
