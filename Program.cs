@@ -38,8 +38,14 @@ internal static class Program
         {
             Console.Error.WriteLine(e);
             if (!args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
-                MessageBox.Show(e.Message + "\n\nIf the folder is protected, extract the game to a writable location.",
+            {
+                string folderHelp = e is IOException or UnauthorizedAccessException
+                    or System.Security.SecurityException
+                    ? "\n\nIf the folder is protected, extract the game to a writable location."
+                    : "";
+                MessageBox.Show(e.Message + folderHelp,
                     "Pro Wrestling Revolution", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
             return 1;
         }
     }
@@ -102,6 +108,19 @@ internal static class Program
             var originalIni = Path.Combine(paths.SystemRoot, "settings.ini");
             File.WriteAllText(originalIni, "Skin=Real\nDatabase=MDB\n", Encoding.UTF8);
             paths.EnsureLayout();
+            string workerBackground = Path.Combine(paths.SkinsRoot,
+                "Obsidian", "Backgrounds", "Worker_Editor.jpg");
+            if (!File.Exists(workerBackground))
+                throw new Exception("The PWR Worker Editor background was not installed.");
+            var preparedBackground = WorkerBackgroundCache
+                .GetAsync(workerBackground).GetAwaiter().GetResult();
+            if (preparedBackground is null ||
+                preparedBackground.Width != SkinArt.WindowWidth ||
+                preparedBackground.Height != SkinArt.WindowHeight ||
+                !ReferenceEquals(preparedBackground,
+                    WorkerBackgroundCache.GetAsync(workerBackground)
+                        .GetAwaiter().GetResult()))
+                throw new Exception("Worker background could not be decoded and cached.");
             // A release build embeds and installs the editor label database.
             // Local developer builds without the Java generator keep fallback labels.
             if (typeof(EditorMetadataTemplate).Assembly
@@ -433,6 +452,11 @@ internal static class Program
                     throw new Exception("Worker Editor fixed general layout is missing.");
                 if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
                     throw new Exception("Worker Editor must not add an extra Back to Database button.");
+                if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true)
+                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity" ||
+                    workerEditor.Controls.Find("WorkerField_BiographyType", true)
+                        .SingleOrDefault()?.Parent?.Name != "WorkerIdentity")
+                    throw new Exception("Picture Type must sit alongside the worker portrait.");
                 if (workerEditor.Controls.Find("WorkerSection_Skills", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_Contracts", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSection_AlterEgo", true).Length != 1)
@@ -462,6 +486,24 @@ internal static class Program
                     if (editableWorker.Controls.Find("WorkerField_Name", true)
                             .SingleOrDefault()?.AccessibleRole != AccessibleRole.PushButton)
                         throw new Exception("Worker name must be an accessible editing control.");
+
+                    // Simulate consecutive dropdown openings. Both must use
+                    // the same live themed menu; Closed must never dispose it.
+                    var getter = typeof(WorkerEditorForm).GetMethod("GetFieldMenu",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)
+                        ?? throw new Exception("The Worker menu factory is missing.");
+                    var original = getter.Invoke(editableWorker, null)
+                        as ContextMenuStrip
+                        ?? throw new Exception("The Worker dropdown is missing.");
+                    original.Items.Add(new ToolStripMenuItem("Regression Choice"));
+                    var again = getter.Invoke(editableWorker, null) as ContextMenuStrip;
+                    if (!ReferenceEquals(original, again) ||
+                        again is null || again.IsDisposed ||
+                        again.Renderer is not ToolStripProfessionalRenderer ||
+                        again.Items.Count != 0 ||
+                        again.BackColor == SystemColors.Control)
+                        throw new Exception("Worker dropdown theme/lifetime regression.");
                 }
 
                 // The current Worker Editor has a single-column popup shell
