@@ -449,7 +449,8 @@ internal sealed class WorkerContractsEditor : UserControl
 
     private sealed class ContractGrid : DataGridView
     {
-        internal Image? Artwork { get; set; }
+        // Not a designer-serialized property; artwork is prepared at runtime.
+        internal Image? Artwork;
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
