@@ -480,7 +480,7 @@ internal sealed class SkillNumberSpinner : UserControl
             TextAlign = HorizontalAlignment.Center,
             ForeColor = Color.White,
             BackColor = Color.FromArgb(12, 34, 59),
-            Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 11.8f, FontStyle.Bold),
             TabStop = canEdit, ReadOnly = !canEdit
         };
         Controls.Add(_editor);
@@ -628,7 +628,7 @@ internal sealed class SkillChromeButton : Button
                  ControlStyles.ResizeRedraw, true);
         BackColor = SkillChrome.Ink;
         ForeColor = Color.White;
-        Font = new Font("Segoe UI", 11f, FontStyle.Bold);
+        Font = new Font("Segoe UI", 12.7f, FontStyle.Bold);
         Cursor = Cursors.Hand;
     }
 
