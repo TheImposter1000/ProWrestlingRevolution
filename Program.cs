@@ -766,6 +766,20 @@ internal static class Program
                                 rows.Padding.Right + 3))
                             throw new Exception(
                                 "Compact Skills rating inputs exceed the panel's right gutter.");
+                        foreach (Control rating in rows.Controls)
+                        {
+                            // Inspect nested controls without relying on a prefix search.
+                            var numeric = rating.Controls.Cast<Control>()
+                                .SelectMany(child => child.Controls.Cast<Control>())
+                                .OfType<SkillNumberSpinner>().FirstOrDefault();
+                            if (numeric is null ||
+                                numeric.Margin.Top < 2 ||
+                                numeric.Margin.Bottom < 2 ||
+                                numeric.Controls.OfType<TextBox>().Any(editor =>
+                                    editor.Top < 0 || editor.Bottom > numeric.Height))
+                                throw new Exception(
+                                    "Compact Skills numeric editors touch or overflow adjacent rows.");
+                        }
                     }
                     var longestSkill = compactSkills.Controls
                         .Find("SkillLabel_PotentialFundamentals", true)
