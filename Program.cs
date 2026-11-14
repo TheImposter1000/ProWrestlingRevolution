@@ -720,7 +720,7 @@ internal static class Program
                         // Reference comparison is authored for a 1650x928
                         // desktop; render a wide editor viewport separately
                         // from the actual 1366px in-game smoke layout.
-                        Size = new System.Drawing.Size(1590, 820)
+                        Size = new System.Drawing.Size(1672, 885)
                     };
                     editableSkillsPreview.CreateControl();
                     editableSkillsPreview.PerformLayout();
