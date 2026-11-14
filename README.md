@@ -1,5 +1,15 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.0: functional database and worker editing
+
+The Worker Editor supports typed field changes, role and active-area toggles, biography editing, name suggestions and assignment of a default moveset reference. Save writes modified native worker records in a transaction after creating an MDB backup, checks for external edits, and keeps protected IDs unchanged. Full moveset definitions still require their own data model.
+
+The Database Editor now supports Add New Item, Copy Item(s), Delete Item(s), and Import Items for verified native PWR Workers, Companies, and Match Types. The operations create a backup, preserve declared linked details when copying/importing, and avoid duplicating employment contracts. Deleting records also deletes declared dependent records after explicit confirmation. For external or incompatible MDBs, these native editing operations are not offered; browsing and existing supported tools remain available.
+
+Back and Escape now return from the Worker Editor to the Database Editor before taking the player to the main menu. The four top-right utility buttons are anchored to the actual header width. Check for Updates continues to install only the standalone EXE; the complete ZIP is for first-time installs, not updates.
+
+**Important:** This is still an editor and application-shell milestone. Full gameplay simulation and career loading remain separate tasks. Test edits on a copied MDB until validation with your installed Access provider is complete.
+
 An original Windows desktop wrestling management project. Version 0.5.20 separates standalone EXE updates from the complete game installation.
 
 ## Version 0.5.20: standalone EXE updates
