@@ -24,6 +24,10 @@ internal static class WorkerFieldRules
         ["None", "Passable", "Basic", "Fluent"];
     internal static readonly string[] Divisions =
         ["Men's Division", "Women's Division", "Both Divisions"];
+    // PRWDefault.mdb stores longer labels in the native text column.
+    // Keep these exact legacy strings while showing concise UI labels.
+    internal static readonly string[] DivisionStorage =
+        ["Men's Division Only", "Women's Division Only", "Both Divisions"];
 
     internal static bool IsDate(string field) => Dates.Contains(field);
     internal static bool IsLanguage(string field) =>
@@ -67,6 +71,15 @@ internal static class WorkerFieldRules
             int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),
                 out int level) && level is >= 0 and < 4)
             return LanguageLevels[level];
+        if (field == "CompetesVs" && value is string divisionText)
+        {
+            for (int index = 0; index < DivisionStorage.Length; index++)
+                if (divisionText.Equals(DivisionStorage[index],
+                        StringComparison.OrdinalIgnoreCase) ||
+                    divisionText.Equals(Divisions[index],
+                        StringComparison.OrdinalIgnoreCase))
+                    return Divisions[index];
+        }
         if (field == "CompetesVs" && value is not string &&
             int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),
                 out int division) && division is >= 0 and < 3)
@@ -80,7 +93,8 @@ internal static class WorkerFieldRules
     internal static object ChoiceValue(DataColumn column, string field, string label,
         int index)
     {
-        if (column.DataType == typeof(string)) return label;
+        if (column.DataType == typeof(string))
+            return field == "CompetesVs" ? DivisionStorage[index] : label;
         // Legacy PRW numeric enum storage uses zero-based codes. We keep the
         // storage type intact; unlike textual labels, numeric indices are not
         // to be changed without a database migration.
