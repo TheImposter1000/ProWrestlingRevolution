@@ -1,6 +1,7 @@
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 
 namespace ProWrestlingRevolution;
@@ -24,19 +25,18 @@ internal sealed class WorkerEditorForm : UserControl
 
     private readonly AppPaths _paths;
     private readonly SkinPalette _palette;
-    private readonly PrwWorkerProfile _profile;
+    private PrwWorkerProfile _profile;
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Ink };
-    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty };
-    private readonly Panel _mainRail = new() { Name = "WorkerMainMenuRail", Dock = DockStyle.Fill, Margin = Padding.Empty };
-    private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Color.Transparent };
+    private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
+    private readonly Panel _body = new() { Name = "WorkerEditorBody", Dock = DockStyle.Fill, Margin = Padding.Empty, BackColor = Color.Transparent };
     private readonly ToolTip _tips = new() { InitialDelay = 350, ReshowDelay = 80 };
     private string _active = "General";
     private int _recordIndex;
     private readonly Font _railNormal = new("Segoe UI", 10f);
     private readonly Font _railActive = new("Segoe UI", 10f, FontStyle.Bold);
     private readonly Dictionary<string, SidebarMenuRow> _mainMenuIcons = new();
-    private readonly Panel _mainArea = new() { Name = "WorkerGeneralCanvas", BackColor = Ink };
+    private readonly Panel _mainArea = new() { Name = "WorkerGeneralCanvas", BackColor = Color.Transparent };
     private readonly Panel _actionArea = new() { Name = "WorkerActionArea", BackColor = Color.Transparent };
     private TableLayoutPanel? _identityBiography;
 
@@ -67,8 +67,19 @@ internal sealed class WorkerEditorForm : UserControl
             e.Handled = true;
         };
 
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
         BuildFrame();
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Worker Editor BuildFrame: {timer.ElapsedMilliseconds} ms");
+
+        timer.Restart();
+
         ShowSection("General");
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Worker Editor ShowSection: {timer.ElapsedMilliseconds} ms");
         Disposed += (_, _) =>
         {
             _tips.Dispose();
@@ -85,6 +96,37 @@ internal sealed class WorkerEditorForm : UserControl
     {
         Location = Point.Empty;
         Size = host.ClientSize;
+    }
+
+    internal void LoadProfile(PrwWorkerProfile profile)
+    {
+        _profile = profile;
+        RequestedNavigation = null;
+
+        if (_identityBiography is TableLayoutPanel top)
+        {
+            top.SuspendLayout();
+
+            foreach (Control old in top.Controls.Cast<Control>().ToArray())
+            {
+                var portrait = old.Controls
+                    .Find("WorkerPicture", true)
+                    .OfType<PictureBox>()
+                    .FirstOrDefault();
+
+                portrait?.Image?.Dispose();
+
+                top.Controls.Remove(old);
+                old.Dispose();
+            }
+
+            BuildIdentity(top);
+            BuildBiography(top);
+
+            top.ResumeLayout(true);
+        }
+
+        ShowSection("General");
     }
 
     private void RequestMainMenu(string key)
@@ -110,32 +152,130 @@ internal sealed class WorkerEditorForm : UserControl
             Name = name,
             Dock = DockStyle.Fill,
             Margin = new Padding(3),
-            Padding = new Padding(0, 27, 0, 0),
-            BackColor = Dark
+            Padding = new Padding(1, 27, 1, 1),
+            BackColor = Color.FromArgb(11, 26, 42)
         };
+
         card.Paint += (_, e) =>
         {
+            var rect = new Rectangle(
+                0, 0, card.ClientSize.Width - 1,
+                card.ClientSize.Height - 1);
+
+            if (rect.Width < 13 || rect.Height < 13)
+                return;
+
+            const int radius = 6;
+            int diameter = radius * 2;
+
+            using var path = new GraphicsPath();
+
+            path.AddArc(rect.Left, rect.Top,
+                diameter, diameter, 180, 90);
+
+            path.AddArc(rect.Right - diameter, rect.Top,
+                diameter, diameter, 270, 90);
+
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            path.AddArc(rect.Left, rect.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            path.CloseFigure();
+
+            using var gradient = new LinearGradientBrush(
+                rect,
+                Color.FromArgb(210, 28, 35, 47),
+                Color.FromArgb(220, 14, 22, 34),
+                LinearGradientMode.Vertical);
+
+            e.Graphics.FillPath(gradient, path);
+
             using var pen = new Pen(Edge);
-            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+
+            e.Graphics.DrawLine(pen,
+                rect.Left, rect.Top + radius,
+                rect.Left, rect.Bottom - radius);
+
+            e.Graphics.DrawArc(pen,
+                rect.Left, rect.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            e.Graphics.DrawLine(pen,
+                rect.Left + radius, rect.Bottom,
+                rect.Right - radius, rect.Bottom);
+
+            e.Graphics.DrawArc(pen,
+                rect.Right - diameter, rect.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            e.Graphics.DrawLine(pen,
+                rect.Right, rect.Bottom - radius,
+                rect.Right, rect.Top + radius);
         };
+
         var heading = new Panel
         {
             Dock = DockStyle.None,
             Location = Point.Empty,
-            Height = 27, Width = Math.Max(1, card.Width),
+            Height = 30,
+            Width = Math.Max(1, card.Width),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Header,
+            BackColor = Color.Transparent,
             Name = name + "Heading"
         };
         heading.Paint += (_, e) =>
         {
-            var rect = new Rectangle(0, 0, Math.Max(1, heading.Width), Math.Max(1, heading.Height));
-            using var gradient = new LinearGradientBrush(rect,
-                Color.FromArgb(36, 91, 144), Color.FromArgb(23, 54, 85), LinearGradientMode.Vertical);
-            e.Graphics.FillRectangle(gradient, rect);
+            int width = heading.ClientSize.Width;
+            int height = heading.ClientSize.Height;
+
+            if (width < 12 || height < 12)
+                return;
+
+            const int diameter = 10;
+
+            using var path = new GraphicsPath();
+
+            path.AddArc(0, 0, diameter, diameter, 180, 90);
+            path.AddArc(width - diameter - 1, 0,
+                diameter, diameter, 270, 90);
+
+            path.AddLine(width - 1, height - 1, 0, height - 1);
+            path.CloseFigure();
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using var gradient = new LinearGradientBrush(
+                new Rectangle(0, 0, width, height),
+                Color.FromArgb(36, 91, 144),
+                Color.FromArgb(23, 54, 85),
+                LinearGradientMode.Vertical);
+
+            e.Graphics.FillPath(gradient, path);
+
             using var pen = new Pen(Accent);
-            e.Graphics.DrawLine(pen, 0, heading.Height - 1, heading.Width, heading.Height - 1);
+            e.Graphics.DrawLine(
+                pen, 0, height - 1, width - 1, height - 1);
+            using var edgePen = new Pen(Edge);
+
+            e.Graphics.DrawArc(
+                edgePen, 0, 0,
+                diameter, diameter, 180, 90);
+
+            e.Graphics.DrawArc(
+                edgePen, width - diameter - 1, 0,
+                diameter, diameter, 270, 90);
+
+            e.Graphics.DrawLine(
+                edgePen, 0, diameter / 2,
+                0, height - 1);
+
+            e.Graphics.DrawLine(
+                edgePen, width - 1, diameter / 2,
+                width - 1, height - 1);
         };
+  
         string symbol = title switch
         {
             "Personal Data" => "▤",
@@ -176,8 +316,10 @@ internal sealed class WorkerEditorForm : UserControl
         internal WorkerSectionButton()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.UserPaint, true);
+    ControlStyles.OptimizedDoubleBuffer |
+    ControlStyles.UserPaint, true);
+            BackColor = Color.FromArgb(11, 24, 39);
+            BackColor = Color.Transparent;
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             Cursor = Cursors.Hand;
@@ -202,7 +344,65 @@ internal sealed class WorkerEditorForm : UserControl
         protected override void OnPaint(PaintEventArgs e)
         {
             if (Width < 3 || Height < 3) return;
+
+            Control? page = Parent;
+
+            while (page != null && page.Name != "WorkerPage")
+                page = page.Parent;
+
+            if (page?.BackgroundImage is Image artwork &&
+                page.ClientSize.Width > 0 &&
+                page.ClientSize.Height > 0)
+            {
+                int x = Left;
+                int y = Top;
+
+                for (Control? current = Parent;
+                     current != null && current != page;
+                     current = current.Parent)
+                {
+                    x += current.Left;
+                    y += current.Top;
+                }
+
+                float scaleX = (float)artwork.Width / page.ClientSize.Width;
+                float scaleY = (float)artwork.Height / page.ClientSize.Height;
+
+                e.Graphics.DrawImage(
+                    artwork,
+                    ClientRectangle,
+                    x * scaleX,
+                    y * scaleY,
+                    Width * scaleX,
+                    Height * scaleY,
+                    GraphicsUnit.Pixel);
+            }
+            else
+            {
+                e.Graphics.Clear(BackColor);
+            }
+
             var area = new Rectangle(0, 0, Width, Height);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
+            int radius = 6;
+            int diameter = radius * 2;
+
+            using var rounded = new GraphicsPath();
+
+            rounded.AddArc(bounds.Left, bounds.Top,
+                diameter, diameter, 180, 90);
+
+            rounded.AddArc(bounds.Right - diameter, bounds.Top,
+                diameter, diameter, 270, 90);
+
+            rounded.AddArc(bounds.Right - diameter, bounds.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            rounded.AddArc(bounds.Left, bounds.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            rounded.CloseFigure();
             var upper = Active
                 ? Color.FromArgb(35, 155, 217)
                 : _hover ? Color.FromArgb(40, 69, 101)
@@ -213,9 +413,9 @@ internal sealed class WorkerEditorForm : UserControl
                     : Color.FromArgb(13, 25, 40);
             using (var brush = new LinearGradientBrush(area, upper, lower,
                 LinearGradientMode.Vertical))
-                e.Graphics.FillRectangle(brush, area);
+                e.Graphics.FillPath(brush, rounded);
             using (var outline = new Pen(Active ? Accent : Edge, Active ? 1.5f : 1f))
-                e.Graphics.DrawRectangle(outline, 1, 1, Width - 3, Height - 3);
+                e.Graphics.DrawPath(outline, rounded);
             TextRenderer.DrawText(e.Graphics, Text, Font, area, Color.White,
                 TextFormatFlags.HorizontalCenter |
                 TextFormatFlags.VerticalCenter |
@@ -254,21 +454,56 @@ internal sealed class WorkerEditorForm : UserControl
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
             AccessibleRole = AccessibleRole.StaticText;
-            BackColor = FieldInk;
+            BackColor = Color.FromArgb(11, 24, 39);
             ForeColor = Color.FromArgb(11, 28, 42);
             Font = new Font("Segoe UI", 9.15f, FontStyle.Bold);
         }
 
         protected override void OnPaint(PaintEventArgs e)
-        {
+        { 
             var rect = ClientRectangle;
-            if (rect.Width < 3 || rect.Height < 3) return;
-            using var gradient = new LinearGradientBrush(rect,
-                Color.FromArgb(251, 252, 253), Color.FromArgb(228, 237, 245),
+
+            if (rect.Width < 14 || rect.Height < 14) return;
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var bounds = new Rectangle(
+                1, 1,
+                rect.Width - 3,
+                rect.Height - 3);
+
+            const int diameter = 10;
+
+            using var path = new GraphicsPath();
+
+            path.AddArc(bounds.Left, bounds.Top,
+                diameter, diameter, 180, 90);
+
+            path.AddArc(bounds.Right - diameter, bounds.Top,
+                diameter, diameter, 270, 90);
+
+            path.AddArc(bounds.Right - diameter,
+                bounds.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            path.AddArc(bounds.Left,
+                bounds.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            path.CloseFigure();
+
+            using var gradient = new LinearGradientBrush(bounds,
+                Color.FromArgb(255,255,255),
+                Color.FromArgb(205,220,235),
                 LinearGradientMode.Vertical);
-            e.Graphics.FillRectangle(gradient, rect);
-            using var border = new Pen(Color.FromArgb(110, 145, 170));
-            e.Graphics.DrawRectangle(border, 0, 0, rect.Width - 1, rect.Height - 1);
+
+            e.Graphics.FillPath(gradient, path);
+
+            using var border = new Pen(
+                Color.FromArgb(110, 145, 170), 1f);
+
+            e.Graphics.DrawPath(border, path);
+
             bool indicator = DropDownIndicator || CalendarIndicator || SpinnerIndicator;
             var textArea = new Rectangle(5, 0,
                 Math.Max(1, rect.Width - (indicator ? 20 : 8)), rect.Height);
@@ -352,164 +587,14 @@ internal sealed class WorkerEditorForm : UserControl
             Dock = DockStyle.Fill,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
-            RowCount = 2,
-            ColumnCount = 2,
+            RowCount = 1,
+            ColumnCount = 1,
             BackColor = Ink
         };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 61));
+
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         Controls.Add(shell);
-
-        var title = new Panel
-        {
-            Name = "WorkerEditorHeader", Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(16, 30, 49),
-            Margin = Padding.Empty
-        };
-        title.Paint += (_, e) =>
-        {
-            var rect = new Rectangle(0, 0, Math.Max(1, title.Width), Math.Max(1, title.Height));
-            using var gradient = new LinearGradientBrush(rect,
-                Color.FromArgb(10, 22, 38), Color.FromArgb(32, 63, 97),
-                LinearGradientMode.Horizontal);
-            e.Graphics.FillRectangle(gradient, rect);
-            using var border = new Pen(Accent, 1);
-            e.Graphics.DrawLine(border, 0, title.Height - 1, title.Width, title.Height - 1);
-        };
-        shell.Controls.Add(title, 0, 0);
-        shell.SetColumnSpan(title, 2);
-
-        var logo = new Panel
-        {
-            Name = "WorkerBrand", Dock = DockStyle.Left,
-            Width = 300, BackColor = Color.Transparent
-        };
-        logo.Paint += (_, args) =>
-        {
-            var g = args.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var swoosh = new Pen(Color.FromArgb(31, 155, 225), 2.4f);
-            g.DrawArc(swoosh, new Rectangle(18, 3, 111, 28), 188, 143);
-            using var large = new Font("Segoe UI", 28f, FontStyle.Bold | FontStyle.Italic);
-            using var small = new Font("Segoe UI", 9.3f, FontStyle.Bold | FontStyle.Italic);
-            using var white = new SolidBrush(Color.White);
-            g.DrawString("PWR", large, white, new PointF(19, -7));
-            g.DrawString("PRO WRESTLING", small, white, new PointF(133, 5));
-            g.DrawString("REVOLUTION", small, white, new PointF(133, 20));
-            using var cyan = new Pen(Accent, 1f);
-            g.DrawLine(cyan, 283, 6, 283, 34);
-        };
-        var pageHeading = new Label
-        {
-            Name = "WorkerEditorHeading",
-            Text = "Worker Editor     /     Edit Worker",
-            Font = new Font("Segoe UI", 13.2f, FontStyle.Bold),
-            ForeColor = Color.White,
-            Dock = DockStyle.Left, Width = 460,
-            TextAlign = ContentAlignment.MiddleLeft,
-            BackColor = Color.Transparent
-        };
-        var close = new Button
-        {
-            Name = "WorkerClose", Text = "×",
-            Dock = DockStyle.Right, Width = 42,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(12, 25, 41),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 17f, FontStyle.Regular),
-            Cursor = Cursors.Hand
-        };
-        close.FlatAppearance.BorderSize = 0;
-        close.Click += (_, _) => Close();
-        var minimize = new Button
-        {
-            Name = "WorkerMinimize", Text = "−",
-            Dock = DockStyle.Right, Width = 37,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.Transparent, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 15f),
-            Cursor = Cursors.Hand
-        };
-        minimize.FlatAppearance.BorderSize = 0;
-        minimize.Click += (_, _) =>
-        {
-            if (FindForm() is Form owner)
-                owner.WindowState = FormWindowState.Minimized;
-        };
-        var maximize = new Button
-        {
-            Name = "WorkerMaximize", Text = "□",
-            Dock = DockStyle.Right, Width = 37,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.Transparent, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 16f),
-            Cursor = Cursors.Hand
-        };
-        maximize.FlatAppearance.BorderSize = 0;
-        maximize.Click += (_, _) =>
-        {
-            if (FindForm() is Form owner)
-                owner.WindowState = owner.WindowState == FormWindowState.Maximized
-                    ? FormWindowState.Normal : FormWindowState.Maximized;
-        };
-        var help = new Button
-        {
-            Name = "WorkerHelp", Text = "?",
-            Dock = DockStyle.Right, Width = 36,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.Transparent, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 13f, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        help.FlatAppearance.BorderSize = 0;
-        help.Click += (_, _) => MessageBox.Show(this,
-            "Select a section on the left to view the worker's information. " +
-            "Saving and data generation will be enabled when the database " +
-            "editing layer is available.", "Worker Editor Help",
-            MessageBoxButtons.OK, MessageBoxIcon.Information);
-        var settings = new Button
-        {
-            Name = "WorkerSettingsButton", Text = "⚙",
-            Dock = DockStyle.Right, Width = 39,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.Transparent, ForeColor = Color.White,
-            Font = new Font("Segoe UI Symbol", 15f),
-            Cursor = Cursors.Hand
-        };
-        settings.FlatAppearance.BorderSize = 0;
-        settings.Click += (_, _) => RequestMainMenu("skins");
-        pageHeading.Cursor = Cursors.Hand;
-        _tips.SetToolTip(pageHeading, "Return to General worker information");
-        pageHeading.Click += (_, _) => ShowSection("General");
-        title.Controls.Add(pageHeading);
-        title.Controls.Add(logo);
-        title.Controls.Add(help);
-        title.Controls.Add(settings);
-        title.Controls.Add(minimize);
-        title.Controls.Add(maximize);
-        title.Controls.Add(close);
-
-        _mainRail.BackColor = Color.FromArgb(11, 25, 41);
-        var navTips = _tips;
-        // Reuse the exact PWR icon artwork and command keys on the rail.
-        foreach (var (key, label, y) in SkinArt.MenuIcons)
-        {
-            var item = new SidebarMenuRow(key, label, _palette, _railNormal, _railActive)
-            {
-                Name = "WorkerMenu_" + key,
-                IconOnly = true,
-                Location = new Point(0, Math.Max(0, y - 40 - 27)),
-                Width = 61
-            };
-            item.UpdateAppearance(_palette, false, key == "editor");
-            item.Click += (_, _) => RequestMainMenu(key);
-            navTips.SetToolTip(item, label);
-            _mainRail.Controls.Add(item);
-            _mainMenuIcons[key] = item;
-        }
-        shell.Controls.Add(_mainRail, 0, 1);
 
         var page = new TableLayoutPanel
         {
@@ -521,12 +606,17 @@ internal sealed class WorkerEditorForm : UserControl
             Padding = Padding.Empty,
             BackColor = Ink
         };
+        string backgroundPath = _palette.Asset(
+    Path.Combine("Backgrounds", "Worker_Editor.jpg"));
+
+        // Background image temporarily disabled for performance testing.
+
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        shell.Controls.Add(page, 1, 1);
+        shell.Controls.Add(page, 0, 0);
 
-        _sectionNavigation.BackColor = Color.FromArgb(11, 24, 39);
+        _sectionNavigation.BackColor = Color.Transparent;
         var sections = new[]
         {
             "Contracts", "Skills", "Popularity", "Attributes", "Business Skills",
@@ -539,7 +629,7 @@ internal sealed class WorkerEditorForm : UserControl
             {
                 Name = "WorkerSection_" + section.Replace(" ", ""),
                 Text = section,
-                Location = new Point(5, 13 + i * 44),
+                Location = new Point(8, 13 + i * 44),
                 Size = new Size(142, 39)
             };
             button.Click += (_, _) => ShowSection(section);
@@ -552,7 +642,7 @@ internal sealed class WorkerEditorForm : UserControl
         {
             var area = new Rectangle(0, 0, Math.Max(1, _body.Width), Math.Max(1, _body.Height));
             using var fill = new LinearGradientBrush(area,
-                Color.FromArgb(22, 38, 61), Color.FromArgb(8, 16, 30),
+                Color.Transparent, Color.Transparent,
                 LinearGradientMode.Vertical);
             e.Graphics.FillRectangle(fill, area);
         };
@@ -563,11 +653,81 @@ internal sealed class WorkerEditorForm : UserControl
             Name = "WorkerIdentityBiographyRow",
             ColumnCount = 2, RowCount = 1,
             Margin = Padding.Empty,
-            Padding = Padding.Empty
+            Padding = new Padding(3),
+            BackColor = Color.Transparent
         };
         top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 29.5f));
         top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70.5f));
         top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        top.Paint += (_, e) =>
+        {
+
+            var rect = new Rectangle(
+                0, 0,
+                top.ClientSize.Width - 3,
+                top.ClientSize.Height - 3);
+
+            if (rect.Width < 13 || rect.Height < 13)
+                return;
+
+            const int diameter = 12;
+            // Draw the correct portion of the Worker Editor background
+            // across the entire identity and biography row.
+            if (page.BackgroundImage is Image artwork &&
+                page.ClientSize.Width > 0 &&
+                page.ClientSize.Height > 0)
+            {
+                Point origin = Point.Empty;
+
+                for (Control? current = top;
+                     current != null && current != page;
+                     current = current.Parent)
+                {
+                    origin.Offset(current.Left, current.Top);
+                }
+
+                float scaleX = (float)artwork.Width / page.ClientSize.Width;
+                float scaleY = (float)artwork.Height / page.ClientSize.Height;
+
+                e.Graphics.DrawImage(
+                    artwork,
+                    top.ClientRectangle,
+                    origin.X * scaleX,
+                    origin.Y * scaleY,
+                    top.ClientSize.Width * scaleX,
+                    top.ClientSize.Height * scaleY,
+                    GraphicsUnit.Pixel);
+
+                using var glassTint = new SolidBrush(
+                    Color.FromArgb(90, 9, 18, 31));
+
+                e.Graphics.FillRectangle(glassTint, top.ClientRectangle);
+            }
+
+            using var path = new GraphicsPath();
+
+            path.AddArc(rect.Left, rect.Top,
+                diameter, diameter, 180, 90);
+
+            path.AddArc(rect.Right - diameter, rect.Top,
+                diameter, diameter, 270, 90);
+
+            path.AddArc(rect.Right - diameter,
+                rect.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            path.AddArc(rect.Left,
+                rect.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            path.CloseFigure();
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using var pen = new Pen(Edge, 1.5f);
+            e.Graphics.DrawPath(pen, path);
+        };
+
         _identityBiography = top;
         BuildIdentity(top);
         BuildBiography(top);
@@ -575,6 +735,44 @@ internal sealed class WorkerEditorForm : UserControl
         _mainArea.Name = "WorkerGeneralCanvas";
         _content.Name = "WorkerSectionContent";
         _mainArea.Controls.Add(_content);
+        _mainArea.Paint += (_, e) =>
+        {
+            if (page.BackgroundImage != null) return;
+            if (page.BackgroundImage is not Image artwork ||
+            page.ClientSize.Width <= 0 ||
+                page.ClientSize.Height <= 0 ||
+                _mainArea.ClientSize.Width <= 0 ||
+                _mainArea.ClientSize.Height <= 0)
+                return;
+
+            Point origin = Point.Empty;
+
+            for (Control? current = _mainArea;
+                 current != null && current != page;
+                 current = current.Parent)
+            {
+                origin.Offset(current.Left, current.Top);
+            }
+
+            float scaleX = (float)artwork.Width / page.ClientSize.Width;
+            float scaleY = (float)artwork.Height / page.ClientSize.Height;
+
+            e.Graphics.DrawImage(
+                artwork,
+                _mainArea.ClientRectangle,
+                origin.X * scaleX,
+                origin.Y * scaleY,
+                _mainArea.ClientSize.Width * scaleX,
+                _mainArea.ClientSize.Height * scaleY,
+                GraphicsUnit.Pixel);
+
+            using var glassTint = new SolidBrush(
+                Color.FromArgb(90, 9, 18, 31));
+
+            e.Graphics.FillRectangle(
+                glassTint,
+                _mainArea.ClientRectangle);
+        };
         _body.Controls.Add(top);
         _body.Controls.Add(_mainArea);
 
@@ -591,11 +789,25 @@ internal sealed class WorkerEditorForm : UserControl
         int contentX = 3;
         int width = Math.Max(100, _body.ClientSize.Width - 8);
         int height = _body.ClientSize.Height;
-        _identityBiography.Bounds = new Rectangle(contentX, 10, width, 145);
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
+        _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
+        long topTime = timer.ElapsedMilliseconds;
+
         int generalY = 165;
         int generalHeight = Math.Max(340, Math.Min(520, height - generalY - 12));
+
         _mainArea.Bounds = new Rectangle(contentX, generalY, width, generalHeight);
+        long mainTime = timer.ElapsedMilliseconds;
+
         _content.Bounds = _mainArea.ClientRectangle;
+        long contentTime = timer.ElapsedMilliseconds;
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Canvas Layout: Top={topTime} ms, " +
+            $"Main={mainTime - topTime} ms, " +
+            $"Content={contentTime - mainTime} ms, " +
+            $"Total={contentTime} ms");
     }
 
     // The top row is a label-and-field editor, not a banner card.
@@ -605,22 +817,25 @@ internal sealed class WorkerEditorForm : UserControl
         {
             Name = "WorkerIdentity",
             Dock = DockStyle.Fill, Margin = Padding.Empty,
-            BackColor = Color.FromArgb(17, 32, 52)
+            BackColor = Color.Transparent
         };
         top.Controls.Add(card, 0, 0);
         var worker = First("tblWorker");
 
         var name = new Label
         {
-            Name = "WorkerNameTitle", Text = "Name",
-            Location = new Point(7, 8), Size = new Size(89, 22),
+            Name = "WorkerNameTitle",
+            Text = "Name",
+            Location = new Point(7, 3),
+            Size = new Size(89, 22),
             ForeColor = Color.White, BackColor = Color.Transparent,
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
         var shortName = new Label
         {
-            Text = "Short Name", Location = new Point(7, 37),
+            Text = "Short Name",
+            Location = new Point(7, 30),
             Size = new Size(89, 22),
             ForeColor = Color.White, BackColor = Color.Transparent,
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -628,7 +843,8 @@ internal sealed class WorkerEditorForm : UserControl
         };
         var pictureLabel = new Label
         {
-            Text = "Picture", Location = new Point(7, 76),
+            Text = "Picture",
+            Location = new Point(7, 65),
             Size = new Size(84, 22),
             ForeColor = Color.White, BackColor = Color.Transparent,
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold)
@@ -636,13 +852,36 @@ internal sealed class WorkerEditorForm : UserControl
         card.Controls.Add(name);
         card.Controls.Add(shortName);
         card.Controls.Add(pictureLabel);
+        var identityLabels = new[] { name, shortName, pictureLabel };
+
+        foreach (var fieldLabel in identityLabels)
+        {
+            fieldLabel.Visible = false;
+        }
+
+        card.Paint += (_, e) =>
+        {
+            foreach (var fieldLabel in identityLabels)
+            {
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    fieldLabel.Text,
+                    fieldLabel.Font,
+                    fieldLabel.Bounds,
+                    fieldLabel.ForeColor,
+                    TextFormatFlags.Left |
+                    TextFormatFlags.VerticalCenter |
+                    TextFormatFlags.NoPrefix |
+                    TextFormatFlags.NoPadding);
+            }
+        };
         var first = ValueBox(Display(worker, "Name"), "WorkerField_Name", false);
         first.Dock = DockStyle.None;
-        first.Location = new Point(100, 8);
+        first.Location = new Point(100, 3);
         first.Size = new Size(210, 22);
         var second = ValueBox(Display(worker, "ShortName"), "WorkerField_ShortName", false);
         second.Dock = DockStyle.None;
-        second.Location = new Point(100, 37);
+        second.Location = new Point(100, 30);
         second.Size = new Size(210, 22);
         card.Controls.Add(first);
         card.Controls.Add(second);
@@ -650,7 +889,8 @@ internal sealed class WorkerEditorForm : UserControl
         var portrait = new PictureBox
         {
             Name = "WorkerPicture",
-            Location = new Point(100, 68), Size = new Size(91, 77),
+            Location = new Point(100, 55),
+            Size = new Size(91,91),
             BackColor = Color.FromArgb(21, 41, 61),
             BorderStyle = BorderStyle.FixedSingle,
             SizeMode = PictureBoxSizeMode.Zoom
@@ -658,11 +898,36 @@ internal sealed class WorkerEditorForm : UserControl
         card.Controls.Add(portrait);
         string picture = Display(worker, "Picture");
         string safeName = Path.GetFileName(picture);
+
+        if (string.IsNullOrWhiteSpace(safeName))
+        {
+            string workerName = Display(worker, "Name");
+
+            string workerFolder = Path.Combine(
+                _paths.Pictures, "Default", "Workers");
+
+            foreach (string extension in new[]
+            {
+        ".gif", ".jpg", ".jpeg", ".png", ".bmp"
+    })
+            {
+                string candidate = Path.Combine(
+                    workerFolder, workerName + extension);
+
+                if (File.Exists(candidate))
+                {
+                    safeName = Path.GetFileName(candidate);
+                    break;
+                }
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(safeName))
         {
             var paths = new[]
             {
                 Path.Combine(_paths.Pictures, safeName),
+                Path.Combine(_paths.Pictures, "Default", "Workers", safeName),
                 Path.Combine(_paths.Pictures, "Workers", safeName),
                 Path.Combine(_paths.Pictures, "People", safeName),
                 Path.Combine(_paths.Pictures, "Worker", safeName)
@@ -674,8 +939,8 @@ internal sealed class WorkerEditorForm : UserControl
                 {
                     using var stream = File.OpenRead(file);
                     using var image = Image.FromStream(stream);
+                    using var fullImage = new Bitmap(image);
                     portrait.Image = new Bitmap(image);
-                    portrait.Disposed += (_, _) => portrait.Image?.Dispose();
                 }
                 catch (Exception ex) when (
                     ex is IOException or ArgumentException or OutOfMemoryException)
@@ -695,28 +960,15 @@ internal sealed class WorkerEditorForm : UserControl
             });
         }
 
-        var typeLabel = new Label
-        {
-            Text = "Picture Type", Location = new Point(200, 86),
-            Size = new Size(121, 18),
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-            ForeColor = Color.White
-        };
-        var typeBox = ValueBox(Display(worker, "BiographyType"),
-            "WorkerField_BiographyType", true);
-        typeBox.Dock = DockStyle.None;
-        typeBox.Location = new Point(200, 110);
-        typeBox.Size = new Size(110, 22);
-        card.Controls.Add(typeLabel);
-        card.Controls.Add(typeBox);
+      
+        
         card.Resize += (_, _) =>
+
         {
             int valueWidth = Math.Max(100, card.ClientSize.Width - 107);
             first.Width = valueWidth;
             second.Width = valueWidth;
-            typeLabel.Left = Math.Max(193, card.ClientSize.Width - 126);
-            typeBox.Left = typeLabel.Left;
-            typeBox.Width = Math.Max(91, card.ClientSize.Width - typeBox.Left - 5);
+
         };
     }
 
@@ -726,12 +978,13 @@ internal sealed class WorkerEditorForm : UserControl
         {
             Name = "WorkerBiographyPanel",
             Dock = DockStyle.Fill, Margin = Padding.Empty,
-            BackColor = Color.FromArgb(17, 32, 52)
+            BackColor = Color.Transparent
         };
         top.Controls.Add(card, 1, 0);
         var heading = new Label
         {
-            Text = "Biography", Location = new Point(5, 9),
+            Text = "Biography",
+            Location = new Point(5, 5),
             Size = new Size(89, 22),
             Font = new Font("Segoe UI", 9.7f, FontStyle.Bold),
             ForeColor = Color.White, BackColor = Color.Transparent
@@ -740,11 +993,11 @@ internal sealed class WorkerEditorForm : UserControl
         var bio = new RichTextBox
         {
             Name = "WorkerBiography",
-            Location = new Point(90, 8),
-            Size = new Size(605, 131),
-            BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(96, 8),
+            Size = new Size(605, 100),
+            BorderStyle = BorderStyle.None,
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            ReadOnly = true,
+            ReadOnly = false,
             DetectUrls = false,
             TabStop = false,
             ScrollBars = RichTextBoxScrollBars.None,
@@ -754,11 +1007,88 @@ internal sealed class WorkerEditorForm : UserControl
                 "No biography has been entered for this worker." : text
         };
         card.Controls.Add(heading);
-        card.Controls.Add(bio);
+        heading.Visible = false;
+
+        card.Paint += (_, e) =>
+        {
+            TextRenderer.DrawText(
+                e.Graphics,
+                heading.Text,
+                heading.Font,
+                heading.Bounds,
+                heading.ForeColor,
+                TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPrefix |
+                TextFormatFlags.NoPadding);
+        };
+
+        var bioFrame = new Panel
+        {
+            Name = "WorkerBiographyFrame",
+            Location = bio.Location,
+            Size = bio.Size,
+            Padding = new Padding(6, 5, 6, 5),
+            BackColor = Color.Transparent
+        };
+
+        bioFrame.Paint += (_, e) =>
+        {
+            var rect = new Rectangle(
+                1, 1,
+                bioFrame.ClientSize.Width - 3,
+                bioFrame.ClientSize.Height - 3);
+
+            if (rect.Width < 13 || rect.Height < 13)
+                return;
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            const int diameter = 12;
+
+            using var path = new GraphicsPath();
+
+            path.AddArc(rect.Left, rect.Top,
+                diameter, diameter, 180, 90);
+
+            path.AddArc(rect.Right - diameter, rect.Top,
+                diameter, diameter, 270, 90);
+
+            path.AddArc(rect.Right - diameter,
+                rect.Bottom - diameter,
+                diameter, diameter, 0, 90);
+
+            path.AddArc(rect.Left,
+                rect.Bottom - diameter,
+                diameter, diameter, 90, 90);
+
+            path.CloseFigure();
+
+            using var brush = new SolidBrush(FieldInk);
+            e.Graphics.FillPath(brush, path);
+
+            using var pen = new Pen(Edge);
+            e.Graphics.DrawPath(pen, path);
+        };
+
+        bio.Dock = DockStyle.Fill;
+        bioFrame.Controls.Add(bio);
+        card.Controls.Add(bioFrame);
+
+
+        var biographyType = ValueBox(
+    Display(First("tblWorker"), "BiographyType"),
+    "WorkerField_BiographyType", true);
+
+        biographyType.Dock = DockStyle.None;
+        biographyType.Location = new Point(5, 36);
+        biographyType.Size = new Size(79, 22);
+
+        card.Controls.Add(biographyType);
         card.Resize += (_, _) =>
         {
-            bio.Width = Math.Max(100, card.ClientSize.Width - bio.Left - 6);
-            bio.Height = Math.Max(70, card.ClientSize.Height - bio.Top - 6);
+            bioFrame.Width = Math.Max(100, card.ClientSize.Width - bioFrame.Left - 6);
+            bioFrame.Height = Math.Max(70, card.ClientSize.Height - bioFrame.Top - 6);
         };
     }
 
@@ -781,7 +1111,7 @@ internal sealed class WorkerEditorForm : UserControl
             Height = fields.Count * rowHeight + topPad + 1,
             ColumnCount = 2, RowCount = fields.Count,
             Margin = Padding.Empty, Padding = new Padding(1, topPad, 2, 0),
-            BackColor = Dark
+            BackColor = Color.FromArgb(11, 26, 42)
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, labelShare));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f - labelShare));
@@ -794,14 +1124,62 @@ internal sealed class WorkerEditorForm : UserControl
                           fields[i].Field is "Born" or "SetToDebut";
             var value = ValueBox(Display(source, fields[i].Field),
                 "WorkerField_" + fields[i].Field, !isWeight && !isDate);
-            value.CalendarIndicator = isDate;
-            value.SpinnerIndicator = isWeight;
-            if (isWeight)
-            {
-                value.Dock = DockStyle.Left;
-                value.Width = 98;
-            }
-            grid.Controls.Add(value, 1, i);
+            
+value.CalendarIndicator = false;
+value.SpinnerIndicator = isWeight;
+
+if (isDate)
+{
+    var dateRow = new TableLayoutPanel
+    {
+        Dock = DockStyle.Fill,
+        ColumnCount = 2,
+        RowCount = 1,
+        Margin = Padding.Empty,
+        Padding = Padding.Empty,
+        BackColor = Color.Transparent
+    };
+
+    dateRow.ColumnStyles.Add(
+        new ColumnStyle(SizeType.Percent, 100));
+
+    dateRow.ColumnStyles.Add(
+        new ColumnStyle(SizeType.Absolute, 32));
+
+    value.Dock = DockStyle.Fill;
+    value.Margin = new Padding(2, 1, 4, 1);
+
+    var calendarButton = new Button
+    {
+        Text = "▦",
+        Dock = DockStyle.Fill,
+        Margin = new Padding(0, 1, 2, 1),
+        FlatStyle = FlatStyle.Flat,
+        BackColor = Color.FromArgb(235, 242, 248),
+        ForeColor = Color.FromArgb(15, 35, 53),
+        Font = new Font("Segoe UI Symbol", 9f),
+        TabStop = false
+    };
+
+    calendarButton.FlatAppearance.BorderColor =
+        Color.FromArgb(110, 145, 170);
+
+    dateRow.Controls.Add(value, 0, 0);
+    dateRow.Controls.Add(calendarButton, 1, 0);
+
+    grid.Controls.Add(dateRow, 1, i);
+}
+else
+{
+    if (isWeight)
+    {
+        value.Dock = DockStyle.Left;
+        value.Width = 98;
+    }
+
+    grid.Controls.Add(value, 1, i);
+}
+
         }
         card.Controls.Add(grid);
         grid.BringToFront();
@@ -820,8 +1198,44 @@ internal sealed class WorkerEditorForm : UserControl
             ColumnCount = 1, RowCount = fields.Count,
             Padding = new Padding(11, 2, 2, 0),
             Margin = Padding.Empty,
-            BackColor = Dark
+            BackColor = Color.Transparent
         };
+
+        grid.Paint += (_, e) =>
+        {
+            if (card.Name == "WorkerRoles")
+                return;
+           
+            var rect = grid.ClientRectangle;
+
+            if (rect.Width <= 0 || rect.Height <= 0)
+                return;
+
+            using var gradient = new LinearGradientBrush(
+                rect,
+                Color.FromArgb(29, 49, 73),
+                Color.FromArgb(12, 23, 39),
+                LinearGradientMode.Vertical);
+
+            e.Graphics.FillRectangle(gradient, rect);
+        };
+        grid.Paint += (_, e) =>
+        {
+            var rect = grid.ClientRectangle;
+
+            if (rect.Width <= 0 || rect.Height <= 0)
+                return;
+
+            using var gradient = new LinearGradientBrush(
+                rect,
+                Color.FromArgb(29, 49, 73),
+                Color.FromArgb(12, 23, 39),
+                LinearGradientMode.Vertical);
+
+            e.Graphics.FillRectangle(gradient, rect);
+        };
+
+
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 0; i < fields.Count; i++)
         {
@@ -850,7 +1264,13 @@ internal sealed class WorkerEditorForm : UserControl
 
     private static TableLayoutPanel Stack(params (Panel Panel, int Weight)[] groups)
     {
-        var result = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = groups.Length };
+        var result = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = groups.Length,
+            BackColor = Color.Transparent
+        };
         result.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         int sum = groups.Sum(x => x.Weight);
         for (int i = 0; i < groups.Length; i++)
@@ -901,7 +1321,7 @@ internal sealed class WorkerEditorForm : UserControl
         MakeRows(loyalty, [
             ("Loyalty", "LoyaltyWorkerUID"), ("Loyalty Type", "LoyaltyType"),
             ("Freelance", "Freelance"), ("User Character", "UserCharacter")
-        ], worker);
+        ], worker, labelShare: 48f);
         var roles = Card("Roles", "WorkerRoles");
         var roleChecks = MakeChecks(roles, [
             ("Wrestler", "RoleWrestler"), ("Occasional Wrestler", "RolePartTimeWrestler"),
@@ -909,29 +1329,67 @@ internal sealed class WorkerEditorForm : UserControl
             ("Play By Play", "RolePlayByPlay"), ("Colour Commentator", "RoleColour"),
             ("Referee", "RoleReferee"), ("Road Agent", "RoleProducer")
         ], worker, rowHeight: 20);
-        roleChecks.Dock = DockStyle.None;
-        roleChecks.Location = new Point(3, 55);
+        var roleBoxes = roleChecks.Controls
+    .OfType<CheckBox>()
+    .ToArray();
+
+        for (int i = 0; i < roleBoxes.Length; i++)
+        {
+            var tick = roleBoxes[i];
+
+            roleChecks.Controls.Remove(tick);
+
+            tick.Dock = DockStyle.None;
+            tick.Location = new Point(14, 55 + i * 20);
+            tick.Size = new Size(250, 20);
+
+            roles.Controls.Add(tick);
+        }
+
+        roles.Controls.Remove(roleChecks);
+        roleChecks.Dispose();
         var competitor = new Panel
         {
             Name = "WorkerCompetesVs", Dock = DockStyle.None,
             Location = new Point(3, 28),
-            Height = 26, BackColor = Dark,
+            Height = 26,
+            BackColor = Color.Transparent,
             Padding = new Padding(3, 3, 4, 2)
         };
+
         var competitorLabel = TextLabel("Competes Vs.");
-        competitorLabel.Dock = DockStyle.Left;
-        competitorLabel.Width = 105;
-        var competitorValue = ValueBox(Display(worker, "CompetesVs"),
+        competitorLabel.Dock = DockStyle.None;
+        competitorLabel.Location = new Point(-3,32);
+        competitorLabel.Size = new Size(90, 22);
+
+        var competitorValue = ValueBox(
+            Display(worker, "CompetesVs"),
             "WorkerField_CompetesVs");
-        competitor.Controls.Add(competitorValue);
-        competitor.Controls.Add(competitorLabel);
-        roles.Controls.Add(competitor);
-        competitor.BringToFront();
+
+        competitorValue.Dock = DockStyle.None;
+        competitorValue.Location = new Point(102, 32);
+        competitorValue.Size = new Size(160, 25);
+
+        roles.Controls.Add(competitorLabel);
+        roles.Controls.Add(competitorValue);
+
+        competitorLabel.BringToFront();
+        competitorValue.BringToFront();
+
         roles.Resize += (_, _) =>
         {
-            competitor.Width = Math.Max(100, roles.ClientSize.Width - 6);
-            roleChecks.Width = Math.Max(100, roles.ClientSize.Width - 6);
+            competitorValue.Width = Math.Max(
+                100,
+                roles.ClientSize.Width - competitorValue.Left - 6);
+
+            foreach (var tick in roleBoxes)
+            {
+                tick.Width = Math.Max(
+                    100,
+                    roles.ClientSize.Width - tick.Left - 6);
+            }
         };
+
         var physical = Card("Physical Health", "WorkerPhysical");
         MakeRows(physical, [
             ("Head Condition", "HeadCondition"), ("Body Condition", "BodyCondition"),
@@ -1011,7 +1469,12 @@ internal sealed class WorkerEditorForm : UserControl
         _content.SuspendLayout();
         if (_actionArea.Parent is Control oldParent)
             oldParent.Controls.Remove(_actionArea);
-        _content.Controls.Clear();
+
+        foreach (Control old in _content.Controls.Cast<Control>().ToArray())
+        {
+            _content.Controls.Remove(old);
+            old.Dispose();
+        }
         if (section == "General") BuildGeneral();
         else BuildSecondary(section);
         _content.ResumeLayout();
@@ -1181,7 +1644,9 @@ internal sealed class WorkerEditorForm : UserControl
         {
             SetStyle(ControlStyles.UserPaint |
                 ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer, true);
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.SupportsTransparentBackColor, true);
+
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -1190,7 +1655,18 @@ internal sealed class WorkerEditorForm : UserControl
             if (bounds.Width <= 2 || bounds.Height <= 2) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(BackColor);
+            using (var fill = new LinearGradientBrush(
+    bounds,
+    Name == "WorkerSave"
+        ? Color.FromArgb(30, 145, 210)
+        : Color.FromArgb(33, 52, 72),
+    Name == "WorkerSave"
+        ? Color.FromArgb(10, 100, 165)
+        : Color.FromArgb(12, 24, 40),
+    LinearGradientMode.Vertical))
+            {
+                g.FillRectangle(fill, bounds);
+            }
             using var outline = new Pen(FlatAppearance.BorderColor, 1f);
             g.DrawRectangle(outline, 0, 0,
                 bounds.Width - 1, bounds.Height - 1);
@@ -1277,7 +1753,45 @@ internal sealed class WorkerEditorForm : UserControl
     {
         _actionArea.Padding = Padding.Empty;
         _actionArea.Margin = Padding.Empty;
-        _actionArea.BackColor = Color.Transparent;
+        _actionArea.BackColor = Color.FromArgb(22, 32, 46);
+        _actionArea.Paint += (_, e) =>
+        {
+            Control? page = _actionArea;
+
+            while (page != null && page.Name != "WorkerPage")
+                page = page.Parent;
+
+            if (page?.BackgroundImage is not Image background ||
+                page.ClientSize.Width <= 0 ||
+                page.ClientSize.Height <= 0 ||
+                _actionArea.ClientSize.Width <= 0 ||
+                _actionArea.ClientSize.Height <= 0)
+                return;
+
+            Point origin = Point.Empty;
+
+            for (Control? current = _actionArea;
+                 current != null && current != page;
+                 current = current.Parent)
+            {
+                origin.Offset(current.Left, current.Top);
+            }
+
+            float scaleX = (float)background.Width / page.ClientSize.Width;
+            float scaleY = (float)background.Height / page.ClientSize.Height;
+
+            e.Graphics.DrawImage(
+                background,
+                _actionArea.ClientRectangle,
+                origin.X * scaleX,
+                origin.Y * scaleY,
+                _actionArea.ClientSize.Width * scaleX,
+                _actionArea.ClientSize.Height * scaleY,
+                GraphicsUnit.Pixel);
+
+            using var tint = new SolidBrush(Color.FromArgb(90, 9, 18, 31));
+            e.Graphics.FillRectangle(tint, _actionArea.ClientRectangle);
+        };
         var buttons = new TableLayoutPanel
         {
             Name = "WorkerEditorActions",
@@ -1285,6 +1799,46 @@ internal sealed class WorkerEditorForm : UserControl
             ColumnCount = 4, RowCount = 1,
             Padding = Padding.Empty, Margin = Padding.Empty,
             BackColor = Color.Transparent
+        };
+        buttons.Paint += (_, e) =>
+        {
+            Control? page = buttons.Parent;
+
+            while (page != null && page.Name != "WorkerPage")
+                page = page.Parent;
+
+            if (page?.BackgroundImage is not Image artwork ||
+                page.ClientSize.Width <= 0 ||
+                page.ClientSize.Height <= 0 ||
+                buttons.ClientSize.Width <= 0 ||
+                buttons.ClientSize.Height <= 0)
+                return;
+
+            Point origin = Point.Empty;
+
+            for (Control? current = buttons;
+                 current != null && current != page;
+                 current = current.Parent)
+            {
+                origin.Offset(current.Left, current.Top);
+            }
+
+            float scaleX = (float)artwork.Width / page.ClientSize.Width;
+            float scaleY = (float)artwork.Height / page.ClientSize.Height;
+
+            e.Graphics.DrawImage(
+                artwork,
+                buttons.ClientRectangle,
+                origin.X * scaleX,
+                origin.Y * scaleY,
+                buttons.ClientSize.Width * scaleX,
+                buttons.ClientSize.Height * scaleY,
+                GraphicsUnit.Pixel);
+
+            using var tint = new SolidBrush(
+                Color.FromArgb(90, 9, 18, 31));
+
+            e.Graphics.FillRectangle(tint, buttons.ClientRectangle);
         };
         buttons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         foreach (int width in new[] { 28, 25, 27, 20 })

@@ -74,6 +74,7 @@ public sealed partial class LauncherForm : Form
 
     private void Navigate(string key)
     {
+
         switch (key)
         {
             case "back": if (_currentPage != "HOME") ShowHome(); break;
@@ -283,7 +284,7 @@ public sealed partial class LauncherForm : Form
         _sidebar.Visible = true;
         RenderSidebar();
         _topbar.Visible = true;
-        _editorPageTitle.Visible = true;
+        _editorPageTitle.Visible = false;
         ClearPageContent();
         _page.BackColor = Color.FromArgb(7, 18, 30);
         _page.Controls.Add(new DatabaseEditorWorkspace(_paths, _skin, ShowHome, Navigate));

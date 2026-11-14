@@ -19,7 +19,8 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     private static readonly Color Cyan = Color.FromArgb(91, 212, 232);
     private static readonly Color Red = Color.FromArgb(242, 48, 75);
     private static readonly Color Soft = Color.FromArgb(170, 191, 207);
-
+    private Panel? _workerOverlayCache;
+    private WorkerEditorForm? _workerFormCache;
     private readonly AppPaths _paths;
     private readonly EditorMetadataCatalog _editorMetadata;
     private readonly SkinPalette _skin;
@@ -984,10 +985,22 @@ internal sealed class DatabaseEditorWorkspace : UserControl
                 StringComparison.OrdinalIgnoreCase) &&
             entry.Row.Table.Columns.Contains("UID"))
         {
-            var profile = PrwWorkerRepository.Load(
-                _universe.MdbPath, entry.Row["UID"], _password);
-            OpenWorkerPopup(profile);
-            return;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+
+var profile = PrwWorkerRepository.Load(
+    _universe.MdbPath, entry.Row["UID"], _password);
+
+System.Diagnostics.Debug.WriteLine(
+    $"Worker Database Load: {timer.ElapsedMilliseconds} ms");
+
+timer.Restart();
+
+OpenWorkerPopup(profile);
+
+System.Diagnostics.Debug.WriteLine(
+    $"Worker Popup Setup: {timer.ElapsedMilliseconds} ms");
+
+return;
         }
         else
         {
@@ -1018,56 +1031,129 @@ internal sealed class DatabaseEditorWorkspace : UserControl
     /// </summary>
     private void OpenWorkerPopup(PrwWorkerProfile profile)
     {
-        if (FindForm() is not Form launcher) return;
-        if (launcher.Controls.Find("WorkerEditorOverlay", false).Length != 0) return;
+        System.Diagnostics.Debug.WriteLine(
+    $"Worker Cache State: " +
+    $"OverlayExists={_workerOverlayCache is not null}, " +
+    $"WorkerExists={_workerFormCache is not null}, " +
+    $"OverlayDisposed={_workerOverlayCache?.IsDisposed}, " +
+    $"SameParent={ReferenceEquals(_workerOverlayCache?.Parent, Parent)}");
+
+        if (FindForm() is not Form launcher)
+            return;
+
+        if (Parent is not Control host)
+            return;
+
+        // Reuse the existing editor when it is available.
+        if (_workerOverlayCache is { IsDisposed: false } cachedOverlay &&
+            _workerFormCache is { IsDisposed: false } cachedWorker &&
+            ReferenceEquals(cachedOverlay.Parent, host))
+        {
+            var cacheTimer = System.Diagnostics.Stopwatch.StartNew();
+
+            cachedWorker.LoadProfile(profile);
+
+            cachedOverlay.Show();
+            cachedOverlay.BringToFront();
+            cachedWorker.BringToFront();
+            cachedWorker.Focus();
+
+            System.Diagnostics.Debug.WriteLine(
+                $"Worker Popup Cache Reused: {cacheTimer.ElapsedMilliseconds} ms");
+
+            return;
+        }
+
+        // Only construct the editor when there is no usable cache.
+        if (host.Controls.Find("WorkerEditorOverlay", false).Length != 0)
+            return;
 
         var overlay = new Panel
         {
-            Name = "WorkerEditorOverlay", Dock = DockStyle.Fill,
-            BackColor = Ink, Margin = Padding.Empty,
-            Padding = Padding.Empty, TabStop = true
+            Name = "WorkerEditorOverlay",
+            Dock = DockStyle.Fill,
+            BackColor = Ink,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            TabStop = true
         };
+
         var worker = new WorkerEditorForm(_paths, _skin, profile);
 
-        bool cleaned = false;
-        void CleanUp()
-        {
-            if (cleaned) return;
-            cleaned = true;
-            if (!overlay.IsDisposed)
-            {
-                launcher.Controls.Remove(overlay);
-                overlay.Dispose();
-            }
-        }
+        _workerOverlayCache = overlay;
+        _workerFormCache = worker;
+
         worker.CloseRequested += (_, _) =>
         {
             var destination = worker.RequestedNavigation;
-            CleanUp();
+
+            // Hide the editor instead of destroying it.
+            if (!overlay.IsDisposed)
+                overlay.Hide();
+
             if (destination is not null)
             {
-                // Do not change the game page while the worker overlay is
-                // disposing its controls.
                 if (launcher.IsHandleCreated)
-                    launcher.BeginInvoke(new Action(() => _navigate?.Invoke(destination)));
+                {
+                    launcher.BeginInvoke(
+                        new Action(() => _navigate?.Invoke(destination)));
+                }
                 else
+                {
                     _navigate?.Invoke(destination);
+                }
             }
         };
-        worker.Disposed += (_, _) => CleanUp();
 
-        launcher.Controls.Add(overlay);
-        overlay.BringToFront();
-        overlay.Controls.Add(worker);
-        worker.FitInside(overlay);
-        overlay.Resize += (_, _) =>
-        {
-            if (!worker.IsDisposed) worker.FitInside(overlay);
-        };
-        worker.Show();
-        worker.BringToFront();
-        worker.Focus();
-    }
+            overlay.Disposed += (_, _) =>
+            {
+                System.Diagnostics.Debug.WriteLine(
+                     $"Worker Cache Disposed: " +
+                     $"WorkspaceDisposed={IsDisposed}, " +
+                     $"HostDisposed={host.IsDisposed}, " +
+                     $"LauncherDisposed={launcher.IsDisposed}");
+
+                System.Diagnostics.Debug.WriteLine(
+                      System.Environment.StackTrace);
+
+                if (ReferenceEquals(_workerOverlayCache, overlay))
+                    if (ReferenceEquals(_workerOverlayCache, overlay))
+                    {
+                        _workerOverlayCache = null;
+                        _workerFormCache = null;
+                    }
+            };
+
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+
+            host.Controls.Add(overlay);
+            overlay.BringToFront();
+
+            System.Diagnostics.Debug.WriteLine(
+                $"Overlay Ready: {timer.ElapsedMilliseconds} ms");
+
+            overlay.SuspendLayout();
+
+            worker.Dock = DockStyle.Fill;
+            worker.Margin = Padding.Empty;
+
+            overlay.Controls.Add(worker);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"Worker Attached: {timer.ElapsedMilliseconds} ms");
+
+            overlay.ResumeLayout(true);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"Layout Completed: {timer.ElapsedMilliseconds} ms");
+
+            worker.Show();
+            worker.BringToFront();
+            worker.Focus();
+
+            System.Diagnostics.Debug.WriteLine(
+                $"Worker Visible: {timer.ElapsedMilliseconds} ms");
+        }
 
     private void MassEdit()
     {
