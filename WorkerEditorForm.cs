@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.CompilerServices;
@@ -26,6 +27,9 @@ internal sealed class WorkerEditorForm : UserControl
     private readonly AppPaths _paths;
     private readonly SkinPalette _palette;
     private PrwWorkerProfile _profile;
+    private readonly string? _databaseFile;
+    private readonly string? _password;
+    private sealed record WorkerFieldBinding(DataRow Row, string Field);
     private readonly Dictionary<string, Button> _tabs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Panel _content = new() { Name = "WorkerSectionContent", BackColor = Color.Transparent };
     private readonly Panel _sectionNavigation = new() { Name = "WorkerSectionNavigation", Dock = DockStyle.Fill, Margin = Padding.Empty,BackColor = Color.Transparent };
@@ -43,14 +47,29 @@ internal sealed class WorkerEditorForm : UserControl
     internal string? RequestedNavigation { get; private set; }
     internal event EventHandler? CloseRequested;
 
-    internal void Close() =>
+    internal void Close()
+    {
+        if (HasPendingChanges() &&
+            MessageBox.Show(FindForm(),
+                "Discard unsaved worker changes and return to the Database Editor?",
+                "Unsaved Worker Changes", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
 
-    internal WorkerEditorForm(AppPaths paths, SkinPalette palette, PrwWorkerProfile profile)
+    private bool HasPendingChanges() => _profile.Sections.Any(section =>
+        section.Records.Rows.Cast<DataRow>().Any(row =>
+            row.RowState is DataRowState.Modified or DataRowState.Added));
+
+    internal WorkerEditorForm(AppPaths paths, SkinPalette palette,
+        PrwWorkerProfile profile, string? databaseFile = null, string? password = null)
     {
         _paths = paths;
         _palette = palette;
         _profile = profile;
+        _databaseFile = databaseFile;
+        _password = password;
 
         Name = "WorkerEditorForm";
         Text = "Pro Wrestling Revolution | Worker Editor";
@@ -452,11 +471,39 @@ internal sealed class WorkerEditorForm : UserControl
         internal WorkerValue()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer, true);
-            AccessibleRole = AccessibleRole.StaticText;
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
+            AccessibleRole = AccessibleRole.PushButton;
+            Cursor = Cursors.Hand;
             BackColor = Color.FromArgb(11, 24, 39);
             ForeColor = Color.FromArgb(11, 28, 42);
             Font = new Font("Segoe UI", 9.15f, FontStyle.Bold);
+        }
+
+        internal void Edit()
+        {
+            Control? current = Parent;
+            while (current is not null && current is not WorkerEditorForm)
+                current = current.Parent;
+            if (current is WorkerEditorForm editor &&
+                Tag is WorkerFieldBinding binding)
+                editor.EditField(this, binding);
+        }
+
+        protected override void OnClick(EventArgs e)
+        {
+            base.OnClick(e);
+            Edit();
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode is Keys.Enter or Keys.Space)
+            {
+                Edit();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -550,8 +597,14 @@ internal sealed class WorkerEditorForm : UserControl
         Name = name, Text = value, DropDownIndicator = dropDown,
         Dock = DockStyle.Fill,
         Margin = new Padding(2, 1, 5, 1),
-        TabStop = false
+        TabStop = true
     };
+
+    private static void Bind(WorkerValue value, DataRow? row, string field)
+    {
+        if (row is not null && row.Table.Columns.Contains(field))
+            value.Tag = new WorkerFieldBinding(row, field);
+    }
 
     private static bool IsTrue(object? value)
     {
@@ -883,6 +936,8 @@ internal sealed class WorkerEditorForm : UserControl
         second.Dock = DockStyle.None;
         second.Location = new Point(100, 30);
         second.Size = new Size(210, 22);
+        Bind(first, worker, "Name");
+        Bind(second, worker, "ShortName");
         card.Controls.Add(first);
         card.Controls.Add(second);
 
@@ -997,7 +1052,7 @@ internal sealed class WorkerEditorForm : UserControl
             Size = new Size(605, 100),
             BorderStyle = BorderStyle.None,
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            ReadOnly = false,
+            ReadOnly = _databaseFile is null,
             DetectUrls = false,
             TabStop = false,
             ScrollBars = RichTextBoxScrollBars.None,
@@ -1074,6 +1129,22 @@ internal sealed class WorkerEditorForm : UserControl
         bio.Dock = DockStyle.Fill;
         bioFrame.Controls.Add(bio);
         card.Controls.Add(bioFrame);
+        bio.TextChanged += (_, _) =>
+        {
+            if (_databaseFile is null) return;
+            var section = _profile.Sections.FirstOrDefault(s => s.Table == "tblWorkerBio");
+            if (section is null) return;
+            var row = section.Records.Rows.Cast<DataRow>().FirstOrDefault();
+            if (row is null)
+            {
+                row = section.Records.NewRow();
+                row["WorkerUID"] = _profile.Identity.Uid;
+                row["Biography"] = bio.Text;
+                section.Records.Rows.Add(row);
+            }
+            else if (!Equals(Convert.ToString(row["Biography"]), bio.Text))
+                row["Biography"] = bio.Text;
+        };
 
 
         var biographyType = ValueBox(
@@ -1083,6 +1154,7 @@ internal sealed class WorkerEditorForm : UserControl
         biographyType.Dock = DockStyle.None;
         biographyType.Location = new Point(5, 36);
         biographyType.Size = new Size(79, 22);
+        Bind(biographyType, First("tblWorker"), "BiographyType");
 
         card.Controls.Add(biographyType);
         card.Resize += (_, _) =>
@@ -1124,6 +1196,7 @@ internal sealed class WorkerEditorForm : UserControl
                           fields[i].Field is "Born" or "SetToDebut";
             var value = ValueBox(Display(source, fields[i].Field),
                 "WorkerField_" + fields[i].Field, !isWeight && !isDate);
+            Bind(value, source, fields[i].Field);
             
 value.CalendarIndicator = false;
 value.SpinnerIndicator = isWeight;
@@ -1165,6 +1238,7 @@ if (isDate)
         Color.FromArgb(110, 145, 170);
 
     dateRow.Controls.Add(value, 0, 0);
+    calendarButton.Click += (_, _) => value.Edit();
     dateRow.Controls.Add(calendarButton, 1, 0);
 
     grid.Controls.Add(dateRow, 1, i);
@@ -1246,8 +1320,8 @@ else
                 Name = "WorkerField_" + field,
                 Text = label,
                 Dock = DockStyle.Fill,
-                AutoCheck = false,
-                TabStop = false,
+                AutoCheck = true,
+                TabStop = true,
                 Checked = source is not null && source.Table.Columns.Contains(field) &&
                     IsTrue(source[field]),
                 ForeColor = TextInk,
@@ -1255,6 +1329,20 @@ else
                 Margin = Padding.Empty,
                 BackColor = Color.Transparent
             };
+            if (source is not null && source.Table.Columns.Contains(field))
+            {
+                tick.CheckedChanged += (_, _) =>
+                {
+                    var col = source.Table.Columns[field]!;
+                    if (col.DataType == typeof(bool))
+                        source[field] = tick.Checked;
+                    else if (col.DataType == typeof(string))
+                        source[field] = tick.Checked ? "Yes" : "No";
+                    else
+                        source[field] = Convert.ChangeType(tick.Checked ? 1 : 0,
+                            col.DataType, CultureInfo.InvariantCulture);
+                };
+            }
             grid.Controls.Add(tick, 0, i);
         }
         card.Controls.Add(grid);
@@ -1371,6 +1459,7 @@ else
         competitorValue.Size = new Size(160, 25);
 
         roles.Controls.Add(competitorLabel);
+        Bind(competitorValue, worker, "CompetesVs");
         roles.Controls.Add(competitorValue);
 
         competitorLabel.BringToFront();
@@ -1749,6 +1838,219 @@ else
         return button;
     }
 
+
+    private void EditField(WorkerValue control, WorkerFieldBinding binding)
+    {
+        if (_databaseFile is null) return;
+        var row = binding.Row;
+        var field = binding.Field;
+        if (field.EndsWith("UID", StringComparison.OrdinalIgnoreCase) ||
+            PrwSchema.Tables.FirstOrDefault(t => t.Name == row.Table.TableName)?
+                .KeyColumns.Contains(field, StringComparer.OrdinalIgnoreCase) == true)
+        {
+            MessageBox.Show(FindForm(), "Linked IDs and record identities cannot be changed here.",
+                "Protected Worker Field", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var column = row.Table.Columns[field]!;
+        object? candidate;
+        if (column.DataType == typeof(bool))
+        {
+            var choice = MessageBox.Show(FindForm(),
+                "Set " + field + " to Yes? Choose No to set it to No.",
+                "Edit " + field, MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+            if (choice == DialogResult.Cancel) return;
+            candidate = choice == DialogResult.Yes;
+        }
+        else if (column.DataType == typeof(DateTime))
+        {
+            using var picker = new Form
+            {
+                Text = "Edit " + field, ClientSize = new Size(365, 130),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false, MinimizeBox = false
+            };
+            var date = new DateTimePicker
+            {
+                Left = 18, Top = 16, Width = 325,
+                Format = DateTimePickerFormat.Custom,
+                CustomFormat = "yyyy-MM-dd", ShowCheckBox = true,
+                Checked = row[field] is DateTime
+            };
+            if (row[field] is DateTime existing)
+                date.Value = existing;
+            var okay = new Button { Text = "Apply", Left = 155, Top = 68,
+                Width = 90, DialogResult = DialogResult.OK };
+            var cancel = new Button { Text = "Cancel", Left = 253, Top = 68,
+                Width = 90, DialogResult = DialogResult.Cancel };
+            picker.Controls.AddRange([date, okay, cancel]);
+            picker.AcceptButton = okay;
+            picker.CancelButton = cancel;
+            if (picker.ShowDialog(FindForm()) != DialogResult.OK) return;
+            candidate = date.Checked ? date.Value.Date : DBNull.Value;
+        }
+        else
+        {
+            string? answer = PromptText("Edit " + field,
+                "Enter a value for " + field + ". Leave blank to clear an optional field.",
+                Display(row, field));
+            if (answer is null) return;
+            try
+            {
+                candidate = answer.Length == 0 && column.AllowDBNull
+                    ? DBNull.Value
+                    : column.DataType == typeof(string) ? answer
+                    : Convert.ChangeType(answer, column.DataType, CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is FormatException or OverflowException
+                                       or InvalidCastException)
+            {
+                MessageBox.Show(FindForm(), "The value must be a valid " +
+                    column.DataType.Name + ".", "Invalid Value",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+        }
+
+        if (Equals(row[field], candidate)) return;
+        try
+        {
+            row[field] = candidate ?? DBNull.Value;
+            control.Text = Display(row, field);
+            control.Invalidate();
+        }
+        catch (Exception ex) when (ex is ArgumentException or ConstraintException)
+        {
+            MessageBox.Show(FindForm(), ex.Message, "Invalid Worker Field",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private string? PromptText(string title, string prompt, string initial)
+    {
+        using var dialog = new Form
+        {
+            Text = title, ClientSize = new Size(450, 185),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            BackColor = Dark, ForeColor = Color.White,
+            MaximizeBox = false, MinimizeBox = false
+        };
+        var label = new Label
+        {
+            Text = prompt, Left = 18, Top = 15,
+            Width = 414, Height = 60, ForeColor = Color.White
+        };
+        var input = new TextBox
+        {
+            Left = 18, Top = 78, Width = 414,
+            Text = initial, BackColor = FieldInk, ForeColor = Ink
+        };
+        var okay = new Button
+        {
+            Text = "Apply", Left = 230, Top = 125, Width = 93,
+            DialogResult = DialogResult.OK
+        };
+        var cancel = new Button
+        {
+            Text = "Cancel", Left = 336, Top = 125, Width = 96,
+            DialogResult = DialogResult.Cancel
+        };
+        dialog.Controls.AddRange([label, input, okay, cancel]);
+        dialog.AcceptButton = okay;
+        dialog.CancelButton = cancel;
+        return dialog.ShowDialog(FindForm()) == DialogResult.OK ? input.Text : null;
+    }
+
+    private void SetWorkerValue(string field, string text)
+    {
+        var row = First("tblWorker");
+        if (row is null) return;
+        row[field] = text;
+        foreach (var control in Controls.Find("WorkerField_" + field, true).OfType<WorkerValue>())
+        {
+            control.Text = Display(row, field);
+            control.Invalidate();
+        }
+    }
+
+    private void CreateMoveset()
+    {
+        string current = Display(First("tblWorker"), "DefaultMoveSet");
+        string? name = PromptText("Create Moveset Reference",
+            "Enter a moveset name. The current database stores a moveset reference, " +
+            "not individual move definitions.", current);
+        if (name is null) return;
+        SetWorkerValue("DefaultMoveSet", name.Trim());
+    }
+
+    private void SuggestName()
+    {
+        string name = Display(First("tblWorker"), "Name");
+        string shortName = Display(First("tblWorker"), "ShortName");
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string suggestion = words.Length >= 2
+            ? words[0] + " \"" + (shortName.Length > 0 ? shortName : words[0]) +
+              "\" " + words[^1]
+            : shortName.Length > 0 ? shortName : name;
+        string? chosen = PromptText("Suggest a Ring Name",
+            "A possible ring name based on this worker's existing name. " +
+            "You can revise it before applying.", suggestion);
+        if (chosen is null || string.IsNullOrWhiteSpace(chosen)) return;
+        SetWorkerValue("Name", chosen.Trim());
+    }
+
+    private void MakeBiography()
+    {
+        var worker = First("tblWorker");
+        string name = Display(worker, "Name");
+        string style = Display(worker, "Style");
+        string based = Display(worker, "BasedIn");
+        string nationality = Display(worker, "Nationality");
+        var description = name + " is a professional wrestling personality.";
+        if (!string.IsNullOrWhiteSpace(style))
+            description += " Their wrestling style is listed as " + style + ".";
+        if (!string.IsNullOrWhiteSpace(nationality))
+            description += " Their recorded nationality is " + nationality + ".";
+        if (!string.IsNullOrWhiteSpace(based))
+            description += " They are based in " + based + ".";
+        var bio = Controls.Find("WorkerBiography", true).OfType<RichTextBox>().FirstOrDefault();
+        if (bio is null) return;
+        string? proposed = PromptText("Make Biography",
+            "Generated only from the worker's recorded information. " +
+            "Review and edit before applying.", description);
+        if (proposed is null) return;
+        bio.Text = proposed;
+    }
+
+    private void SaveWorker()
+    {
+        if (_databaseFile is null) return;
+        try
+        {
+            string backup = PrwWorkerEditorService.Save(_databaseFile, _profile, _password);
+            if (backup.Length == 0)
+            {
+                MessageBox.Show(FindForm(), "No changes to save.",
+                    "Worker Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            var refreshed = PrwWorkerRepository.Load(_databaseFile,
+                _profile.Identity.Uid, _password);
+            LoadProfile(refreshed);
+            MessageBox.Show(FindForm(), "Worker changes were saved. Backup created at:\n" +
+                backup, "Worker Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(FindForm(), "Worker changes were not saved.\n\n" + ex.Message,
+                "Worker Save Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
     private void BuildActions()
     {
         _actionArea.Padding = Padding.Empty;
@@ -1848,6 +2150,10 @@ else
         var suggest = ActionButton("Suggest Name", "WorkerSuggestName");
         var biography = ActionButton("Make Biography", "WorkerMakeBiography");
         var save = ActionButton("Save", "WorkerSave", primary: true);
+        moveset.Click += (_, _) => CreateMoveset();
+        suggest.Click += (_, _) => SuggestName();
+        biography.Click += (_, _) => MakeBiography();
+        save.Click += (_, _) => SaveWorker();
         var actions = new[] { moveset, suggest, biography, save };
         for (int i = 0; i < actions.Length; i++)
         {
@@ -1856,9 +2162,10 @@ else
             button.Size = Size.Empty;
             button.Height = 38;
             button.Margin = new Padding(3, 2, 3, 2);
-            button.Enabled = false;
-            _tips.SetToolTip(button,
-                "Worker editing functions are not yet connected to the database.");
+            button.Enabled = _databaseFile is not null;
+            _tips.SetToolTip(button, _databaseFile is null
+                ? "Open a native PWR universe to edit workers."
+                : "Changes are staged until Save; a backup is created before writing.");
             var holder = new Panel
             {
                 Dock = DockStyle.Fill,
