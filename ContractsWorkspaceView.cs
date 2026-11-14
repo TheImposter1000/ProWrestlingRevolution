@@ -43,13 +43,13 @@ internal sealed class ContractsWorkspaceView : UserControl
     private readonly List<(Control Control, Rectangle Bounds)> _positioned = [];
     private readonly Dictionary<string, Control> _fields =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, RoleToggle> _roles =
+    private readonly Dictionary<string, CheckBox> _roles =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly List<FieldSpec> _labels = [];
     private TextBox? _search;
     private DarkDrop? _filter;
     private DarkDrop? _employerPicker;
-    private ContractText? _biography;
+    private RichTextBox? _biography;
     private DataRow? _selected;
     private bool _editing;
     private bool _creating;
@@ -85,7 +85,8 @@ internal sealed class ContractsWorkspaceView : UserControl
         _employers = file is null ? [] : PrwContractStore.Employers(file, password);
         var identity = profile.Sections.First(s => s.Table == "tblWorker")
             .Records.Rows.Cast<DataRow>().FirstOrDefault();
-        _portrait = Picture(Read(identity, "Picture", ""), _workerName, "Workers");
+        _portrait = WorkerEditorTheme.LoadWorkerPortrait(_paths,
+            Read(identity, "Picture", ""), _workerName);
         foreach (var employer in _employers)
             _logos.TryAdd(employer.Initials,
                 Picture(employer.Logo, employer.Initials, "Logos"));
@@ -516,10 +517,42 @@ internal sealed class ContractsWorkspaceView : UserControl
         Field("Short Name", "ShortName", 179, 97, 267, 183,
             Read(_selected, "ShortName", _profile.Identity.ShortName), true);
 
-        _biography = new ContractText(true, "");
-        _biography.Name = "ContractBiography";
-        _biography.Input.Text = ContractBiography();
-        Place(_biography, 817, 22, 502, 102, true);
+        // The same light biography editor and frame as General, widened to
+        // use the area freed by hiding the worker section sidebar.
+        var biographyFrame = new Panel
+        {
+            Name = "ContractBiographyFrame",
+            Padding = new Padding(6, 5, 6, 5),
+            BackColor = Color.Transparent
+        };
+        biographyFrame.Paint += (_, e) =>
+            WorkerEditorTheme.PaintBiographyFrame(e.Graphics,
+                new Rectangle(1, 1, biographyFrame.ClientSize.Width - 3,
+                    biographyFrame.ClientSize.Height - 3));
+        _biography = WorkerEditorTheme.CreateBiography("ContractBiography",
+            ContractBiography(), _file is null);
+        _biography.Dock = DockStyle.Fill;
+        biographyFrame.Controls.Add(_biography);
+        Place(biographyFrame, 817, 22, 502, 102, true);
+
+        // Match General's picture box exactly: 91x91, a single subtle
+        // border, zoomed worker photograph, and NO IMAGE fallback.
+        var portrait = WorkerEditorTheme.CreatePortrait("ContractWorkerPicture");
+        portrait.Image = _portrait;
+        portrait.Location = new Point(0, 0);
+        if (_portrait is null)
+        {
+            portrait.Controls.Add(new Label
+            {
+                Text = "NO IMAGE",
+                Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(144, 178, 200),
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 7.8f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+        }
+        Place(portrait, 64, 26, 91, 91, true);
 
         int y = 216;
         Field("Contract Type", "ContractType", 49, y, 175, 167, "Handshake",
@@ -609,10 +642,18 @@ internal sealed class ContractsWorkspaceView : UserControl
             ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
         for (int i = 0; i < roleKeys.Length; i++)
         {
-            var toggle = new RoleToggle(roleLabels[i])
+            var toggle = new CheckBox
             {
                 Name = "ContractRole_" + roleKeys[i],
-                Checked = EnabledRole(_selected ?? workerIdentity, roleKeys[i])
+                Text = roleLabels[i],
+                Checked = EnabledRole(_selected ?? workerIdentity, roleKeys[i]),
+                AutoCheck = true,
+                TabStop = true,
+                BackColor = Color.Transparent,
+                ForeColor = Color.FromArgb(225, 239, 248),
+                Font = new Font("Segoe UI", 9.1f, FontStyle.Regular),
+                CheckAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleLeft
             };
             _roles.Add(roleKeys[i], toggle);
             Place(toggle, 1088, 222 + i * 34, 240, 29, true);
@@ -731,11 +772,11 @@ internal sealed class ContractsWorkspaceView : UserControl
             StringComparer.OrdinalIgnoreCase);
         if (_creating)
             PrwContractStore.Create(_file, _password, _workerUid,
-                employer, values, roles, _biography.Input.Text);
+                employer, values, roles, _biography.Text);
         else
             PrwContractStore.Update(_file, _password, _workerUid,
                 _selected ?? throw new InvalidOperationException("No contract selected."),
-                values, roles, _biography.Input.Text);
+                values, roles, _biography.Text);
         _editorMode(false);
         _saved();
     }
@@ -819,27 +860,15 @@ internal sealed class ContractsWorkspaceView : UserControl
         g.FillRectangle(glass, rect);
     }
 
-    private static void PanelFrame(Graphics g, Rectangle rect)
-    {
-        // Match the Worker Editor's glass instead of obscuring its skin
-        // artwork with the old opaque, nearly black card rectangles.
-        FillGradient(g, rect, Color.FromArgb(164, 11, 40, 66),
-            Color.FromArgb(174, 4, 19, 39), 10);
-        using var rounded = Round(rect, 10);
-        using (var gleam = new Pen(Color.FromArgb(35, Cyan), 4f))
-            g.DrawPath(gleam, rounded);
-        Stroke(g, rect, Color.FromArgb(190, 41, 199, 230), 10, 1.25f);
-    }
+    private static void PanelFrame(Graphics g, Rectangle rect) =>
+        WorkerEditorTheme.PaintCard(g,
+            new Rectangle(rect.Left, rect.Top, rect.Width - 1, rect.Height - 1));
 
     private static void SectionBand(Graphics g, Rectangle rect, string name)
     {
-        // Experienced players need section names, not pictograms or subtitles.
-        FillGradient(g, rect, Color.FromArgb(186, 19, 76, 118),
-            Color.FromArgb(166, 7, 37, 67), 8);
-        using var line = new Pen(Color.FromArgb(162, 37, 185, 221), 1.1f);
-        g.DrawLine(line, rect.Left, rect.Bottom, rect.Right, rect.Bottom);
-        Caption(g, name, rect.Left + 18, rect.Top + 2,
-            rect.Width - 32, rect.Height - 3, 16.1f, true);
+        WorkerEditorTheme.PaintHeader(g, rect);
+        Caption(g, name, rect.Left + 11, rect.Top + 1,
+            rect.Width - 19, rect.Height - 2, 9.7f, true);
     }
 
     private void PaintSelector(Graphics g)
@@ -941,24 +970,13 @@ internal sealed class ContractsWorkspaceView : UserControl
         Caption(g, "Name", 179, 62, 87, 25, 10.4f, true);
         Caption(g, "Short Name", 179, 97, 87, 25, 9.1f, true);
         Caption(g, "Biography", 732, 23, 84, 25, 10.4f, true);
-        FillGradient(g, new Rectangle(46, 17, 113, 119),
-            Color.FromArgb(22, 43, 61), Color.Black, 4);
-        Stroke(g, new Rectangle(46, 17, 113, 119), Cyan, 4);
-        Caption(g, _workerName.ToUpperInvariant(),
-            48, 116, 110, 18, 9f, true, White,
-            alignment: ContentAlignment.MiddleCenter);
-        if (_portrait is not null)
-            g.DrawImage(_portrait, new Rectangle(48, 19, 109, 96));
-        else
-            DrawHeadPortrait(g, new Rectangle(62, 28, 79, 83));
-
         int[] xs = [25, 366, 706, 1055];
         int[] widths = [330, 329, 335, 286];
         for (int i = 0; i < 4; i++)
         {
             var card = new Rectangle(xs[i], 155, widths[i], 426);
             PanelFrame(g, card);
-            SectionBand(g, new Rectangle(xs[i] + 1, 156, widths[i] - 2, 43),
+            SectionBand(g, new Rectangle(xs[i] + 1, 156, widths[i] - 2, 30),
                 new[] { "Basic Details", "Roster Details",
                     "Terms, Perks & Bonuses", "Roles" }[i]);
         }
@@ -978,18 +996,6 @@ internal sealed class ContractsWorkspaceView : UserControl
         Caption(g, "Copy Terms From Another Contract", 52, 650, 299, 29, 10.6f, true);
     }
 
-    private static void DrawHeadPortrait(Graphics g, Rectangle rect)
-    {
-        using var shadow = new SolidBrush(Color.FromArgb(55, 65, 75));
-        using var light = new SolidBrush(Color.FromArgb(139, 145, 152));
-        using var dark = new SolidBrush(Color.FromArgb(20, 23, 28));
-        g.FillEllipse(shadow, rect.Left + 20, rect.Top + 1, 40, 53);
-        g.FillEllipse(light, rect.Left + 23, rect.Top + 5, 34, 48);
-        g.FillEllipse(dark, rect.Left + 9, rect.Bottom - 27, 66, 53);
-        using var pen = new Pen(Color.FromArgb(70, 80, 87), 2);
-        g.DrawArc(pen, rect.Left + 24, rect.Top + 7, 30, 44, 0, 180);
-    }
-
     private sealed class ContractText : UserControl
     {
         internal TextBox Input { get; }
@@ -1000,7 +1006,7 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
-            BackColor = Color.FromArgb(0, 21, 37);
+            BackColor = WorkerEditorTheme.FieldInk;
             _searchIcon = !multiline && placeholder.Length > 0;
             _placeholder = placeholder;
             Cursor = _searchIcon ? Cursors.IBeam : Cursors.Default;
@@ -1010,7 +1016,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Multiline = multiline,
                 ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None,
                 Font = new Font("Segoe UI", multiline ? 10 : 11, FontStyle.Regular),
-                ForeColor = White, BackColor = Color.FromArgb(4, 27, 48),
+                ForeColor = WorkerEditorTheme.FieldText,
+                BackColor = WorkerEditorTheme.FieldInk,
                 PlaceholderText = placeholder,
                 Visible = !_searchIcon
             };
@@ -1046,13 +1053,11 @@ internal sealed class ContractsWorkspaceView : UserControl
         {
             var r = new Rectangle(1, 1, Math.Max(2, Width - 3),
                 Math.Max(2, Height - 3));
-            FillGradient(e.Graphics, r, Color.FromArgb(18, 52, 83),
-                Color.FromArgb(1, 21, 40), 5);
-            Stroke(e.Graphics, r, Color.FromArgb(139, 185, 225), 5, 1.2f);
+            WorkerEditorTheme.PaintField(e.Graphics, ClientRectangle, Enabled);
             if (_searchIcon)
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using var searchPen = new Pen(White, 2.2f)
+                using var searchPen = new Pen(WorkerEditorTheme.FieldText, 1.9f)
                 {
                     StartCap = LineCap.Round, EndCap = LineCap.Round
                 };
@@ -1061,7 +1066,7 @@ internal sealed class ContractsWorkspaceView : UserControl
                     36, Height / 2 + 11);
                 if (!Input.Visible && Input.TextLength == 0)
                     Caption(e.Graphics, _placeholder, 45, 3, Math.Max(1, Width - 52),
-                        Math.Max(1, Height - 7), 10.4f, false, Dim, italic: true);
+                        Math.Max(1, Height - 7), 10.4f, false, WorkerEditorTheme.FieldText, italic: true);
             }
         }
     }
@@ -1089,9 +1094,9 @@ internal sealed class ContractsWorkspaceView : UserControl
             SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.ResizeRedraw, true);
-            BackColor = Color.FromArgb(18, 49, 78);
-            ForeColor = White;
-            Font = new Font("Segoe UI", 9.6f, FontStyle.Bold);
+            BackColor = WorkerEditorTheme.FieldInk;
+            ForeColor = WorkerEditorTheme.FieldText;
+            Font = new Font("Segoe UI", 9.15f, FontStyle.Bold);
             TabStop = false;
             Cursor = Cursors.IBeam;
             _input = new TextBox
@@ -1099,8 +1104,8 @@ internal sealed class ContractsWorkspaceView : UserControl
                 Name = "EditableValue",
                 BorderStyle = BorderStyle.None,
                 Multiline = false,
-                ForeColor = White,
-                BackColor = Color.FromArgb(19, 51, 80),
+                ForeColor = WorkerEditorTheme.FieldText,
+                BackColor = WorkerEditorTheme.FieldInk,
                 Font = Font,
                 TabStop = true,
                 ShortcutsEnabled = true
@@ -1111,7 +1116,8 @@ internal sealed class ContractsWorkspaceView : UserControl
             EnabledChanged += (_, _) =>
             {
                 _input.ReadOnly = !Enabled;
-                _input.ForeColor = Enabled ? White : Dim;
+                _input.ForeColor = Enabled
+                    ? WorkerEditorTheme.FieldText : Color.FromArgb(112, 128, 140);
                 Invalidate();
             };
             Disposed += (_, _) =>
@@ -1194,69 +1200,14 @@ internal sealed class ContractsWorkspaceView : UserControl
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            var rect = new Rectangle(1, 1, Math.Max(2, Width - 3),
-                Math.Max(2, Height - 3));
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            FillGradient(e.Graphics, rect, Color.FromArgb(34, 81, 115),
-                Color.FromArgb(16, 48, 80), 5);
-            Stroke(e.Graphics, rect,
-                Enabled ? Color.FromArgb(151, 194, 222) :
-                    Color.FromArgb(83, 125, 151), 5, 1.1f);
+            WorkerEditorTheme.PaintField(e.Graphics, ClientRectangle, Enabled);
             if (_choices.Length == 0) return;
-            int x = Width - 15, y = Height / 2;
-            using var chevron = new SolidBrush(
-                Enabled ? Color.FromArgb(232, 241, 250) : Dim);
-            e.Graphics.FillPolygon(chevron,
-                [new Point(x - 5, y - 2), new Point(x + 5, y - 2),
-                 new Point(x, y + 3)]);
-        }
-    }
-
-    private sealed class RoleToggle : Control
-    {
-        [System.ComponentModel.DesignerSerializationVisibility(
-            System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-        internal bool Checked { get; set; }
-        internal RoleToggle(string title)
-        {
-            Text = title;
-            TabStop = true;
-            Cursor = Cursors.Hand;
-            SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.SupportsTransparentBackColor, true);
-            BackColor = Color.Transparent;
-        }
-        protected override void OnClick(EventArgs e)
-        {
-            Checked = !Checked;
-            Invalidate();
-            base.OnClick(e);
-        }
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Space)
-            {
-                OnClick(EventArgs.Empty);
-                e.Handled = true;
-            }
-        }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            FillGradient(g, new Rectangle(2, 3, 26, 24), Color.FromArgb(12, 43, 65),
-                Color.FromArgb(0, 19, 36), 4);
-            Stroke(g, new Rectangle(2, 3, 26, 24), Checked ? Cyan : Dim,
-                4, Checked ? 2.5f : 1.7f);
-            if (Checked)
-            {
-                using var pen = new Pen(White, 3f) { StartCap = LineCap.Round,
-                    EndCap = LineCap.Round };
-                g.DrawLines(pen, [new Point(7, 15), new Point(12, 20),
-                    new Point(23, 8)]);
-            }
-            Caption(g, Text, 46, 0, Math.Max(1, Width - 48), Height, 10.1f, true);
+            int x = Width - 14, y = Height / 2 + 1;
+            using var arrow = new SolidBrush(WorkerEditorTheme.FieldText);
+            e.Graphics.FillPolygon(arrow,
+                [new Point(x - 4, y - 3),
+                 new Point(x + 4, y - 3),
+                 new Point(x, y + 2)]);
         }
     }
 
@@ -1311,24 +1262,10 @@ internal sealed class ContractsWorkspaceView : UserControl
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            var rect = new Rectangle(2, 2, Math.Max(2, Width - 5),
-                Math.Max(2, Height - 5));
-            Color upper = _primary
-                ? Color.FromArgb(30, 121, 179) :
-                  _hover ? Color.FromArgb(35, 90, 133) :
-                           Color.FromArgb(26, 66, 101);
-            Color lower = _primary
-                ? Color.FromArgb(8, 64, 112) :
-                  _hover ? Color.FromArgb(11, 48, 82) :
-                           Color.FromArgb(10, 33, 57);
-            FillGradient(g, rect, upper, lower, 5);
-            Stroke(g, rect,
-                _primary ? Color.FromArgb(122, 223, 242) :
-                    Color.FromArgb(139, 184, 218), 5, 1.25f);
-            Caption(g, Text, 7, 2, Math.Max(1, Width - 14),
-                Math.Max(1, Height - 4), 10.6f, true,
+            WorkerEditorTheme.PaintAction(e.Graphics, ClientRectangle, _primary,
+                _primary ? WorkerEditorTheme.Accent : WorkerEditorTheme.Edge);
+            Caption(e.Graphics, Text, 5, 1, Math.Max(1, Width - 10),
+                Math.Max(1, Height - 2), 9.4f, true,
                 Enabled ? White : Dim,
                 alignment: ContentAlignment.MiddleCenter);
         }

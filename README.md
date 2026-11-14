@@ -1,5 +1,13 @@
 # Pro Wrestling Revolution
 
+## Version 0.6.9: One Worker Editor design system
+
+The General Worker Editor defines the shared visual language for every worker section. `WorkerEditorTheme.cs` now contains the actual silver-white field gradient, steel-blue border, glass panel, metallic section header, picture box, biography editor and action finishes used in General and Contracts. The Contracts layout remains full-width without the General sidebar, and continues to arrange contract-specific data in four panels.
+
+General's 91 by 91 PictureBox, centered zoom, picture-pack lookup and NO IMAGE behavior are shared with Contracts. The Contract biography now uses General's light RichTextBox and frame. All editable contract inputs use the same light silver gradient with dark text, while preserving typing and database choice menus. Roles use matching native checkboxes and the action buttons use the same gradient treatment without extra icons.
+
+The General preview is pixel-identical before and after extraction at 1366 by 768. Windows smoke tests check shared portrait and biography appearance, silver field fill, and input editability. No contract persistence or database schema changes are introduced.
+
 ## Version 0.6.8: Worker-consistent contract inputs and glass
 
 The Contracts selection and editor now reuse the current skin's **Backgrounds/Worker_Editor.jpg** (falling back to Obsidian) instead of painting a disconnected dark arena. All native contract fields, including Name, Short Name, Wage, Downside and Contract Begin, share one blue-glass input style that supports direct typing. Where choices exist, a small dropdown indicator also exposes values from the MDB. Numeric and date inputs are validated at Save. Fields absent from the current native contract schema remain read-only; values must never falsely appear saved.

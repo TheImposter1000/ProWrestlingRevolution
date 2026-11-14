@@ -722,6 +722,29 @@ internal static class Program
                              "ContractCopySource" })
                     if (contractView.Controls.Find(name, true).Length != 1)
                         throw new Exception("Contract editor layout is missing " + name);
+                // Contracts must use the actual General Worker components,
+                // not an independently styled portrait or navy biography box.
+                var contractPortrait = contractView.Controls
+                    .Find("ContractWorkerPicture", true)
+                    .OfType<PictureBox>().Single();
+                using (var expectedPortrait =
+                    WorkerEditorTheme.CreatePortrait("ReferenceWorkerPortrait"))
+                {
+                    if (contractPortrait.Size != expectedPortrait.Size ||
+                        contractPortrait.BorderStyle != expectedPortrait.BorderStyle ||
+                        contractPortrait.SizeMode != expectedPortrait.SizeMode ||
+                        contractPortrait.BackColor != expectedPortrait.BackColor)
+                        throw new Exception("Contract portrait diverged from General.");
+                }
+                var contractBio = contractView.Controls.Find("ContractBiography", true)
+                    .OfType<RichTextBox>().Single();
+                if (contractBio.BackColor != WorkerEditorTheme.FieldInk ||
+                    contractBio.ForeColor != Color.FromArgb(16, 28, 41) ||
+                    contractBio.BorderStyle != BorderStyle.None)
+                    throw new Exception("Contract biography differs from General.");
+                if (contractView.Controls.Find("ContractRole_RoleWrestler", true)
+                    .Single() is not CheckBox)
+                    throw new Exception("Contracts must reuse General's checkbox style.");
                 // Every editable entry, including numeric/date, must expose the
                 // exact same styled input surface as list-backed contract fields.
                 var fieldsToCheck = new[] { "Name", "ShortName", "Wage",
@@ -736,6 +759,8 @@ internal static class Program
                     if (control.GetType() != sharedType ||
                         control.Controls.Find("EditableValue", true)
                             .SingleOrDefault() is not TextBox edit ||
+                        edit.BackColor != WorkerEditorTheme.FieldInk ||
+                        edit.ForeColor != WorkerEditorTheme.FieldText ||
                         !edit.Enabled || edit.ReadOnly)
                         throw new Exception(
                             "Contract value is not consistently typeable: " + field);
@@ -783,6 +808,17 @@ internal static class Program
                     workerEditor.Controls.Find("WorkerPage", true).Length != 1 ||
                     workerEditor.Controls.Find("WorkerSectionNavigation", true).Length != 1)
                     throw new Exception("Worker Editor fixed general layout is missing.");
+                var workerPortrait = workerEditor.Controls.Find("WorkerPicture", true)
+                    .OfType<PictureBox>().Single();
+                if (workerPortrait.Size != new Size(91, 91) ||
+                    workerPortrait.BorderStyle != BorderStyle.FixedSingle ||
+                    workerPortrait.SizeMode != PictureBoxSizeMode.Zoom)
+                    throw new Exception("General Worker portrait template changed.");
+                var workerBio = workerEditor.Controls.Find("WorkerBiography", true)
+                    .OfType<RichTextBox>().Single();
+                if (workerBio.BackColor != WorkerEditorTheme.FieldInk ||
+                    workerBio.ForeColor != Color.FromArgb(16, 28, 41))
+                    throw new Exception("General Worker biography template changed.");
                 if (workerEditor.Controls.Find("WorkerBackToDatabase", true).Length != 0)
                     throw new Exception("Worker Editor must not add an extra Back to Database button.");
                 if (workerEditor.Controls.Find("WorkerPictureTypeLabel", true).Length != 1 ||

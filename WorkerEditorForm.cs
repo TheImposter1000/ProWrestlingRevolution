@@ -15,14 +15,14 @@ namespace ProWrestlingRevolution;
 /// </summary>
 internal sealed class WorkerEditorForm : UserControl
 {
-    private static readonly Color Ink = Color.FromArgb(9, 18, 31);
-    private static readonly Color Surface = Color.FromArgb(17, 34, 53);
-    private static readonly Color Dark = Color.FromArgb(11, 26, 42);
+    private static readonly Color Ink = WorkerEditorTheme.Ink;
+    private static readonly Color Surface = WorkerEditorTheme.Surface;
+    private static readonly Color Dark = WorkerEditorTheme.Dark;
     private static readonly Color Header = Color.FromArgb(27, 64, 101);
-    private static readonly Color Edge = Color.FromArgb(65, 132, 183);
-    private static readonly Color Accent = Color.FromArgb(39, 177, 232);
+    private static readonly Color Edge = WorkerEditorTheme.Edge;
+    private static readonly Color Accent = WorkerEditorTheme.Accent;
     private static readonly Color TextInk = Color.FromArgb(225, 239, 248);
-    private static readonly Color FieldInk = Color.FromArgb(240, 247, 251);
+    private static readonly Color FieldInk = WorkerEditorTheme.FieldInk;
 
     private readonly AppPaths _paths;
     private readonly SkinPalette _palette;
@@ -232,63 +232,9 @@ internal sealed class WorkerEditorForm : UserControl
         };
 
         card.Paint += (_, e) =>
-        {
-            var rect = new Rectangle(
-                0, 0, card.ClientSize.Width - 1,
-                card.ClientSize.Height - 1);
-
-            if (rect.Width < 13 || rect.Height < 13)
-                return;
-
-            const int radius = 6;
-            int diameter = radius * 2;
-
-            using var path = new GraphicsPath();
-
-            path.AddArc(rect.Left, rect.Top,
-                diameter, diameter, 180, 90);
-
-            path.AddArc(rect.Right - diameter, rect.Top,
-                diameter, diameter, 270, 90);
-
-            path.AddArc(rect.Right - diameter, rect.Bottom - diameter,
-                diameter, diameter, 0, 90);
-
-            path.AddArc(rect.Left, rect.Bottom - diameter,
-                diameter, diameter, 90, 90);
-
-            path.CloseFigure();
-
-            using var gradient = new LinearGradientBrush(
-                rect,
-                Color.FromArgb(210, 28, 35, 47),
-                Color.FromArgb(220, 14, 22, 34),
-                LinearGradientMode.Vertical);
-
-            e.Graphics.FillPath(gradient, path);
-
-            using var pen = new Pen(Edge);
-
-            e.Graphics.DrawLine(pen,
-                rect.Left, rect.Top + radius,
-                rect.Left, rect.Bottom - radius);
-
-            e.Graphics.DrawArc(pen,
-                rect.Left, rect.Bottom - diameter,
-                diameter, diameter, 90, 90);
-
-            e.Graphics.DrawLine(pen,
-                rect.Left + radius, rect.Bottom,
-                rect.Right - radius, rect.Bottom);
-
-            e.Graphics.DrawArc(pen,
-                rect.Right - diameter, rect.Bottom - diameter,
-                diameter, diameter, 0, 90);
-
-            e.Graphics.DrawLine(pen,
-                rect.Right, rect.Bottom - radius,
-                rect.Right, rect.Top + radius);
-        };
+            WorkerEditorTheme.PaintCard(e.Graphics,
+                new Rectangle(0, 0, card.ClientSize.Width - 1,
+                    card.ClientSize.Height - 1));
 
         var heading = new Panel
         {
@@ -301,56 +247,8 @@ internal sealed class WorkerEditorForm : UserControl
             Name = name + "Heading"
         };
         heading.Paint += (_, e) =>
-        {
-            int width = heading.ClientSize.Width;
-            int height = heading.ClientSize.Height;
+            WorkerEditorTheme.PaintHeader(e.Graphics, heading.ClientRectangle);
 
-            if (width < 12 || height < 12)
-                return;
-
-            const int diameter = 10;
-
-            using var path = new GraphicsPath();
-
-            path.AddArc(0, 0, diameter, diameter, 180, 90);
-            path.AddArc(width - diameter - 1, 0,
-                diameter, diameter, 270, 90);
-
-            path.AddLine(width - 1, height - 1, 0, height - 1);
-            path.CloseFigure();
-
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-            using var gradient = new LinearGradientBrush(
-                new Rectangle(0, 0, width, height),
-                Color.FromArgb(36, 91, 144),
-                Color.FromArgb(23, 54, 85),
-                LinearGradientMode.Vertical);
-
-            e.Graphics.FillPath(gradient, path);
-
-            using var pen = new Pen(Accent);
-            e.Graphics.DrawLine(
-                pen, 0, height - 1, width - 1, height - 1);
-            using var edgePen = new Pen(Edge);
-
-            e.Graphics.DrawArc(
-                edgePen, 0, 0,
-                diameter, diameter, 180, 90);
-
-            e.Graphics.DrawArc(
-                edgePen, width - diameter - 1, 0,
-                diameter, diameter, 270, 90);
-
-            e.Graphics.DrawLine(
-                edgePen, 0, diameter / 2,
-                0, height - 1);
-
-            e.Graphics.DrawLine(
-                edgePen, width - 1, diameter / 2,
-                width - 1, height - 1);
-        };
-  
         string symbol = title switch
         {
             "Personal Data" => "▤",
@@ -566,42 +464,7 @@ internal sealed class WorkerEditorForm : UserControl
 
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
-            var bounds = new Rectangle(
-                1, 1,
-                rect.Width - 3,
-                rect.Height - 3);
-
-            const int diameter = 10;
-
-            using var path = new GraphicsPath();
-
-            path.AddArc(bounds.Left, bounds.Top,
-                diameter, diameter, 180, 90);
-
-            path.AddArc(bounds.Right - diameter, bounds.Top,
-                diameter, diameter, 270, 90);
-
-            path.AddArc(bounds.Right - diameter,
-                bounds.Bottom - diameter,
-                diameter, diameter, 0, 90);
-
-            path.AddArc(bounds.Left,
-                bounds.Bottom - diameter,
-                diameter, diameter, 90, 90);
-
-            path.CloseFigure();
-
-            using var gradient = new LinearGradientBrush(bounds,
-                Color.FromArgb(255,255,255),
-                Color.FromArgb(205,220,235),
-                LinearGradientMode.Vertical);
-
-            e.Graphics.FillPath(gradient, path);
-
-            using var border = new Pen(
-                Color.FromArgb(110, 145, 170), 1f);
-
-            e.Graphics.DrawPath(border, path);
+            WorkerEditorTheme.PaintField(e.Graphics, rect, Enabled);
 
             bool indicator = DropDownIndicator || CalendarIndicator || SpinnerIndicator;
             var textArea = new Rectangle(5, 0,
@@ -1039,15 +902,8 @@ internal sealed class WorkerEditorForm : UserControl
         card.Controls.Add(first);
         card.Controls.Add(second);
 
-        var portrait = new PictureBox
-        {
-            Name = "WorkerPicture",
-            Location = new Point(100, 55),
-            Size = new Size(91,91),
-            BackColor = Color.FromArgb(21, 41, 61),
-            BorderStyle = BorderStyle.FixedSingle,
-            SizeMode = PictureBoxSizeMode.Zoom
-        };
+        var portrait = WorkerEditorTheme.CreatePortrait("WorkerPicture");
+        portrait.Location = new Point(100, 55);
         card.Controls.Add(portrait);
 
         // Picture Type belongs alongside the portrait, not in the
@@ -1069,59 +925,8 @@ internal sealed class WorkerEditorForm : UserControl
         Bind(pictureType, worker, "BiographyType");
         card.Controls.Add(pictureTypeLabel);
         card.Controls.Add(pictureType);
-        string picture = Display(worker, "Picture");
-        string safeName = Path.GetFileName(picture);
-
-        if (string.IsNullOrWhiteSpace(safeName))
-        {
-            string workerName = Display(worker, "Name");
-
-            string workerFolder = Path.Combine(
-                _paths.Pictures, "Default", "Workers");
-
-            foreach (string extension in new[]
-            {
-        ".gif", ".jpg", ".jpeg", ".png", ".bmp"
-    })
-            {
-                string candidate = Path.Combine(
-                    workerFolder, workerName + extension);
-
-                if (File.Exists(candidate))
-                {
-                    safeName = Path.GetFileName(candidate);
-                    break;
-                }
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(safeName))
-        {
-            var paths = new[]
-            {
-                Path.Combine(_paths.Pictures, safeName),
-                Path.Combine(_paths.Pictures, "Default", "Workers", safeName),
-                Path.Combine(_paths.Pictures, "Workers", safeName),
-                Path.Combine(_paths.Pictures, "People", safeName),
-                Path.Combine(_paths.Pictures, "Worker", safeName)
-            };
-            var file = paths.FirstOrDefault(File.Exists);
-            if (file is not null)
-            {
-                try
-                {
-                    using var stream = File.OpenRead(file);
-                    using var image = Image.FromStream(stream);
-                    // Only one detached bitmap is needed for each portrait.
-                    portrait.Image = new Bitmap(image);
-                }
-                catch (Exception ex) when (
-                    ex is IOException or ArgumentException or OutOfMemoryException)
-                {
-                    // Missing or invalid worker photographs are optional.
-                }
-            }
-        }
+        portrait.Image = WorkerEditorTheme.LoadWorkerPortrait(_paths,
+            Display(worker, "Picture"), Display(worker, "Name"));
         if (portrait.Image is null)
         {
             portrait.Controls.Add(new Label
@@ -1164,22 +969,14 @@ internal sealed class WorkerEditorForm : UserControl
             ForeColor = Color.White, BackColor = Color.Transparent
         };
         var text = Display(First("tblWorkerBio"), "Biography");
-        var bio = new RichTextBox
-        {
-            Name = "WorkerBiography",
-            Location = new Point(96, 8),
-            Size = new Size(605, 100),
-            BorderStyle = BorderStyle.None,
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            ReadOnly = _databaseFile is null,
-            DetectUrls = false,
-            TabStop = false,
-            ScrollBars = RichTextBoxScrollBars.None,
-            BackColor = FieldInk,
-            ForeColor = Color.FromArgb(16, 28, 41),
-            Text = string.IsNullOrWhiteSpace(text) ?
-                "No biography has been entered for this worker." : text
-        };
+        var bio = WorkerEditorTheme.CreateBiography("WorkerBiography",
+            string.IsNullOrWhiteSpace(text)
+                ? "No biography has been entered for this worker." : text,
+            _databaseFile is null);
+        bio.Location = new Point(96, 8);
+        bio.Size = new Size(605, 100);
+        bio.TabStop = false;
+        bio.ScrollBars = RichTextBoxScrollBars.None;
         card.Controls.Add(heading);
         heading.Visible = false;
 
@@ -1207,43 +1004,9 @@ internal sealed class WorkerEditorForm : UserControl
         };
 
         bioFrame.Paint += (_, e) =>
-        {
-            var rect = new Rectangle(
-                1, 1,
-                bioFrame.ClientSize.Width - 3,
-                bioFrame.ClientSize.Height - 3);
-
-            if (rect.Width < 13 || rect.Height < 13)
-                return;
-
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-            const int diameter = 12;
-
-            using var path = new GraphicsPath();
-
-            path.AddArc(rect.Left, rect.Top,
-                diameter, diameter, 180, 90);
-
-            path.AddArc(rect.Right - diameter, rect.Top,
-                diameter, diameter, 270, 90);
-
-            path.AddArc(rect.Right - diameter,
-                rect.Bottom - diameter,
-                diameter, diameter, 0, 90);
-
-            path.AddArc(rect.Left,
-                rect.Bottom - diameter,
-                diameter, diameter, 90, 90);
-
-            path.CloseFigure();
-
-            using var brush = new SolidBrush(FieldInk);
-            e.Graphics.FillPath(brush, path);
-
-            using var pen = new Pen(Edge);
-            e.Graphics.DrawPath(pen, path);
-        };
+            WorkerEditorTheme.PaintBiographyFrame(e.Graphics,
+                new Rectangle(1, 1, bioFrame.ClientSize.Width - 3,
+                    bioFrame.ClientSize.Height - 3));
 
         bio.Dock = DockStyle.Fill;
         bioFrame.Controls.Add(bio);
@@ -1991,21 +1754,8 @@ else
             if (bounds.Width <= 2 || bounds.Height <= 2) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var fill = new LinearGradientBrush(
-    bounds,
-    Name == "WorkerSave"
-        ? Color.FromArgb(30, 145, 210)
-        : Color.FromArgb(33, 52, 72),
-    Name == "WorkerSave"
-        ? Color.FromArgb(10, 100, 165)
-        : Color.FromArgb(12, 24, 40),
-    LinearGradientMode.Vertical))
-            {
-                g.FillRectangle(fill, bounds);
-            }
-            using var outline = new Pen(FlatAppearance.BorderColor, 1f);
-            g.DrawRectangle(outline, 0, 0,
-                bounds.Width - 1, bounds.Height - 1);
+            WorkerEditorTheme.PaintAction(g, bounds, Name == "WorkerSave",
+                FlatAppearance.BorderColor);
 
             var textSize = TextRenderer.MeasureText(g, Text, Font,
                 new Size(int.MaxValue, Height),
