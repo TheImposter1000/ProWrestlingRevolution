@@ -737,8 +737,8 @@ internal static class Program
                 // without writing to a database.
                 contractsView.Controls.Find("ContractAdd", true)
                     .OfType<Button>().Single().PerformClick();
-                var drafts = contractTable.Rows.Cast<DataRow>()
-                    .Where(row => row.RowState == DataRowState.Added).ToArray();
+                var drafts = contractTable.Rows.Cast<System.Data.DataRow>()
+                    .Where(row => row.RowState == System.Data.DataRowState.Added).ToArray();
                 if (!contractsView.IsEditing || drafts.Length != 1 ||
                     contractsView.Controls.Find("ContractField_Name", true).Length != 1)
                     throw new Exception(
