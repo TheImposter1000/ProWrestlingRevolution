@@ -44,6 +44,27 @@ public sealed partial class LauncherForm : Form
         KeyDown += HandleShortcut;
     }
 
+    /// <summary>
+    /// Enable unattended stable-release updates for the installed game only.
+    /// Smoke tests and preview windows never attach this handler.
+    /// The player can opt out under Skins without changing their data.
+    /// </summary>
+    internal void EnableAutomaticReleaseUpdates()
+    {
+        if (!_paths.ReadSetting("AutoInstallUpdates", "Yes")
+            .Equals("Yes", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Shown += async (_, _) =>
+        {
+            await Task.Yield();
+            if (IsDisposed) return;
+            await GameUpdate.AutoInstallIfNewerAsync(this, _updateButton,
+                () => !IsDisposed && _currentPage == "HOME" &&
+                      WindowState != FormWindowState.Minimized);
+        };
+    }
+
     private void HandleShortcut(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Escape && _currentPage != "HOME")
@@ -316,6 +337,16 @@ public sealed partial class LauncherForm : Form
             ShowSkins();
         }, true));
         right.Controls.Add(ActionButton("OPEN SKINS FOLDER", () => OpenFolder(_paths.SkinsRoot)));
+        bool automaticUpdates = _paths.ReadSetting("AutoInstallUpdates", "Yes")
+            .Equals("Yes", StringComparison.OrdinalIgnoreCase);
+        right.Controls.Add(ActionButton(
+            automaticUpdates ? "AUTO INSTALL UPDATES: ON" : "AUTO INSTALL UPDATES: OFF",
+            () =>
+            {
+                _paths.WriteSetting("AutoInstallUpdates",
+                    automaticUpdates ? "No" : "Yes");
+                ShowSkins();
+            }));
         right.Controls.Add(information);
         skins.SelectedIndexChanged += (_, _) =>
         {
