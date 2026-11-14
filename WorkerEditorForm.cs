@@ -76,6 +76,8 @@ internal sealed class WorkerEditorForm : UserControl
             ShowSection("General");
             return;
         }
+        if (_active == "Contracts" && ActiveContractsEditor()?.ReturnToList() == true)
+            return;
         if (HasPendingChanges() &&
             MessageBox.Show(FindForm(),
                 "Discard unsaved worker changes and return to the Database Editor?",
@@ -690,6 +692,9 @@ internal sealed class WorkerEditorForm : UserControl
     private WorkerSkillsEditor? ActiveSkillsEditor() =>
         _content.Controls.OfType<WorkerSkillsEditor>().FirstOrDefault();
 
+    private WorkerContractsEditor? ActiveContractsEditor() =>
+        _content.Controls.OfType<WorkerContractsEditor>().FirstOrDefault();
+
     private DataRow? First(string table) =>
         _profile.Sections.FirstOrDefault(s => s.Table.Equals(table, StringComparison.OrdinalIgnoreCase))
             ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
@@ -927,7 +932,7 @@ internal sealed class WorkerEditorForm : UserControl
         int height = _body.ClientSize.Height;
         var timer = System.Diagnostics.Stopwatch.StartNew();
 
-        bool skills = _active == "Skills";
+        bool skills = _active is "Skills" or "Contracts";
         _identityBiography.Visible = !skills;
         _identityBiography.Bounds = new Rectangle(contentX, 10, width, 152);
         long topTime = timer.ElapsedMilliseconds;
@@ -1650,6 +1655,9 @@ else
         if (_active == "Skills" &&
             ActiveSkillsEditor()?.ValidateBeforeLeaving() == false)
             return;
+        if (_active == "Contracts" &&
+            ActiveContractsEditor()?.ValidateBeforeLeaving() == false)
+            return;
 
         var timer = System.Diagnostics.Stopwatch.StartNew();
         bool existingPage = _sectionViews.TryGetValue(section, out var target) &&
@@ -1693,13 +1701,14 @@ else
             {
                 if (section == "General") BuildGeneral();
                 else if (section == "Skills") BuildSkills();
+                else if (section == "Contracts") BuildContracts();
                 else BuildSecondary(section);
                 var rendered = _content.Controls.Cast<Control>().Single();
                 _sectionViews[section] = rendered;
                 SectionViewBuildCount++;
             }
 
-            SetImmersiveSkillsLayout(section == "Skills");
+            SetImmersiveSkillsLayout(section is "Skills" or "Contracts");
         }
         finally
         {
@@ -1718,7 +1727,7 @@ else
 
     private void RestoreCachedActions(Control view, string section)
     {
-        if (section == "Skills") return;
+        if (section is "Skills" or "Contracts") return;
         if (section == "General" && view is TableLayoutPanel general)
         {
             _actionArea.Dock = DockStyle.Fill;
@@ -1769,6 +1778,20 @@ else
     {
         _content.Controls.Add(new WorkerSkillsEditor(_profile,
             _databaseFile is not null, SaveWorker, _loadedSkillValues));
+    }
+
+    private void BuildContracts()
+    {
+        _content.Controls.Add(new WorkerContractsEditor(_paths, _profile,
+            _databaseFile, _password,
+            context => SectionChanged?.Invoke(context),
+            () =>
+            {
+                // A contract Save should return to its list, not close the
+                // Worker Editor or commit unrelated unsaved worker fields.
+                _initialValueSnapshot = SnapshotValues(_profile);
+                _saveStatus.Text = "";
+            }));
     }
 
     private static string? SectionTable(string section) => section switch
