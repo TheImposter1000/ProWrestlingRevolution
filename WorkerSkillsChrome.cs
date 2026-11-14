@@ -241,17 +241,17 @@ internal sealed class SkillGlassHeader : Control
         using var underline = new Pen(Color.FromArgb(170, 0, 206, 253), 1f);
         g.DrawLine(underline, 0, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
 
-        int iconSize = Math.Clamp(rect.Height - 15, 27, 43);
+        int iconSize = Math.Clamp(rect.Height - 10, 35, 53);
         SkillChrome.DrawIcon(g, _icon,
-            new Rectangle(14, (rect.Height - iconSize) / 2, iconSize, iconSize),
+            new Rectangle(23, (rect.Height - iconSize) / 2, iconSize, iconSize),
             Color.FromArgb(232, 244, 255));
-        int left = iconSize + 27;
+        int left = iconSize + 54;
         bool crowded = _heading.Length > 27 && rect.Width < 750;
         float titleSize = crowded ? 13.0f :
-            rect.Width >= 750 ? 17.0f : 14.8f;
+            rect.Width >= 750 ? 18.0f : 15.2f;
         using var titleFont = new Font("Segoe UI", titleSize, FontStyle.Bold);
         using var subtitleFont = new Font("Segoe UI",
-            rect.Width >= 750 ? 9.1f : 8.3f, FontStyle.Italic);
+            rect.Width >= 750 ? 10.7f : 8.9f, FontStyle.Italic);
         Size titleSizePx = TextRenderer.MeasureText(g, _heading, titleFont,
             new Size(2000, 100), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
         int titleWidth = Math.Min(rect.Width - left - 14, titleSizePx.Width + 5);
