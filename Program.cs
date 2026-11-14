@@ -423,6 +423,8 @@ internal static class Program
                 categoricalRow, "LanguageEnglish");
             if (divisions.Select(x => x.Label)
                     .SequenceEqual(WorkerFieldRules.Divisions) == false ||
+                divisions.Select(x => Convert.ToString(x.Value))
+                    .SequenceEqual(WorkerFieldRules.DivisionStorage) == false ||
                 language.Select(x => x.Label)
                     .SequenceEqual(WorkerFieldRules.LanguageLevels) == false ||
                 divisions.Count != 3 || language.Count != 4)
