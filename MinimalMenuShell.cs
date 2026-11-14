@@ -32,12 +32,14 @@ public sealed partial class LauncherForm
         _sidebar.Visible = _currentPage != "HOME" && !isSkills;
         if (isWorker)
         {
-            var title = section == "General" ? "Worker Editor" : section!;
+            var title = section == "General" ? "Worker Editor"
+                : section == "Contracts.Edit" ? "Contracts" : section!;
             var detail = section switch
             {
                 "General" => "Edit Worker",
                 "Skills" => "Worker Skill Editor",
                 "Contracts" => "Worker Contracts",
+                "Contracts.Edit" => "Contract Editor",
                 "Popularity" => "Worker Popularity",
                 "Attributes" => "Worker Attributes",
                 "Business Skills" => "Worker Business Skills",
