@@ -57,7 +57,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PWR-v0.6.1-WorkerEditor-Test
+          name: PWR-v0.6.2-WorkerEditor-Test
           path: publish/ProWrestlingRevolution.exe
           if-no-files-found: error
           retention-days: 30
