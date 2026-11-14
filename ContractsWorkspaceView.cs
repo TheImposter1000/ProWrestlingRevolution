@@ -447,50 +447,48 @@ internal sealed class ContractsWorkspaceView : UserControl
         _labels.Add(new FieldSpec(label, column, labelX, y, inputX, width,
             text, defaultValue, choices));
         string current = Read(_selected, column, defaultValue);
-        Control control;
-        if (text)
+        var choicesForField = new List<string>();
+        DataRow? template = _selected ??
+            _records.Rows.Cast<DataRow>().FirstOrDefault();
+
+        if (!text && template is not null && _file is not null &&
+            template.Table.Columns.Contains(column))
         {
-            var field = new ContractText(false, "");
-            field.Input.Text = current;
-            control = field;
+            foreach (var choice in PrwWorkerFieldOptions.Get(_paths, _file,
+                         _password, template, column))
+                choicesForField.Add(choice.Label);
         }
-        else
+        if (!text && (template?.Table.Columns[column]?.DataType is null ||
+            template.Table.Columns[column]!.DataType == typeof(string)))
+            choicesForField.AddRange(choices);
+
+        if (_creating && !text &&
+            template?.Table.Columns[column]?.DataType is Type inputType &&
+            inputType != typeof(string))
+            current = choicesForField.FirstOrDefault() ?? current;
+        if (!text && current.Length != 0)
+            choicesForField.Insert(0, current);
+
+        // All contract values are the same editable glass field. A field with
+        // known choices also has a subtle arrow to open them; typing is always
+        // possible for schema-backed fields, even when a list is available.
+        var field = new DarkDrop(_palette)
         {
-            var drop = new DarkDrop(_palette);
-            var items = new List<string>();
-            DataRow? template = _selected ??
-                _records.Rows.Cast<DataRow>().FirstOrDefault();
-            if (template is not null && _file is not null &&
-                template.Table.Columns.Contains(column))
-            {
-                foreach (var value in PrwWorkerFieldOptions.Get(_paths, _file,
-                             _password, template, column))
-                    items.Add(value.Label);
-            }
-            if (template?.Table.Columns[column]?.DataType is null ||
-                template.Table.Columns[column]!.DataType == typeof(string))
-                items.AddRange(choices);
-            if (_creating && template?.Table.Columns[column]?.DataType is Type inputType &&
-                inputType != typeof(string) && !text)
-                current = items.FirstOrDefault() ?? current;
-            if (!items.Contains(current, StringComparer.OrdinalIgnoreCase))
-                items.Insert(0, current);
-            drop.SetChoices(items.Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), current);
-            control = drop;
-        }
-        control.Name = "ContractField_" + column;
-        _fields[column] = control;
-        Place(control, inputX, y, width, 25, true);
-        // The reference contains several data items absent from the current MDB.
-        // Keep their exact visible slots, but never offer a fake persistent edit.
+            Name = "ContractField_" + column
+        };
+        field.SetChoices(text ? [] : choicesForField, current);
+        _fields[column] = field;
+        Place(field, inputX, y, width, 25, true);
+
+        // Do not present values absent from tblContract as saved options.
         bool supported = _selected?.Table.Columns.Contains(column) ??
             PrwSchema.Tables.Single(t => t.Name == "tblContract")
                 .Columns.Contains(column, StringComparer.OrdinalIgnoreCase);
         if (!supported)
         {
-            control.Enabled = false;
-            _help.SetToolTip(control, "This field is not present in the current PWR contract table.");
+            field.Enabled = false;
+            _help.SetToolTip(field,
+                "Read-only: this field is not in the current PWR contract schema.");
         }
     }
 
@@ -683,18 +681,13 @@ internal sealed class ContractsWorkspaceView : UserControl
 
     private void SetField(string key, string value)
     {
-        if (!_fields.TryGetValue(key, out var control)) return;
-        if (control is ContractText text) text.Input.Text = value;
-        if (control is DarkDrop drop) drop.SetValue(value);
+        if (_fields.TryGetValue(key, out var control) && control is DarkDrop field)
+            field.SetValue(value);
     }
 
     private string GetField(string key) =>
-        _fields.TryGetValue(key, out var control) ? control switch
-        {
-            ContractText text => text.Input.Text,
-            DarkDrop drop => drop.Value,
-            _ => ""
-        } : "";
+        _fields.TryGetValue(key, out var control) && control is DarkDrop field
+            ? field.Value : "";
 
     private void SaveEditor()
     {
@@ -1071,83 +1064,149 @@ internal sealed class ContractsWorkspaceView : UserControl
         }
     }
 
-    private sealed class DarkDrop : Control
+    /// <summary>
+    /// One unified entry treatment for all contract fields. Text editing,
+    /// pick lists and typed numeric/date fields share identical blue-glass
+    /// surfaces. The right arrow opens known MDB choices; it is never a
+    /// separate opaque native button or a required input method.
+    /// </summary>
+    private sealed class DarkDrop : UserControl
     {
         private readonly SkinPalette _palette;
+        private readonly TextBox _input;
         private ContextMenuStrip? _menu;
         private string[] _choices = [];
-        internal string Value { get; private set; } = "";
+
+        internal string Value => _input.Text;
+        internal TextBox Input => _input;
         internal event Action<string>? ValueChanged;
 
         internal DarkDrop(SkinPalette palette)
         {
             _palette = palette;
             SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint, true);
-            Cursor = Cursors.Hand;
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.ResizeRedraw, true);
+            BackColor = Color.FromArgb(18, 49, 78);
             ForeColor = White;
-            Font = new Font("Segoe UI", 11f, FontStyle.Bold);
-            TabStop = true;
-            Disposed += (_, _) => _menu?.Dispose();
+            Font = new Font("Segoe UI", 9.6f, FontStyle.Bold);
+            TabStop = false;
+            Cursor = Cursors.IBeam;
+            _input = new TextBox
+            {
+                Name = "EditableValue",
+                BorderStyle = BorderStyle.None,
+                Multiline = false,
+                ForeColor = White,
+                BackColor = Color.FromArgb(19, 51, 80),
+                Font = Font,
+                TabStop = true,
+                ShortcutsEnabled = true
+            };
+            Controls.Add(_input);
+            _input.TextChanged += (_, _) => ValueChanged?.Invoke(_input.Text);
+            Resize += (_, _) => PositionInput();
+            EnabledChanged += (_, _) =>
+            {
+                _input.ReadOnly = !Enabled;
+                _input.ForeColor = Enabled ? White : Dim;
+                Invalidate();
+            };
+            Disposed += (_, _) =>
+            {
+                _menu?.Dispose();
+                _input.Font = Control.DefaultFont;
+            };
+            PositionInput();
         }
+
+        private void PositionInput()
+        {
+            int rightPadding = _choices.Length > 0 ? 27 : 7;
+            _input.Bounds = new Rectangle(8, Math.Max(2, (Height - 19) / 2),
+                Math.Max(1, Width - 8 - rightPadding), 19);
+        }
+
         internal void SetChoices(IEnumerable<string> choices, string value)
         {
-            _choices = choices.Where(x => x.Length > 0)
+            _choices = choices.Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            Value = value;
+            SetValue(value);
+            PositionInput();
             Invalidate();
         }
+
         internal void SetValue(string value)
         {
-            Value = value;
-            ValueChanged?.Invoke(value);
+            _input.Text = value;
             Invalidate();
         }
-        protected override void OnClick(EventArgs e)
+
+        protected override void OnMouseDown(MouseEventArgs e)
         {
-            base.OnClick(e);
-            if (!Enabled) return;
+            base.OnMouseDown(e);
+            if (!Enabled || e.Button != MouseButtons.Left) return;
+            if (_choices.Length > 0 && e.X >= Width - 31)
+                ShowChoices();
+            else
+                _input.Focus();
+        }
+
+        private void ShowChoices()
+        {
+            if (!Enabled || _choices.Length == 0) return;
             _menu ??= new ContextMenuStrip
             {
-                BackColor = Color.FromArgb(11, 31, 52),
+                BackColor = Color.FromArgb(17, 45, 74),
                 ForeColor = White,
                 ShowImageMargin = false,
-                Renderer = new ToolStripProfessionalRenderer(new WorkerMenuColorTable(_palette))
+                Renderer = new ToolStripProfessionalRenderer(
+                    new WorkerMenuColorTable(_palette))
             };
             _menu.Items.Clear();
             foreach (string choice in _choices)
             {
-                string copy = choice;
-                var item = new ToolStripMenuItem(copy);
-                item.Click += (_, _) => SetValue(copy);
+                string selection = choice;
+                var item = new ToolStripMenuItem(selection);
+                item.Click += (_, _) =>
+                {
+                    SetValue(selection);
+                    _input.Focus();
+                    _input.SelectionStart = _input.TextLength;
+                };
                 _menu.Items.Add(item);
             }
-            if (_menu.Items.Count == 0) return;
             _menu.Show(this, new Point(0, Height));
         }
-        protected override void OnKeyDown(KeyEventArgs e)
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (e.KeyCode is Keys.Enter or Keys.Space or Keys.Down)
+            if (Enabled && _choices.Length > 0 &&
+                keyData is (Keys.Alt | Keys.Down) or Keys.F4)
             {
-                OnClick(EventArgs.Empty);
-                e.Handled = true;
+                ShowChoices();
+                return true;
             }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            var r = new Rectangle(1, 1, Math.Max(2, Width - 3),
+            var rect = new Rectangle(1, 1, Math.Max(2, Width - 3),
                 Math.Max(2, Height - 3));
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            FillGradient(e.Graphics, r, Color.FromArgb(27, 68, 101),
-                Color.FromArgb(4, 23, 42), 5);
-            Stroke(e.Graphics, r, Color.FromArgb(161, 207, 239), 5);
-            float size = Value.Length >= 19 ? 8f : Value.Length >= 15 ? 9f : 10.5f;
-            Caption(e.Graphics, Value, 9, 1, Math.Max(1, Width - 35),
-                Math.Max(1, Height - 2), size, true, Enabled ? White : Dim);
-            using var pen = new Pen(White, 1.5f);
-            int x = Width - 19, cy = Height / 2;
-            e.Graphics.FillPolygon(Brushes.White, [new Point(x - 6, cy - 3),
-                new Point(x + 6, cy - 3), new Point(x, cy + 4)]);
+            FillGradient(e.Graphics, rect, Color.FromArgb(34, 81, 115),
+                Color.FromArgb(16, 48, 80), 5);
+            Stroke(e.Graphics, rect,
+                Enabled ? Color.FromArgb(151, 194, 222) :
+                    Color.FromArgb(83, 125, 151), 5, 1.1f);
+            if (_choices.Length == 0) return;
+            int x = Width - 15, y = Height / 2;
+            using var chevron = new SolidBrush(
+                Enabled ? Color.FromArgb(232, 241, 250) : Dim);
+            e.Graphics.FillPolygon(chevron,
+                [new Point(x - 5, y - 2), new Point(x + 5, y - 2),
+                 new Point(x, y + 3)]);
         }
     }
 
@@ -1162,7 +1221,9 @@ internal sealed class ContractsWorkspaceView : UserControl
             TabStop = true;
             Cursor = Cursors.Hand;
             SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint, true);
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
         }
         protected override void OnClick(EventArgs e)
         {
@@ -1197,99 +1258,77 @@ internal sealed class ContractsWorkspaceView : UserControl
         }
     }
 
-    private sealed class PwrContractButton : Button
+    /// <summary>
+    /// Deliberately restrained native-feeling action surface. No icons,
+    /// extraneous focus rectangles or opaque black button backing.
+    /// </summary>
+    private sealed class PwrContractButton : Control
     {
-        private static void DrawButtonIcon(Graphics g, string kind, int x, int y)
-        {
-            using var pen = new Pen(White, 2.3f)
-            {
-                StartCap = LineCap.Round, EndCap = LineCap.Round,
-                LineJoin = LineJoin.Round
-            };
-            switch (kind)
-            {
-                case "Remove":
-                    g.DrawRectangle(pen, x + 4, y + 6, 16, 16);
-                    g.DrawLine(pen, x + 2, y + 4, x + 22, y + 4);
-                    g.DrawLine(pen, x + 9, y + 1, x + 15, y + 1);
-                    g.DrawLine(pen, x + 9, y + 10, x + 9, y + 18);
-                    g.DrawLine(pen, x + 15, y + 10, x + 15, y + 18);
-                    break;
-                case "Open":
-                    g.DrawLines(pen, [new Point(x + 13, y + 3),
-                        new Point(x + 22, y + 3), new Point(x + 22, y + 12)]);
-                    g.DrawLine(pen, x + 22, y + 3, x + 10, y + 15);
-                    g.DrawLines(pen, [new Point(x + 17, y + 16),
-                        new Point(x + 17, y + 22), new Point(x + 3, y + 22),
-                        new Point(x + 3, y + 8), new Point(x + 9, y + 8)]);
-                    break;
-                case "Add Contract":
-                    g.DrawLine(pen, x + 12, y + 1, x + 12, y + 23);
-                    g.DrawLine(pen, x + 1, y + 12, x + 23, y + 12);
-                    break;
-                case "Reset":
-                    g.DrawArc(pen, x + 3, y + 3, 19, 19, -105, 310);
-                    g.DrawLines(pen, [new Point(x + 2, y + 5),
-                        new Point(x + 2, y + 13), new Point(x + 10, y + 13)]);
-                    break;
-                case "Save":
-                    g.DrawRectangle(pen, x + 2, y + 2, 20, 20);
-                    g.DrawRectangle(pen, x + 7, y + 3, 11, 7);
-                    g.DrawRectangle(pen, x + 7, y + 14, 11, 8);
-                    break;
-            }
-        }
-
         private readonly bool _primary;
         private bool _hover;
+
         internal PwrContractButton(string title, bool primary)
         {
             _primary = primary;
             Text = title;
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
+            AccessibleRole = AccessibleRole.PushButton;
+            AccessibleName = title;
+            TabStop = true;
             Cursor = Cursors.Hand;
-            Font = new Font("Segoe UI", 12.5f, FontStyle.Bold);
             ForeColor = White;
-            SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.AllPaintingInWmPaint, true);
+            BackColor = Color.Transparent;
+            Font = new Font("Segoe UI", 10.6f, FontStyle.Bold);
+            SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.SupportsTransparentBackColor, true);
         }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (!Enabled || e.KeyCode is not (Keys.Enter or Keys.Space)) return;
+            OnClick(EventArgs.Empty);
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+
         protected override void OnMouseEnter(EventArgs e)
         {
-            _hover = true; Invalidate(); base.OnMouseEnter(e);
+            base.OnMouseEnter(e);
+            _hover = true;
+            Invalidate();
         }
+
         protected override void OnMouseLeave(EventArgs e)
         {
-            _hover = false; Invalidate(); base.OnMouseLeave(e);
+            base.OnMouseLeave(e);
+            _hover = false;
+            Invalidate();
         }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            var rect = new Rectangle(3, 3, Math.Max(2, Width - 7),
-                Math.Max(2, Height - 7));
-            if (_primary || _hover)
-            {
-                using var glow = new Pen(Color.FromArgb(86, Cyan), 7);
-                using var glowPath = Round(rect, 6);
-                g.DrawPath(glow, glowPath);
-            }
-            FillGradient(g, rect,
-                _primary ? Color.FromArgb(2, 170, 242) : Color.FromArgb(30, 73, 115),
-                _primary ? Color.FromArgb(0, 72, 150) : Color.FromArgb(6, 26, 46), 6);
-            Stroke(g, rect, _primary ? Cyan : Color.FromArgb(178, 216, 247), 6, 1.7f);
-            if (Text is "Remove" or "Open" or "Add Contract" or "Reset" or "Save")
-            {
-                DrawButtonIcon(g, Text, 17, Height / 2 - 10);
-                Caption(g, Text, 46, 3, Math.Max(1, Width - 51),
-                    Math.Max(1, Height - 6), 11.1f, true,
-                    Enabled ? White : Dim,
-                    alignment: ContentAlignment.MiddleCenter);
-            }
-            else
-                Caption(g, Text, 7, 3, Math.Max(1, Width - 14),
-                    Math.Max(1, Height - 6), 10.4f, true,
-                    Enabled ? White : Dim, alignment: ContentAlignment.MiddleCenter);
+            var rect = new Rectangle(2, 2, Math.Max(2, Width - 5),
+                Math.Max(2, Height - 5));
+            Color upper = _primary
+                ? Color.FromArgb(30, 121, 179) :
+                  _hover ? Color.FromArgb(35, 90, 133) :
+                           Color.FromArgb(26, 66, 101);
+            Color lower = _primary
+                ? Color.FromArgb(8, 64, 112) :
+                  _hover ? Color.FromArgb(11, 48, 82) :
+                           Color.FromArgb(10, 33, 57);
+            FillGradient(g, rect, upper, lower, 5);
+            Stroke(g, rect,
+                _primary ? Color.FromArgb(122, 223, 242) :
+                    Color.FromArgb(139, 184, 218), 5, 1.25f);
+            Caption(g, Text, 7, 2, Math.Max(1, Width - 14),
+                Math.Max(1, Height - 4), 10.6f, true,
+                Enabled ? White : Dim,
+                alignment: ContentAlignment.MiddleCenter);
         }
     }
 }
