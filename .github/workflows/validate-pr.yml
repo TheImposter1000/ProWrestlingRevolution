@@ -45,6 +45,7 @@ jobs:
           path: |
             worker-editor-preview.png
             worker-skills-preview.png
+            worker-skills-header-preview.png
           if-no-files-found: warn
           retention-days: 30
       - name: Verify published runtime paths and base template
