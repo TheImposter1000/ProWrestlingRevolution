@@ -50,7 +50,9 @@ internal static class PrwRecordOperations
                 fields["RecordName"] = name.Trim();
                 fields["Name"] = name.Trim();
             }
-            Insert(target, tx, table, fields);
+            InsertWithRequiredDefaults(target, tx, table, fields);
+            if (table == "tblWorker")
+                CreateWorkerDetails(target, tx, fields["UID"]!);
             tx.Commit();
             return new Result(1, backup);
         }
@@ -170,7 +172,7 @@ internal static class PrwRecordOperations
         try
         {
             foreach (var graph in graphs)
-                InsertGraph(target, tx, graph, null, null, rename);
+                InsertGraph(target, tx, graph, null, null, rename, !rename);
             tx.Commit();
             return new Result(graphs.Count, backup);
         }
@@ -182,7 +184,8 @@ internal static class PrwRecordOperations
     }
 
     private static object InsertGraph(OleDbConnection target, OleDbTransaction tx,
-        Snapshot snapshot, string? overrideColumn, object? overrideValue, bool rename)
+        Snapshot snapshot, string? overrideColumn, object? overrideValue,
+        bool rename, bool isImport)
     {
         var table = GetTable(snapshot.Table);
         var data = snapshot.Row.Table.Columns.Cast<DataColumn>()
@@ -195,21 +198,37 @@ internal static class PrwRecordOperations
             data[overrideColumn] = overrideValue;
         if (data.ContainsKey("UID"))
             data["UID"] = NewUid(target, tx, table.Name);
-        if (rename)
+        if (table.Name is "tblWorker" or "tblFed" or "tblMatch")
         {
             string labelField = table.Name == "tblMatch" ? "RecordName" : "Name";
             if (data.TryGetValue(labelField, out object? old) && old is string value)
-                data[labelField] = value + " (Copy)";
-            if (table.Name == "tblWorker" && data.TryGetValue("ShortName", out old) &&
-                old is string shortName)
-                data["ShortName"] = shortName + " (Copy)";
+            {
+                string suffix = rename ? "Copy" : "Imported";
+                var uniqueName = UniqueName(target, tx, table.Name,
+                    labelField, value, suffix);
+                data[labelField] = uniqueName;
+                if (table.Name == "tblWorker" && data.ContainsKey("ShortName"))
+                    data["ShortName"] = uniqueName;
+                if (table.Name == "tblMatch" && data.ContainsKey("Name"))
+                    data["Name"] = uniqueName;
+            }
+        }
+        // Cross-universe worker and alter-ego references must not silently point
+        // to unrelated records with coincidentally matching integer IDs.
+        if (isImport && table.Name == "tblWorker" &&
+            data.ContainsKey("LoyaltyWorkerUID"))
+            data["LoyaltyWorkerUID"] = 0;
+        if (isImport && table.Name == "tblAlternative")
+        {
+            if (data.ContainsKey("FedUID")) data["FedUID"] = 0;
+            if (data.ContainsKey("CompanyInitials")) data["CompanyInitials"] = "";
         }
         Insert(target, tx, table.Name, data);
         object parentId = data.TryGetValue("UID", out object? newUid)
             ? newUid! : data[table.KeyColumns[0]]!;
 
         foreach (var (foreignKey, child) in snapshot.Children)
-            InsertGraph(target, tx, child, foreignKey, parentId, false);
+            InsertGraph(target, tx, child, foreignKey, parentId, false, isImport);
         return parentId;
     }
 
@@ -277,6 +296,70 @@ internal static class PrwRecordOperations
         foreach (string field in names) AddValue(command, fields[field]);
         if (command.ExecuteNonQuery() != 1)
             throw new DBConcurrencyException("Insertion failed for " + table + ".");
+    }
+
+
+    private static void CreateWorkerDetails(OleDbConnection connection,
+        OleDbTransaction tx, object workerUid)
+    {
+        foreach (var table in new[]
+            { "tblWorkerBio", "tblWorkerSkills", "tblWorkerPhysical", "tblWorkerBusiness" })
+        {
+            var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["WorkerUID"] = workerUid
+            };
+            if (table == "tblWorkerBio") values["Biography"] = "";
+            InsertWithRequiredDefaults(connection, tx, table, values);
+        }
+    }
+
+    private static void InsertWithRequiredDefaults(OleDbConnection connection,
+        OleDbTransaction tx, string table, Dictionary<string, object?> values)
+    {
+        // Respect Access defaults where present. Initialize only columns which
+        // explicitly disallow null and have no database-supplied default.
+        using var command = new OleDbCommand(
+            "SELECT * FROM " + Quote(table) + " WHERE 1 = 0", connection, tx);
+        using var adapter = new OleDbDataAdapter(command);
+        var schema = new DataTable(table);
+        adapter.FillSchema(schema, SchemaType.Source);
+        foreach (DataColumn column in schema.Columns)
+        {
+            if (values.ContainsKey(column.ColumnName) || column.AutoIncrement ||
+                column.AllowDBNull || column.DefaultValue is not DBNull)
+                continue;
+            object fallback = column.DataType == typeof(string)
+                ? "" : column.DataType == typeof(DateTime)
+                    ? DateTime.Today : column.DataType == typeof(bool)
+                        ? false : column.DataType.IsValueType
+                            ? Activator.CreateInstance(column.DataType)!
+                            : throw new InvalidDataException(
+                                "Cannot initialize required field: " + column.ColumnName);
+            values[column.ColumnName] = fallback;
+        }
+        Insert(connection, tx, table, values);
+    }
+
+    private static string UniqueName(OleDbConnection connection, OleDbTransaction tx,
+        string table, string field, string initial, string suffix)
+    {
+        string candidate = initial;
+        int version = 0;
+        while (true)
+        {
+            using var command = new OleDbCommand(
+                "SELECT COUNT(*) FROM " + Quote(table) +
+                " WHERE " + Quote(field) + " = ?", connection, tx);
+            AddValue(command, candidate);
+            if (Convert.ToInt32(command.ExecuteScalar()) == 0)
+                return candidate;
+            version++;
+            candidate = initial + " (" + suffix +
+                (version > 1 ? " " + version.ToString(CultureInfo.InvariantCulture) : "") + ")";
+            if (version > 1000)
+                throw new IOException("Could not find an available name for the new record.");
+        }
     }
 
     private static string Backup(string file)
