@@ -984,25 +984,9 @@ internal sealed class WorkerEditorForm : UserControl
         };
         card.Controls.Add(portrait);
 
-        // Picture Type belongs alongside the portrait, not in the
-        // biography panel. This matches the reference editor grouping.
-        var pictureTypeLabel = new Label
-        {
-            Name = "WorkerPictureTypeLabel",
-            Text = "Picture Type",
-            Location = new Point(205, 62),
-            Size = new Size(138, 20),
-            ForeColor = Color.White, BackColor = Color.Transparent,
-            Font = new Font("Segoe UI", 8.8f, FontStyle.Bold)
-        };
-        var pictureType = ValueBox(Display(worker, "BiographyType"),
-            "WorkerField_BiographyType", true);
-        pictureType.Dock = DockStyle.None;
-        pictureType.Location = new Point(205, 85);
-        pictureType.Size = new Size(132, 23);
-        Bind(pictureType, worker, "BiographyType");
-        card.Controls.Add(pictureTypeLabel);
-        card.Controls.Add(pictureType);
+        // Picture type is not a worker-image property in the native MDB.
+        // BiographyType is retained in the data model, but it must never be
+        // mislabeled or displayed as "Picture Type".
         string picture = Display(worker, "Picture");
         string safeName = Path.GetFileName(picture);
 
@@ -1075,8 +1059,7 @@ internal sealed class WorkerEditorForm : UserControl
             int valueWidth = Math.Max(100, card.ClientSize.Width - 107);
             first.Width = valueWidth;
             second.Width = valueWidth;
-            pictureType.Width = Math.Max(80,
-                card.ClientSize.Width - pictureType.Left - 7);
+
         };
     }
 
