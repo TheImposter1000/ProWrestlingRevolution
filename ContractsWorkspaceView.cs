@@ -571,12 +571,14 @@ internal sealed class ContractsWorkspaceView : UserControl
             "Wrestler", "Occasional Wrestler", "Manager", "On-Screen Personality",
             "Play By Play Commentator", "Colour Commentator", "Referee", "Road Agent"
         ];
+        var workerIdentity = _profile.Sections.FirstOrDefault(s => s.Table == "tblWorker")
+            ?.Records.Rows.Cast<DataRow>().FirstOrDefault();
         for (int i = 0; i < roleKeys.Length; i++)
         {
             var toggle = new RoleToggle(roleLabels[i])
             {
                 Name = "ContractRole_" + roleKeys[i],
-                Checked = EnabledRole(_selected, roleKeys[i])
+                Checked = EnabledRole(_selected ?? workerIdentity, roleKeys[i])
             };
             _roles.Add(roleKeys[i], toggle);
             Place(toggle, 1088, 222 + i * 34, 240, 29, true);
