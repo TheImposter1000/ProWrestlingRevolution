@@ -406,7 +406,8 @@ internal sealed class WorkerContractsEditor : UserControl
     {
         return new Label
         {
-            Text = text, AutoEllipsis = true, BackColor = Color.Transparent,
+            Text = text, AutoEllipsis = true, UseMnemonic = false,
+            BackColor = Color.Transparent,
             ForeColor = color ?? White,
             Font = new Font("Segoe UI", size,
                 bold ? FontStyle.Bold : FontStyle.Regular),
@@ -1117,7 +1118,11 @@ internal sealed class WorkerContractsEditor : UserControl
             int y = 10;
             foreach (var field in fields)
             {
-                var caption = Label(field.Label, 10, true);
+                // Keep long field labels readable without ellipses. Each
+                // column still uses the same baseline and input geometry.
+                float font = field.Label.Length > 16 ? 8.4f
+                    : field.Label.Length > 13 ? 9.2f : 10f;
+                var caption = Label(field.Label, font, true);
                 caption.Bounds = new Rectangle(11, y, textWidth - gap, 25);
                 body.Controls.Add(caption);
                 Control input = field.Kind == "unsupported"
